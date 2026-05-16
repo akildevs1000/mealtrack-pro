@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { camps, employees, recentScans } from "@/lib/mock-data";
-import { FileBarChart, FileSpreadsheet, FileText, Filter, Server, Download, Search, X, CheckCircle2, AlertCircle, BarChart3, ScanLine, CalendarClock, Printer } from "lucide-react";
+import { FileBarChart, FileSpreadsheet, FileText, Filter, Server, Download, Search, X, CheckCircle2, AlertCircle, BarChart3, ScanLine, CalendarClock } from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
-import { ReportPreview, REPORT_CSS, type ReportType, type MealFilter } from "@/components/app/ReportPreview";
+import { ReportPreview, type ReportType, type MealFilter } from "@/components/app/ReportPreview";
 
 export const Route = createFileRoute("/reports")({
   component: ReportsPage,
@@ -48,22 +48,47 @@ function ReportsPage() {
   const reportName = `${active}_${from}_to_${to}${camp !== "all" ? "_" + camp : ""}`;
   const title = reportTypes.find((r) => r.id === active)!.title;
 
-  function exportPdf() {
-    const doc = new jsPDF({ orientation: "landscape" });
-    doc.setFontSize(16);
-    doc.text("MyMeals — " + title, 14, 16);
-    doc.setFontSize(10);
-    doc.setTextColor(120);
-    doc.text(`Range: ${from} → ${to}    Camp: ${camp}    Meal: ${meal}    Status: ${status}`, 14, 22);
-    autoTable(doc, {
-      head: [data.headers],
-      body: data.rows,
-      startY: 28,
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [37, 99, 235], textColor: 255 },
-      alternateRowStyles: { fillColor: [245, 247, 250] },
-    });
-    doc.save(`${reportName}.pdf`);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  async function exportPdf() {
+    const node = previewRef.current?.querySelector(".mo-report") as HTMLElement | null;
+    if (!node) return;
+    setPdfBusy(true);
+    try {
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+        windowWidth: node.scrollWidth,
+        windowHeight: node.scrollHeight,
+      });
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      if (imgHeight <= pageHeight) {
+        doc.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
+      } else {
+        // multi-page: slice the image vertically
+        let remaining = imgHeight;
+        let yOffset = 0;
+        while (remaining > 0) {
+          doc.addImage(imgData, "JPEG", 0, -yOffset, imgWidth, imgHeight);
+          remaining -= pageHeight;
+          if (remaining > 0) {
+            doc.addPage();
+            yOffset += pageHeight;
+          }
+        }
+      }
+      doc.save(`${reportName}.pdf`);
+    } finally {
+      setPdfBusy(false);
+    }
   }
 
   function exportExcel() {
@@ -71,25 +96,6 @@ function ReportsPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 28));
     XLSX.writeFile(wb, `${reportName}.xlsx`);
-  }
-
-  function printReport() {
-    const node = previewRef.current?.querySelector(".mo-report");
-    if (!node) return;
-    const win = window.open("", "_blank", "width=1200,height=900");
-    if (!win) return;
-    win.document.write(`<!doctype html><html><head><meta charset="utf-8"/><title>${title} — MealOps</title>
-      <style>
-        @page { size: A4 landscape; margin: 0; }
-        html, body { margin: 0; padding: 0; background: #f3f4f6; }
-        ${REPORT_CSS}
-        body { padding: 0; }
-        .mo-report { box-shadow: 0 4px 24px rgba(15,23,42,0.06); margin: 16px auto; }
-        @media print { .mo-report { margin: 0 auto; box-shadow: none; } }
-      </style></head><body>${node.outerHTML}
-      <script>window.addEventListener("load", () => { setTimeout(() => window.print(), 250); });<\/script>
-      </body></html>`);
-    win.document.close();
   }
 
   return (
@@ -111,11 +117,8 @@ function ReportsPage() {
           <Link to="/schedules" className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
             <CalendarClock className="size-4" /> Scheduled reports
           </Link>
-          <button onClick={printReport} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
-            <Printer className="size-4" /> Print / Save PDF
-          </button>
-          <button onClick={exportPdf} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
-            <FileText className="size-4" /> Quick PDF
+          <button onClick={exportPdf} disabled={pdfBusy} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium disabled:opacity-60">
+            <FileText className="size-4" /> {pdfBusy ? "Generating…" : "Download PDF"}
           </button>
           <button onClick={exportExcel} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
             <FileSpreadsheet className="size-4" /> Download Excel
@@ -192,18 +195,20 @@ function ReportsPage() {
         </div>
       </div>
 
-      {/* Styled report preview (matches pdf-samples design) */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <div>
-            <div className="font-semibold">{title} — Preview</div>
-            <div className="text-xs text-muted-foreground">{data.rows.length} rows · {from} → {to}</div>
-          </div>
-          <div className="text-xs text-muted-foreground hidden md:block">File: <span className="font-mono">{reportName}</span></div>
-        </div>
-        <div ref={previewRef} className="overflow-x-auto max-h-[720px] overflow-y-auto">
-          <ReportPreview type={active} filters={previewFilters} scopeCodes={scope} />
-        </div>
+      {/* Offscreen render — used as source for the PDF export */}
+      <div
+        ref={previewRef}
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          left: "-10000px",
+          top: 0,
+          width: "1123px",
+          pointerEvents: "none",
+          zIndex: -1,
+        }}
+      >
+        <ReportPreview type={active} filters={previewFilters} scopeCodes={scope} />
       </div>
 
       {ftpOpen && (
