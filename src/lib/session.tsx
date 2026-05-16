@@ -1,0 +1,174 @@
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { api, setToken } from "./api";
+
+export type Role = "admin" | "operator" | "user" | "manager";
+export type TabKey =
+  | "overview" | "scanner" | "camps" | "employees" | "managers"
+  | "forecast" | "devices" | "reports" | "users";
+
+export type Perm = { view: boolean; edit: boolean; delete: boolean };
+export type RolePermissions = Record<TabKey, Perm>;
+
+export type AppUser = {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  role: Role;
+  assignedCampCode?: string | null;
+  status: "Active" | "Inactive";
+};
+
+export const TABS: { key: TabKey; label: string }[] = [
+  { key: "overview", label: "Overview" },
+  { key: "scanner", label: "QR Scanner" },
+  { key: "camps", label: "Camps" },
+  { key: "employees", label: "Employees" },
+  { key: "managers", label: "Camp Managers" },
+  { key: "forecast", label: "Forecast" },
+  { key: "devices", label: "Devices" },
+  { key: "reports", label: "Reports" },
+  { key: "users", label: "User Profiles" },
+];
+
+const NONE: Perm = { view: false, edit: false, delete: false };
+const ALL: Perm = { view: true, edit: true, delete: true };
+
+function emptyMatrix(): Record<Role, RolePermissions> {
+  const role = (def: Perm) =>
+    TABS.reduce((acc, t) => { acc[t.key] = def; return acc; }, {} as RolePermissions);
+  return { admin: role(ALL), operator: role(NONE), user: role(NONE), manager: role(NONE) };
+}
+
+type AuthState =
+  | { status: "loading" }
+  | { status: "unauthenticated" }
+  | { status: "authenticated"; user: AppUser; perms: Record<Role, RolePermissions> };
+
+type Ctx = {
+  status: AuthState["status"];
+  currentUser: AppUser | null;
+  perms: Record<Role, RolePermissions>;
+  campScope: string[] | null;
+  can: (tab: TabKey, action?: keyof Perm) => boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+  refresh: () => Promise<void>;
+};
+
+const SessionCtx = createContext<Ctx | null>(null);
+
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({ status: "loading" });
+
+  const loadSession = async () => {
+    try {
+      const user = await api<AppUser>("/auth/me");
+      // Permissions endpoint is admin-only; non-admins use a sensible default
+      // matrix matching the seed defaults for their role.
+      let perms = emptyMatrix();
+      try {
+        const matrix = await api<Record<string, Record<string, Perm>>>("/users/permissions/all");
+        // Backfill any missing tabs with NONE
+        for (const role of Object.keys(perms) as Role[]) {
+          for (const t of TABS) {
+            perms[role][t.key] = matrix[role]?.[t.key] ?? NONE;
+          }
+        }
+      } catch {
+        // Non-admin: derive perms from a static default that matches the seed.
+        perms = defaultPermsFor(user.role);
+      }
+      setState({ status: "authenticated", user, perms });
+    } catch {
+      setToken(null);
+      setState({ status: "unauthenticated" });
+    }
+  };
+
+  useEffect(() => {
+    void loadSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const value = useMemo<Ctx>(() => {
+    const currentUser = state.status === "authenticated" ? state.user : null;
+    const perms = state.status === "authenticated" ? state.perms : emptyMatrix();
+    const campScope =
+      currentUser?.role === "manager" && currentUser.assignedCampCode
+        ? [currentUser.assignedCampCode]
+        : null;
+
+    return {
+      status: state.status,
+      currentUser,
+      perms,
+      campScope,
+      can: (tab, action = "view") => {
+        if (!currentUser) return false;
+        return Boolean(perms[currentUser.role]?.[tab]?.[action]);
+      },
+      login: async (username, password) => {
+        const res = await api<{ token: string; user: AppUser }>("/auth/login", {
+          method: "POST",
+          auth: false,
+          body: JSON.stringify({ username, password }),
+        });
+        setToken(res.token);
+        await loadSession();
+      },
+      logout: () => {
+        setToken(null);
+        setState({ status: "unauthenticated" });
+      },
+      refresh: loadSession,
+    };
+  }, [state]);
+
+  return <SessionCtx.Provider value={value}>{children}</SessionCtx.Provider>;
+}
+
+export function useSession() {
+  const ctx = useContext(SessionCtx);
+  if (!ctx) throw new Error("useSession must be used within SessionProvider");
+  return ctx;
+}
+
+export function useTabPerm(tab: TabKey): Perm {
+  const { currentUser, perms } = useSession();
+  if (!currentUser) return NONE;
+  return perms[currentUser.role][tab];
+}
+
+export function useCampScope() {
+  return useSession().campScope;
+}
+
+const VIEW: Perm = { view: true, edit: false, delete: false };
+const EDIT: Perm = { view: true, edit: true, delete: false };
+
+// Fallback for non-admins who can't read the global permissions matrix.
+// Mirrors the seed defaults.
+function defaultPermsFor(role: Role): Record<Role, RolePermissions> {
+  const m = emptyMatrix();
+  const apply = (r: Role, p: Partial<Record<TabKey, Perm>>) => {
+    for (const t of TABS) m[r][t.key] = p[t.key] ?? NONE;
+  };
+  if (role === "operator") {
+    apply("operator", {
+      overview: VIEW, scanner: EDIT, camps: EDIT, employees: EDIT,
+      managers: VIEW, forecast: EDIT, devices: EDIT, reports: VIEW, users: NONE,
+    });
+  } else if (role === "user") {
+    apply("user", {
+      overview: VIEW, scanner: VIEW, camps: VIEW, employees: VIEW,
+      managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW, users: NONE,
+    });
+  } else if (role === "manager") {
+    apply("manager", {
+      overview: VIEW, scanner: EDIT, camps: VIEW, employees: VIEW,
+      managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW, users: NONE,
+    });
+  }
+  return m;
+}

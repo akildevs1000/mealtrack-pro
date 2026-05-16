@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Camp Performance — MealOps</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f3f4f6; }
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .page {
+    width: 297mm;
+    min-height: 210mm;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 14mm 16mm 12mm 16mm;
+    display: flex;
+    flex-direction: column;
+  }
+  .page + .page { margin-top: 16px; }
+  @media print {
+    .page { page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+  }
+  .page-cont-title {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    letter-spacing: 3px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .page-cont-title span {
+    color: #94a3b8;
+    font-weight: 400;
+    letter-spacing: 1px;
+    margin-left: 6px;
+  }
+  .battery-cell { min-width: 130px; }
+  .battery-row { display: flex; align-items: center; gap: 10px; }
+  .battery-pct { font-weight: 700; font-variant-numeric: tabular-nums; width: 40px; text-align: right; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 10px; color: #475569; }
+  .device-name { font-weight: 600; }
+  .device-meta { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+
+  /* Branding bar */
+  .brand-bar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; }
+  .brand-left { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+    color: #fff; font-weight: 700; font-size: 14px;
+    display: grid; place-items: center; letter-spacing: .5px;
+  }
+  .brand-name { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
+  .brand-sub  { font-size: 9.5px; color: #64748b; letter-spacing: 1.2px; text-transform: uppercase; }
+  .brand-tag  { font-size: 9.5px; color: #64748b; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+
+  .meta { text-align: right; font-size: 10px; line-height: 1.55; }
+  .meta .row span:first-child { color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin-right: 8px; font-size: 9px; }
+  .meta .row span:last-child  { color: #0f172a; font-weight: 600; }
+
+  /* Title band */
+  .title-band {
+    background: #efeaff;
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-top: 4px;
+    text-align: center;
+  }
+  .title-band h1 { margin: 0; font-size: 18px; letter-spacing: 4px; font-weight: 600; }
+  .title-band .subtitle { margin-top: 4px; font-size: 10.5px; color: #475569; }
+  .title-band .subtitle .dot { color: #94a3b8; margin: 0 6px; }
+
+  /* Top KPI cards (Monthly-Attendance style: profile + 3 stats) */
+  .top-cards {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .card .lbl { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
+  .card .val { font-size: 19px; font-weight: 700; margin-top: 4px; }
+  .card .sub { font-size: 9.5px; color: #94a3b8; margin-top: 2px; }
+  .card.summary { display: flex; gap: 14px; align-items: center; }
+  .card.summary .icon {
+    width: 50px; height: 50px; border-radius: 12px;
+    background: #eef2ff; color: #4338ca;
+    display: grid; place-items: center;
+    font-size: 22px; font-weight: 700;
+  }
+  .card.summary .title { font-size: 13px; font-weight: 700; }
+  .card.summary .desc  { font-size: 10px; color: #64748b; margin-top: 2px; }
+
+  /* Status pills row */
+  .pills { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 10px; }
+  .pill {
+    border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .pill .lbl { font-size: 9.5px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
+  .pill .val { font-size: 15px; font-weight: 600; }
+  .pill.online   .lbl, .pill.online   .val { color: #047857; }
+  .pill.offline  .lbl, .pill.offline  .val { color: #b91c1c; }
+  .pill.employees.lbl, .pill.employees .val { color: #1d4ed8; }
+  .pill.served   .lbl, .pill.served   .val { color: #c2410c; }
+  .pill.balance  .lbl, .pill.balance  .val { color: #b45309; }
+  .pill.duplicate.lbl, .pill.duplicate .val { color: #6d28d9; }
+
+  /* Table */
+  table { width: 100%; margin-top: 14px; border-collapse: collapse; font-size: 11.5px; }
+  thead th {
+    text-align: left; text-transform: uppercase;
+    font-size: 10px; letter-spacing: 1px; color: #475569; font-weight: 600;
+    padding: 12px 10px; border-bottom: 1px solid #e5e7eb; background: #fafbfc;
+  }
+  thead th.right, tbody td.right { text-align: right; }
+  thead th.center, tbody td.center { text-align: center; }
+  tbody td {
+    padding: 12px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle;
+  }
+  tbody tr:hover { background: #fafbfc; }
+  tbody tr.offline { background: #fef7f7; }
+
+  .camp .code  { font-weight: 700; }
+  .camp .name  { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+
+  .num { font-variant-numeric: tabular-nums; }
+
+  .bar-cell { min-width: 110px; }
+  .bar-track {
+    height: 6px; border-radius: 999px; background: #e5e7eb; overflow: hidden;
+    margin-top: 4px;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #10b981 0%, #0d9488 100%);
+  }
+  .bar-fill.warn { background: linear-gradient(90deg, #f59e0b 0%, #ea580c 100%); }
+  .bar-fill.crit { background: linear-gradient(90deg, #ef4444 0%, #b91c1c 100%); }
+
+  .status {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600;
+  }
+  .status.online  { color: #059669; background: #ecfdf5; }
+  .status.offline { color: #b91c1c; background: #fef2f2; }
+
+  .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .dot.green { background: #10b981; }
+  .dot.red   { background: #ef4444; }
+
+  /* Footer */
+  .footer {
+    margin-top: auto; padding-top: 14px; border-top: 1px solid #cbd5e1;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #475569;
+    font-weight: 500;
+  }
+  .footer .legend span { margin-right: 14px; }
+  .footer .legend .online  { color: #059669; }
+  .footer .legend .offline { color: #b91c1c; }
+</style>
+</head>
+<body>
+<section class="page">
+
+  <header class="brand-bar">
+    <div class="brand-left">
+      <div class="brand-logo">MO</div>
+      <div>
+        <div class="brand-name">MEALOPS</div>
+        <div class="brand-sub">Meal Tracking System</div>
+        <div class="brand-tag">UAE Labour Camps</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="row"><span>Period</span><span>16-May-2026</span></div>
+      <div class="row"><span>Scope</span><span>All Camps</span></div>
+      <div class="row"><span>Generated</span><span>16-May-2026 14:22</span></div>
+    </div>
+  </header>
+
+  <div class="title-band">
+    <h1>CAMP PERFORMANCE</h1>
+    <div class="subtitle">Camp-wise totals <span class="dot">•</span> online %, balance and duplicates <span class="dot">•</span> 16-May-2026</div>
+  </div>
+
+  <div class="top-cards">
+    <div class="card summary">
+      <div class="icon">🏢</div>
+      <div>
+        <div class="title">6 Active Camps</div>
+        <div class="desc">Across Abu Dhabi, Dubai, Sharjah, Ajman, RAK</div>
+        <div class="desc" style="margin-top:6px;">38 of 42 scanner devices online · 4 needs attention</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="lbl">Online %</div>
+      <div class="val">90.5%</div>
+      <div class="sub">38 / 42 devices</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Total Served</div>
+      <div class="val">18,420</div>
+      <div class="sub">82.4% of estimated</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Score</div>
+      <div class="val">82%</div>
+      <div class="sub">+3.4% vs yesterday</div>
+    </div>
+  </div>
+
+  <div class="pills">
+    <div class="pill online">    <span class="lbl">Online</span>     <span class="val">5</span></div>
+    <div class="pill offline">   <span class="lbl">Offline</span>    <span class="val">1</span></div>
+    <div class="pill employees"> <span class="lbl">Employees</span>  <span class="val">7,950</span></div>
+    <div class="pill served">    <span class="lbl">Served</span>     <span class="val">18,420</span></div>
+    <div class="pill balance">   <span class="lbl">Balance</span>    <span class="val">3,920</span></div>
+    <div class="pill duplicate"> <span class="lbl">Duplicates</span> <span class="val">47</span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 130px;">Camp</th>
+        <th>Site</th>
+        <th class="right">Employees</th>
+        <th class="right">Served Today</th>
+        <th class="bar-cell">Coverage</th>
+        <th class="right">Balance</th>
+        <th class="center">Duplicates</th>
+        <th class="center">Devices</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="camp"><div class="code">AD-01</div><div class="name">Al Reem Camp</div></td>
+        <td>Reem Tower Project</td>
+        <td class="right num">1,240</td>
+        <td class="right num">3,100</td>
+        <td class="bar-cell"><div class="num">86%</div><div class="bar-track"><div class="bar-fill" style="width:86%"></div></div></td>
+        <td class="right num">496</td>
+        <td class="center num">8</td>
+        <td class="center"><span class="dot green"></span>2 / 2</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr>
+        <td class="camp"><div class="code">DXB-04</div><div class="name">Marina Workers Village</div></td>
+        <td>Marina Heights</td>
+        <td class="right num">980</td>
+        <td class="right num">2,450</td>
+        <td class="bar-cell"><div class="num">83%</div><div class="bar-track"><div class="bar-fill" style="width:83%"></div></div></td>
+        <td class="right num">392</td>
+        <td class="center num">3</td>
+        <td class="center"><span class="dot green"></span>1 / 1</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr>
+        <td class="camp"><div class="code">SHJ-02</div><div class="name">Sharjah Industrial Camp</div></td>
+        <td>Industrial Park 7</td>
+        <td class="right num">1,560</td>
+        <td class="right num">3,900</td>
+        <td class="bar-cell"><div class="num">79%</div><div class="bar-track"><div class="bar-fill warn" style="width:79%"></div></div></td>
+        <td class="right num">624</td>
+        <td class="center num">12</td>
+        <td class="center"><span class="dot green"></span>1 / 1</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr class="offline">
+        <td class="camp"><div class="code">AUH-09</div><div class="name">Mussafah Labour Camp</div></td>
+        <td>Mussafah Bridge</td>
+        <td class="right num">2,110</td>
+        <td class="right num">5,275</td>
+        <td class="bar-cell"><div class="num">62%</div><div class="bar-track"><div class="bar-fill crit" style="width:62%"></div></div></td>
+        <td class="right num">844</td>
+        <td class="center num">18</td>
+        <td class="center"><span class="dot red"></span>0 / 1</td>
+        <td><span class="status offline">Offline</span></td>
+      </tr>
+      <tr>
+        <td class="camp"><div class="code">RAK-01</div><div class="name">Al Hamra Camp</div></td>
+        <td>Al Hamra Mall Ext.</td>
+        <td class="right num">740</td>
+        <td class="right num">1,850</td>
+        <td class="bar-cell"><div class="num">92%</div><div class="bar-track"><div class="bar-fill" style="width:92%"></div></div></td>
+        <td class="right num">296</td>
+        <td class="center num">2</td>
+        <td class="center"><span class="dot green"></span>1 / 1</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr>
+        <td class="camp"><div class="code">AJM-03</div><div class="name">Ajman Central Camp</div></td>
+        <td>Corniche Towers</td>
+        <td class="right num">1,320</td>
+        <td class="right num">3,300</td>
+        <td class="bar-cell"><div class="num">88%</div><div class="bar-track"><div class="bar-fill" style="width:88%"></div></div></td>
+        <td class="right num">528</td>
+        <td class="center num">4</td>
+        <td class="center"><span class="dot green"></span>1 / 1</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr style="background: #f8fafc; font-weight: 600;">
+        <td>TOTAL</td>
+        <td>6 camps</td>
+        <td class="right num">7,950</td>
+        <td class="right num">19,875</td>
+        <td class="bar-cell"><div class="num">82%</div></td>
+        <td class="right num">3,180</td>
+        <td class="center num">47</td>
+        <td class="center">5 / 7</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="footer">
+    <div class="legend">
+      <span><span class="online">●</span> Online — all scanners reachable</span>
+      <span><span class="offline">●</span> Offline — at least one scanner down</span>
+    </div>
+    <div>Powered by <strong style="color:#0f172a">MealOps</strong></div>
+    <div>Page 1 of 2</div>
+  </footer>
+
+</section>
+
+<!-- ====================== PAGE 2 ====================== -->
+<section class="page">
+
+  <h2 class="page-cont-title">DEVICE STATUS <span>— 7 registered scanners across 6 camps</span></h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Device</th>
+        <th>Camp</th>
+        <th>Model</th>
+        <th>App Version</th>
+        <th class="battery-cell">Battery</th>
+        <th>Last Sync</th>
+        <th>IP Address</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><div class="device-name">Scanner-AD01-A</div><div class="device-meta">Ahmed Al Mansouri</div></td>
+        <td>AD-01</td>
+        <td>Zebra TC22</td>
+        <td>MealOps 4.2.1</td>
+        <td class="battery-cell">
+          <div class="battery-row">
+            <div class="bar-track"><div class="bar-fill" style="width:86%"></div></div>
+            <div class="battery-pct">86%</div>
+          </div>
+        </td>
+        <td>2s ago</td>
+        <td class="mono">10.42.10.21</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr>
+        <td><div class="device-name">Scanner-AD01-B</div><div class="device-meta">Ahmed Al Mansouri</div></td>
+        <td>AD-01</td>
+        <td>Zebra TC22</td>
+        <td>MealOps 4.2.1</td>
+        <td class="battery-cell">
+          <div class="battery-row">
+            <div class="bar-track"><div class="bar-fill warn" style="width:42%"></div></div>
+            <div class="battery-pct">42%</div>
+          </div>
+        </td>
+        <td>8s ago</td>
+        <td class="mono">10.42.10.22</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr>
+        <td><div class="device-name">Scanner-DXB04</div><div class="device-meta">Rajesh Pillai</div></td>
+        <td>DXB-04</td>
+        <td>Honeywell EDA52</td>
+        <td>MealOps 4.2.0</td>
+        <td class="battery-cell">
+          <div class="battery-row">
+            <div class="bar-track"><div class="bar-fill" style="width:71%"></div></div>
+            <div class="battery-pct">71%</div>
+          </div>
+        </td>
+        <td>4s ago</td>
+        <td class="mono">10.44.20.11</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr>
+        <td><div class="device-name">Scanner-SHJ02-A</div><div class="device-meta">Khalid Al Suwaidi</div></td>
+        <td>SHJ-02</td>
+        <td>Zebra MC2200</td>
+        <td>MealOps 4.1.8</td>
+        <td class="battery-cell">
+          <div class="battery-row">
+            <div class="bar-track"><div class="bar-fill" style="width:58%"></div></div>
+            <div class="battery-pct">58%</div>
+          </div>
+        </td>
+        <td>12s ago</td>
+        <td class="mono">10.46.30.31</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr class="offline">
+        <td><div class="device-name">Scanner-AUH09-A</div><div class="device-meta">Imran Sheikh</div></td>
+        <td>AUH-09</td>
+        <td>Samsung XCover 6 Pro</td>
+        <td>MealOps 4.2.1</td>
+        <td class="battery-cell">
+          <div class="battery-row">
+            <div class="bar-track"><div class="bar-fill crit" style="width:12%"></div></div>
+            <div class="battery-pct">12%</div>
+          </div>
+        </td>
+        <td>14m ago</td>
+        <td class="mono">10.48.40.12</td>
+        <td><span class="status offline">Offline</span></td>
+      </tr>
+      <tr>
+        <td><div class="device-name">Scanner-RAK01</div><div class="device-meta">Fatima Al Hosani</div></td>
+        <td>RAK-01</td>
+        <td>Honeywell CT30 XP</td>
+        <td>MealOps 4.2.1</td>
+        <td class="battery-cell">
+          <div class="battery-row">
+            <div class="bar-track"><div class="bar-fill" style="width:94%"></div></div>
+            <div class="battery-pct">94%</div>
+          </div>
+        </td>
+        <td>1s ago</td>
+        <td class="mono">10.50.50.10</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+      <tr>
+        <td><div class="device-name">Scanner-AJM03</div><div class="device-meta">Bilal Ahmed</div></td>
+        <td>AJM-03</td>
+        <td>Zebra TC52</td>
+        <td>MealOps 4.2.0</td>
+        <td class="battery-cell">
+          <div class="battery-row">
+            <div class="bar-track"><div class="bar-fill" style="width:67%"></div></div>
+            <div class="battery-pct">67%</div>
+          </div>
+        </td>
+        <td>6s ago</td>
+        <td class="mono">10.52.60.18</td>
+        <td><span class="status online">Online</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="footer">
+    <div class="legend">
+      <span><span class="online">●</span> Online — last sync &lt; 60s</span>
+      <span><span class="offline">●</span> Offline — last sync &gt; 5 min or battery &lt; 15%</span>
+    </div>
+    <div>Powered by <strong style="color:#0f172a">MealOps</strong></div>
+    <div>Page 2 of 2</div>
+  </footer>
+
+</section>
+</body>
+</html>

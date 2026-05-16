@@ -1,0 +1,262 @@
+/**
+ * Seed the database from the existing frontend mock data.
+ * Idempotent: safe to re-run.
+ */
+import "dotenv/config";
+import { PrismaClient, Role } from "@prisma/client";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+const DEFAULT_PASSWORD = "password123";
+
+const camps = [
+  { code: "AD-01", name: "Al Reem Camp", site: "Reem Tower Project", employees: 1240, online: true,
+    breakfastStart: "05:30", breakfastEnd: "08:30", lunchStart: "12:00", lunchEnd: "14:00", dinnerStart: "18:30", dinnerEnd: "21:30" },
+  { code: "DXB-04", name: "Marina Workers Village", site: "Marina Heights", employees: 980, online: true,
+    breakfastStart: "06:00", breakfastEnd: "09:00", lunchStart: "12:30", lunchEnd: "14:30", dinnerStart: "19:00", dinnerEnd: "22:00" },
+  { code: "SHJ-02", name: "Sharjah Industrial Camp", site: "Industrial Park 7", employees: 1560, online: true,
+    breakfastStart: "05:00", breakfastEnd: "08:00", lunchStart: "11:30", lunchEnd: "13:30", dinnerStart: "18:00", dinnerEnd: "21:00" },
+  { code: "AUH-09", name: "Mussafah Labour Camp", site: "Mussafah Bridge", employees: 2110, online: false,
+    breakfastStart: "05:30", breakfastEnd: "08:30", lunchStart: "12:00", lunchEnd: "14:00", dinnerStart: "19:00", dinnerEnd: "22:00" },
+  { code: "RAK-01", name: "Al Hamra Camp", site: "Al Hamra Mall Ext.", employees: 740, online: true,
+    breakfastStart: "06:00", breakfastEnd: "08:30", lunchStart: "12:00", lunchEnd: "13:30", dinnerStart: "18:30", dinnerEnd: "21:00" },
+  { code: "AJM-03", name: "Ajman Central Camp", site: "Corniche Towers", employees: 1320, online: true,
+    breakfastStart: "05:45", breakfastEnd: "08:45", lunchStart: "12:15", lunchEnd: "14:15", dinnerStart: "18:45", dinnerEnd: "21:45" },
+];
+
+const cmsEmployees = [
+  { company: "INNOVOBLD", laborId: 57175, laborCode: "INVOW00001", name: "INNOVO EMPLOYEE 1", designation: "STEEL FITTER", doj: "2021-07-07", campCode: "CAMP 19", campName: "Al Quoz Rent Camp- 02", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2026-01-01" },
+  { company: "INNOVOBLD", laborId: 57180, laborCode: "INVOW00002", name: "INNOVO EMPLOYEE 2", designation: "HELPER", doj: "2021-07-12", campCode: "CAMP 04", campName: "M-2", mealsEligibility: "Y", status: "InActive", effectiveDate: "2025-08-01", lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57181, laborCode: "INVOW00003", name: "INNOVO EMPLOYEE 3", designation: "HELPER", doj: "2021-07-13", campCode: "CAMP 18", campName: "DIP Rent Camp 1", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57182, laborCode: "INVOW00004", name: "INNOVO EMPLOYEE 4", designation: "HELPER", doj: "2021-07-14", campCode: "CAMP 12", campName: "J-4", mealsEligibility: "Y", status: "InActive", effectiveDate: "2025-08-01", lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57190, laborCode: "INVOW00005", name: "INNOVO EMPLOYEE 5", designation: "HELPER", doj: "2021-07-26", campCode: "CAMP 02", campName: "Al Qouz -2", mealsEligibility: "Y", status: "InActive", effectiveDate: "2022-11-21", lastUpdated: "2021-07-26" },
+  { company: "INNOVOBLD", laborId: 57191, laborCode: "INVOW00006", name: "INNOVO EMPLOYEE 6", designation: "TILE MASON", doj: "2021-07-26", campCode: "CAMP 09", campName: "J-3", mealsEligibility: "Y", status: "leave", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57192, laborCode: "INVOW00007", name: "INNOVO EMPLOYEE 7", designation: "HELPER", doj: "2021-07-26", campCode: "CAMP 09", campName: "J-3", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57193, laborCode: "INVOW00008", name: "INNOVO EMPLOYEE 8", designation: "HELPER", doj: "2021-07-27", campCode: "CAMP 02", campName: "Al Qouz -2", mealsEligibility: "Y", status: "InActive", effectiveDate: "2022-05-23", lastUpdated: "2021-07-27" },
+  { company: "INNOVOBLD", laborId: 59933, laborCode: "INVOW00009", name: "INNOVO EMPLOYEE 9", designation: "HELPER CHARGE HAND", doj: "2021-08-24", campCode: "CAMP 18", campName: "DIP Rent Camp 1", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2025-04-01" },
+  { company: "INNOVOBLD", laborId: 59934, laborCode: "INVOW00010", name: "INNOVO EMPLOYEE 10", designation: "LOGISTICS CHARGE HAND", doj: "2021-08-24", campCode: "CAMP 03", campName: "M-1", mealsEligibility: "N", status: "InActive", effectiveDate: "2025-05-01", lastUpdated: "2024-11-01" },
+  { company: "INNOVOBLD", laborId: 59937, laborCode: "INVOW00011", name: "INNOVO EMPLOYEE 11", designation: "SAFETY CHARGE HAND", doj: "2021-08-24", campCode: "CAMP 09", campName: "J-3", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2025-09-01" },
+  { company: "INNOVOBLD", laborId: 59939, laborCode: "INVOW00012", name: "INNOVO EMPLOYEE 12", designation: "STEEL FITTER", doj: "2021-08-24", campCode: "CAMP 09", campName: "J-3", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57240, laborCode: "INVOW00013", name: "INNOVO EMPLOYEE 13", designation: "MASON", doj: "2021-08-24", campCode: "CAMP 09", campName: "J-3", mealsEligibility: "Y", status: "InActive", effectiveDate: "2024-11-01", lastUpdated: "2024-07-01" },
+  { company: "INNOVOBLD", laborId: 59935, laborCode: "INVOW00014", name: "INNOVO EMPLOYEE 14", designation: "CARPENTER", doj: "2021-08-24", campCode: "CAMP 18", campName: "DIP Rent Camp 1", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59936, laborCode: "INVOW00015", name: "INNOVO EMPLOYEE 15", designation: "SCAFFOLDER", doj: "2021-08-24", campCode: "CAMP 18", campName: "DIP Rent Camp 1", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2026-01-01" },
+  { company: "INNOVOBLD", laborId: 59938, laborCode: "INVOW00016", name: "INNOVO EMPLOYEE 16", designation: "CARPENTER", doj: "2021-08-24", campCode: "CAMP 15", campName: "AL NASSER AUH", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57267, laborCode: "INVOW00017", name: "INNOVO EMPLOYEE 17", designation: "HELPER", doj: "2021-09-06", campCode: "CAMP 12", campName: "J-4", mealsEligibility: "Y", status: "InActive", effectiveDate: "2025-07-14", lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57285, laborCode: "INVOW00018", name: "INNOVO EMPLOYEE 18", designation: "MASON", doj: "2021-09-15", campCode: "CAMP 16", campName: "DIC Rent Camp", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 57286, laborCode: "INVOW00019", name: "INNOVO EMPLOYEE 19", designation: "TILE MASON", doj: "2021-09-15", campCode: "CAMP 18", campName: "DIP Rent Camp 1", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59940, laborCode: "INVOW00020", name: "INNOVO EMPLOYEE 20", designation: "STEEL FITTER", doj: "2021-09-22", campCode: "CAMP 18", campName: "DIP Rent Camp 1", mealsEligibility: "N", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59941, laborCode: "INVOW00021", name: "INNOVO EMPLOYEE 21", designation: "SENIOR CARPENTER", doj: "2021-09-22", campCode: "CAMP 17", campName: "Al Quoz Rent Camp 1", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2025-09-01" },
+  { company: "INNOVOBLD", laborId: 59942, laborCode: "INVOW00022", name: "INNOVO EMPLOYEE 22", designation: "STEEL FITTER CHARGE HAND", doj: "2021-09-22", campCode: "CAMP 17", campName: "Al Quoz Rent Camp 1", mealsEligibility: "N", status: "Active", effectiveDate: null, lastUpdated: "2026-01-01" },
+  { company: "INNOVOBLD", laborId: 59943, laborCode: "INVOW00023", name: "INNOVO EMPLOYEE 23", designation: "CARPENTER", doj: "2021-09-22", campCode: "CAMP 19", campName: "Al Quoz Rent Camp- 02", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59944, laborCode: "INVOW00024", name: "INNOVO EMPLOYEE 24", designation: "WATCHMAN", doj: "2021-10-16", campCode: "CAMP 09", campName: "J-3", mealsEligibility: "Y", status: "InActive", effectiveDate: "2025-09-01", lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59945, laborCode: "INVOW00025", name: "INNOVO EMPLOYEE 25", designation: "HELPER", doj: "2021-10-16", campCode: "CAMP 18", campName: "DIP Rent Camp 1", mealsEligibility: "N", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59946, laborCode: "INVOW00026", name: "INNOVO EMPLOYEE 26", designation: "ASSISTANT STORE KEEPER", doj: "2021-10-16", campCode: "CAMP 18", campName: "DIP Rent Camp 1", mealsEligibility: "N", status: "Active", effectiveDate: null, lastUpdated: "2025-04-01" },
+  { company: "INNOVOBLD", laborId: 59947, laborCode: "INVOW00027", name: "INNOVO EMPLOYEE 27", designation: "CARPENTER", doj: "2021-10-16", campCode: "CAMP 19", campName: "Al Quoz Rent Camp- 02", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59948, laborCode: "INVOW00028", name: "INNOVO EMPLOYEE 28", designation: "CARPENTER", doj: "2021-10-16", campCode: "CAMP 19", campName: "Al Quoz Rent Camp- 02", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2026-01-01" },
+  { company: "INNOVOBLD", laborId: 59949, laborCode: "INVOW00029", name: "INNOVO EMPLOYEE 29", designation: "HELPER", doj: "2021-10-16", campCode: "CAMP 19", campName: "Al Quoz Rent Camp- 02", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59950, laborCode: "INVOW00030", name: "INNOVO EMPLOYEE 30", designation: "CARPENTER", doj: "2021-10-16", campCode: "CAMP 16", campName: "DIC Rent Camp", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2024-10-01" },
+  { company: "INNOVOBLD", laborId: 59951, laborCode: "INVOW00031", name: "INNOVO EMPLOYEE 31", designation: "ASST. MASON", doj: "2021-10-16", campCode: "CAMP 08", campName: "J-2", mealsEligibility: "Y", status: "InActive", effectiveDate: "2023-05-25", lastUpdated: "2020-07-01" },
+  { company: "INNOVOBLD", laborId: 59952, laborCode: "INVOW00032", name: "INNOVO EMPLOYEE 32", designation: "OFFICE BOY", doj: "2021-10-16", campCode: "CAMP 09", campName: "J-3", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2025-01-01" },
+];
+
+const devices = [
+  { name: "Scanner-AD01-A", campCode: "AD-01", battery: 86, online: true, macAddress: "A4:5E:60:11:8C:21", serial: "ZBR-AD01A-7781", model: "Zebra TC22", androidVersion: "Android 13", appVersion: "MealOps 4.2.1", ipAddress: "10.42.10.21", assignedTo: "Ahmed Al Mansouri", registeredOn: "2024-02-14" },
+  { name: "Scanner-AD01-B", campCode: "AD-01", battery: 42, online: true, macAddress: "A4:5E:60:11:8C:22", serial: "ZBR-AD01B-7782", model: "Zebra TC22", androidVersion: "Android 13", appVersion: "MealOps 4.2.1", ipAddress: "10.42.10.22", assignedTo: "Ahmed Al Mansouri", registeredOn: "2024-02-14" },
+  { name: "Scanner-DXB04", campCode: "DXB-04", battery: 71, online: true, macAddress: "B8:27:EB:44:19:7C", serial: "HON-DXB04-3320", model: "Honeywell EDA52", androidVersion: "Android 12", appVersion: "MealOps 4.2.0", ipAddress: "10.44.20.11", assignedTo: "Rajesh Pillai", registeredOn: "2023-11-02" },
+  { name: "Scanner-SHJ02-A", campCode: "SHJ-02", battery: 58, online: true, macAddress: "DC:A6:32:8E:55:01", serial: "ZBR-SHJ02A-9120", model: "Zebra MC2200", androidVersion: "Android 11", appVersion: "MealOps 4.1.8", ipAddress: "10.46.30.31", assignedTo: "Khalid Al Suwaidi", registeredOn: "2023-09-21" },
+  { name: "Scanner-AUH09-A", campCode: "AUH-09", battery: 12, online: false, macAddress: "F0:18:98:21:AC:55", serial: "SAM-AUH09A-1145", model: "Samsung XCover 6 Pro", androidVersion: "Android 13", appVersion: "MealOps 4.2.1", ipAddress: "10.48.40.12", assignedTo: "Imran Sheikh", registeredOn: "2022-12-08" },
+  { name: "Scanner-RAK01", campCode: "RAK-01", battery: 94, online: true, macAddress: "3C:5A:B4:77:09:E2", serial: "HON-RAK01-5560", model: "Honeywell CT30 XP", androidVersion: "Android 13", appVersion: "MealOps 4.2.1", ipAddress: "10.50.50.10", assignedTo: "Fatima Al Hosani", registeredOn: "2024-04-03" },
+  { name: "Scanner-AJM03", campCode: "AJM-03", battery: 67, online: true, macAddress: "00:1A:7D:DA:71:13", serial: "ZBR-AJM03-2244", model: "Zebra TC52", androidVersion: "Android 12", appVersion: "MealOps 4.2.0", ipAddress: "10.52.60.18", assignedTo: "Bilal Ahmed", registeredOn: "2023-06-19" },
+];
+
+const addDays = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d;
+};
+
+// `pin` is a demo Android-scanner PIN (4 digits) — admin should overwrite via the UI.
+const managers = [
+  { name: "Ahmed Al Mansouri", username: "ahmed.mansouri", password: "Ad@2025!Reem", pin: "1111", email: "ahmed.m@mealops.ae", phone: "+971 50 442 8821", emiratesId: "784-1988-2237811-3", campCode: "AD-01", role: "CampManager", shift: "FullDay", joinDate: new Date("2023-03-12"), expiryDate: addDays(184), status: "Active", avatar: "AM", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
+  { name: "Rajesh Pillai", username: "rajesh.pillai", password: "Mar!na#0420", pin: "2222", email: "rajesh.p@mealops.ae", phone: "+971 55 119 7733", emiratesId: "784-1985-9912334-1", campCode: "DXB-04", role: "SeniorManager", shift: "Morning", joinDate: new Date("2022-08-04"), expiryDate: addDays(42), status: "Active", avatar: "RP", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
+  { name: "Khalid Al Suwaidi", username: "khalid.suwaidi", password: "ShJ$Indus#02", pin: "3333", email: "khalid.s@mealops.ae", phone: "+971 52 880 4471", emiratesId: "784-1990-5567129-7", campCode: "SHJ-02", role: "CampManager", shift: "FullDay", joinDate: new Date("2024-01-22"), expiryDate: addDays(310), status: "Active", avatar: "KS", permBreakfast: true, permLunch: true, permDinner: true, permReports: false },
+  { name: "Imran Sheikh", username: "imran.sheikh", password: "Mus@ffah*09", pin: null,   email: "imran.s@mealops.ae", phone: "+971 56 339 0098", emiratesId: "784-1982-1133447-9", campCode: "AUH-09", role: "Supervisor", shift: "Evening", joinDate: new Date("2021-11-18"), expiryDate: addDays(-8), status: "Expired", avatar: "IS", permBreakfast: false, permLunch: true, permDinner: true, permReports: false },
+  { name: "Fatima Al Hosani", username: "fatima.hosani", password: "Hamr@2026$RAK", pin: "4444", email: "fatima.h@mealops.ae", phone: "+971 50 778 1290", emiratesId: "784-1992-7782311-2", campCode: "RAK-01", role: "CampManager", shift: "Morning", joinDate: new Date("2023-09-30"), expiryDate: addDays(96), status: "Active", avatar: "FH", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
+  { name: "Bilal Ahmed", username: "bilal.ahmed", password: "Ajm@n!Cent03", pin: "5555", email: "bilal.a@mealops.ae", phone: "+971 54 220 9981", emiratesId: "784-1987-4456789-5", campCode: "AJM-03", role: "CampManager", shift: "FullDay", joinDate: new Date("2022-05-14"), expiryDate: addDays(15), status: "Suspended", avatar: "BA", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
+];
+
+const TABS = ["overview", "scanner", "camps", "employees", "managers", "forecast", "devices", "reports", "users"];
+
+const ALL = { view: true, edit: true, delete: true };
+const VIEW = { view: true, edit: false, delete: false };
+const EDIT = { view: true, edit: true, delete: false };
+const NONE = { view: false, edit: false, delete: false };
+
+const rolePerms: Record<Role, Record<string, typeof ALL>> = {
+  admin: Object.fromEntries(TABS.map((t) => [t, ALL])) as any,
+  operator: {
+    overview: VIEW, scanner: EDIT, camps: EDIT, employees: EDIT,
+    managers: VIEW, forecast: EDIT, devices: EDIT, reports: VIEW, users: NONE,
+  },
+  user: {
+    overview: VIEW, scanner: VIEW, camps: VIEW, employees: VIEW,
+    managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW, users: NONE,
+  },
+  manager: {
+    overview: VIEW, scanner: EDIT, camps: VIEW, employees: VIEW,
+    managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW, users: NONE,
+  },
+};
+
+async function main() {
+  console.log("[seed] starting...");
+
+  // Camps
+  for (const c of camps) {
+    await prisma.camp.upsert({
+      where: { code: c.code },
+      create: c,
+      update: c,
+    });
+  }
+  console.log(`[seed] camps: ${camps.length}`);
+
+  // CMS employees
+  for (const e of cmsEmployees) {
+    await prisma.cmsEmployee.upsert({
+      where: { laborId: e.laborId },
+      create: {
+        ...e,
+        doj: new Date(e.doj),
+        effectiveDate: e.effectiveDate ? new Date(e.effectiveDate) : null,
+        lastUpdated: new Date(e.lastUpdated),
+        mealsEligibility: e.mealsEligibility as any,
+        status: e.status as any,
+      },
+      update: {
+        company: e.company,
+        laborCode: e.laborCode,
+        name: e.name,
+        designation: e.designation,
+        doj: new Date(e.doj),
+        campCode: e.campCode,
+        campName: e.campName,
+        mealsEligibility: e.mealsEligibility as any,
+        status: e.status as any,
+        effectiveDate: e.effectiveDate ? new Date(e.effectiveDate) : null,
+        lastUpdated: new Date(e.lastUpdated),
+      },
+    });
+  }
+  console.log(`[seed] cms employees: ${cmsEmployees.length}`);
+
+  // Devices
+  for (const d of devices) {
+    await prisma.device.upsert({
+      where: { serial: d.serial },
+      create: { ...d, registeredOn: new Date(d.registeredOn), lastSync: new Date() },
+      update: { ...d, registeredOn: new Date(d.registeredOn) },
+    });
+  }
+  console.log(`[seed] devices: ${devices.length}`);
+
+  // Camp managers — each also gets a linked User row so they can log in.
+  for (const m of managers) {
+    const passwordHash = await bcrypt.hash(m.password, 10);
+    const pinHash = m.pin ? await bcrypt.hash(m.pin, 10) : null;
+    const { password, pin, ...rest } = m;
+    await prisma.campManager.upsert({
+      where: { username: m.username },
+      create: { ...rest, passwordHash, pinHash, role: m.role as any, shift: m.shift as any, status: m.status as any },
+      // Don't overwrite the PIN if admin has already set one (preserve admin changes on re-seed).
+      update: { ...rest, passwordHash, role: m.role as any, shift: m.shift as any, status: m.status as any, ...(pinHash ? { pinHash } : {}) },
+    });
+    await prisma.user.upsert({
+      where: { username: m.username },
+      create: {
+        name: m.name,
+        username: m.username,
+        email: m.email,
+        passwordHash,
+        role: "manager",
+        status: m.status === "Active" ? "Active" : "Inactive",
+        assignedCampCode: m.campCode,
+      },
+      update: {
+        name: m.name,
+        email: m.email,
+        passwordHash,
+        role: "manager",
+        status: m.status === "Active" ? "Active" : "Inactive",
+        assignedCampCode: m.campCode,
+      },
+    });
+  }
+  console.log(`[seed] camp managers + matching login users: ${managers.length}`);
+
+  // App users (for auth)
+  const defaultHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const appUsers = [
+    { username: "admin",    name: "Head Office Admin",        email: "admin@mealops.io",  role: "admin"    as Role, assignedCampCode: null },
+    { username: "sara.op",  name: "Sara Operator",            email: "sara@mealops.io",   role: "operator" as Role, assignedCampCode: null },
+    { username: "viewer",   name: "Read-only User",           email: "viewer@mealops.io", role: "user"     as Role, assignedCampCode: null },
+    { username: "khalid.ad01", name: "Khalid (AD-01 Manager)", email: "khalid@mealops.io", role: "manager" as Role, assignedCampCode: "AD-01" },
+    { username: "omar.dxb04",  name: "Omar (DXB-04 Manager)",  email: "omar@mealops.io",   role: "manager" as Role, assignedCampCode: "DXB-04" },
+  ];
+  for (const u of appUsers) {
+    await prisma.user.upsert({
+      where: { username: u.username },
+      create: { ...u, passwordHash: defaultHash, status: "Active" },
+      update: { name: u.name, email: u.email, role: u.role, assignedCampCode: u.assignedCampCode },
+    });
+  }
+  console.log(`[seed] app users: ${appUsers.length} (default password: ${DEFAULT_PASSWORD})`);
+
+  // Role permissions
+  for (const role of Object.keys(rolePerms) as Role[]) {
+    for (const tab of TABS) {
+      const perm = rolePerms[role][tab];
+      await prisma.rolePermission.upsert({
+        where: { role_tab: { role, tab } },
+        create: { role, tab, ...perm },
+        update: perm,
+      });
+    }
+  }
+  console.log(`[seed] role permissions: ${Object.keys(rolePerms).length} roles x ${TABS.length} tabs`);
+
+  // Seed some recent scans (last 24h) so /overview has data
+  const existingScanCount = await prisma.scan.count();
+  if (existingScanCount === 0) {
+    const meals: ("Breakfast" | "Lunch" | "Dinner")[] = ["Breakfast", "Lunch", "Dinner"];
+    const statuses: ("Eligible" | "AlreadyServed" | "NotEligible" | "WrongCamp" | "Expired")[] =
+      ["Eligible", "Eligible", "Eligible", "Eligible", "AlreadyServed", "NotEligible", "WrongCamp"];
+    const names = ["Mohammed Rafiq", "Suresh Kumar", "Anwar Hussain", "Ramesh Babu", "Bilal Ahmed", "Vinod Sharma", "Iqbal Khan", "Tariq Mahmood"];
+    const scans: any[] = [];
+    for (let i = 0; i < 600; i++) {
+      const c = camps[i % camps.length];
+      const t = new Date();
+      t.setHours(5 + Math.floor(Math.random() * 17), Math.floor(Math.random() * 60), Math.floor(Math.random() * 60), 0);
+      t.setDate(t.getDate() - Math.floor(Math.random() * 7));
+      scans.push({
+        time: t,
+        name: names[i % names.length],
+        labourId: `LB-${20000 + i * 7}`,
+        campCode: c.code,
+        meal: meals[Math.floor(Math.random() * meals.length)],
+        status: statuses[Math.floor(Math.random() * statuses.length)],
+      });
+    }
+    await prisma.scan.createMany({ data: scans });
+    console.log(`[seed] scans: ${scans.length}`);
+  } else {
+    console.log(`[seed] scans already exist (${existingScanCount}) — skipping`);
+  }
+
+  console.log("[seed] done.");
+}
+
+main()
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });

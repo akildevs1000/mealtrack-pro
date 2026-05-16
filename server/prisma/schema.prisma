@@ -1,0 +1,249 @@
+// MealTrack Pro database schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  operator
+  user
+  manager
+}
+
+enum UserStatus {
+  Active
+  Inactive
+}
+
+enum EmployeeStatus {
+  Active
+  Leave
+  Vacation
+  Inactive
+}
+
+enum CmsEmployeeStatus {
+  Active
+  InActive
+  leave
+}
+
+enum MealEligibility {
+  Y
+  N
+}
+
+enum MealKind {
+  Breakfast
+  Lunch
+  Dinner
+}
+
+enum ScanStatus {
+  Eligible
+  AlreadyServed
+  NotEligible
+  WrongCamp
+  Expired
+}
+
+enum ManagerRole {
+  CampManager
+  SeniorManager
+  Supervisor
+}
+
+enum ManagerShift {
+  Morning
+  Evening
+  FullDay
+}
+
+enum ManagerStatus {
+  Active
+  Suspended
+  Expired
+}
+
+model User {
+  id               String     @id @default(cuid())
+  name             String
+  username         String     @unique
+  email            String     @unique
+  passwordHash     String
+  role             Role
+  status           UserStatus @default(Active)
+  assignedCampCode String?
+  lastLoginAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([role])
+}
+
+model RolePermission {
+  id     String @id @default(cuid())
+  role   Role
+  tab    String
+  view   Boolean @default(false)
+  edit   Boolean @default(false)
+  delete Boolean @default(false)
+
+  @@unique([role, tab])
+  @@index([role])
+}
+
+model Camp {
+  id        String   @id @default(cuid())
+  code      String   @unique // e.g. "AD-01"
+  name      String
+  site      String
+  employees Int      @default(0)
+  online    Boolean  @default(true)
+  // Meal windows stored as HH:mm strings
+  breakfastStart String @default("05:30")
+  breakfastEnd   String @default("08:30")
+  lunchStart     String @default("11:30")
+  lunchEnd       String @default("14:00")
+  dinnerStart    String @default("18:30")
+  dinnerEnd      String @default("21:30")
+
+  scans     Scan[]
+  devices   Device[]
+  managers  CampManager[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// CMS employee roster (different camp coding scheme: "CAMP 19")
+model CmsEmployee {
+  id              String             @id @default(cuid())
+  company         String
+  laborId         Int                @unique
+  laborCode       String             @unique
+  name            String
+  designation     String
+  doj             DateTime
+  campCode        String             // e.g. "CAMP 19"
+  campName        String
+  mealsEligibility MealEligibility   @default(Y)
+  status          CmsEmployeeStatus  @default(Active)
+  effectiveDate   DateTime?
+  lastUpdated     DateTime
+
+  mealRecords     MealRecord[]
+
+  @@index([campCode])
+  @@index([status])
+}
+
+// Per-day meal record for a CMS employee
+model MealRecord {
+  id          String      @id @default(cuid())
+  employee    CmsEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  date        DateTime    @db.Date
+  breakfastTaken Boolean  @default(false)
+  breakfastTime  String?  // HH:mm
+  lunchTaken     Boolean  @default(false)
+  lunchTime      String?
+  dinnerTaken    Boolean  @default(false)
+  dinnerTime     String?
+
+  @@unique([employeeId, date])
+  @@index([date])
+}
+
+// Scan events (live activity)
+model Scan {
+  id        String       @id @default(cuid())
+  time      DateTime     @default(now())
+  name      String       // labour name at time of scan
+  labourId  String
+  camp      Camp         @relation(fields: [campCode], references: [code])
+  campCode  String
+  meal      MealKind
+  status    ScanStatus
+  // Filled when the scan came from the Android scanner app, identifying
+  // which camp manager was logged in. Null for legacy/admin-posted scans.
+  manager   CampManager? @relation(fields: [managerId], references: [id])
+  managerId String?
+
+  @@index([time])
+  @@index([campCode])
+  @@index([status])
+  @@index([managerId])
+}
+
+model Device {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  camp           Camp     @relation(fields: [campCode], references: [code])
+  campCode       String
+  battery        Int      @default(100)
+  online         Boolean  @default(true)
+  lastSync       DateTime @default(now())
+  macAddress     String
+  serial         String   @unique
+  model          String
+  androidVersion String
+  appVersion     String
+  ipAddress      String
+  assignedTo     String
+  registeredOn   DateTime
+
+  @@index([campCode])
+}
+
+model CampManager {
+  id          String        @id @default(cuid())
+  name        String
+  username    String        @unique
+  passwordHash String
+  // Bcrypt hash of the numeric PIN this manager uses to log into the
+  // Android scanner. Null when the manager cannot operate a scanner.
+  pinHash      String?
+  email       String        @unique
+  phone       String
+  emiratesId  String
+  camp        Camp          @relation(fields: [campCode], references: [code])
+  campCode    String
+  role        ManagerRole
+  shift       ManagerShift
+  joinDate    DateTime
+  expiryDate  DateTime
+  status      ManagerStatus @default(Active)
+  lastLoginAt DateTime?
+  avatar      String?
+  permBreakfast Boolean @default(true)
+  permLunch     Boolean @default(true)
+  permDinner    Boolean @default(true)
+  permReports   Boolean @default(true)
+
+  scans Scan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campCode])
+}
+
+// Audit log (used by /audit route)
+model AuditLog {
+  id        String   @id @default(cuid())
+  at        DateTime @default(now())
+  actorId   String?
+  actor     String?
+  action    String
+  target    String?
+  details   String?
+
+  @@index([at])
+}

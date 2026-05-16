@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Wastage &amp; Variance — MealOps</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f3f4f6; }
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .page {
+    width: 297mm;
+    min-height: 210mm;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 14mm 16mm 12mm 16mm;
+    display: flex;
+    flex-direction: column;
+  }
+  .page + .page { margin-top: 16px; }
+  @media print {
+    .page { page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+  }
+  .page-cont-title {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    letter-spacing: 3px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .page-cont-title span {
+    color: #94a3b8;
+    font-weight: 400;
+    letter-spacing: 1px;
+    margin-left: 6px;
+  }
+  .day .date { font-weight: 700; }
+  .day .name { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+
+  /* Branding bar */
+  .brand-bar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; }
+  .brand-left { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+    color: #fff; font-weight: 700; font-size: 14px;
+    display: grid; place-items: center; letter-spacing: .5px;
+  }
+  .brand-name { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
+  .brand-sub  { font-size: 9.5px; color: #64748b; letter-spacing: 1.2px; text-transform: uppercase; }
+  .brand-tag  { font-size: 9.5px; color: #64748b; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+
+  .meta { text-align: right; font-size: 10px; line-height: 1.55; }
+  .meta .row span:first-child { color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin-right: 8px; font-size: 9px; }
+  .meta .row span:last-child  { color: #0f172a; font-weight: 600; }
+
+  /* Title band */
+  .title-band {
+    background: #efeaff;
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-top: 4px;
+    text-align: center;
+  }
+  .title-band h1 { margin: 0; font-size: 18px; letter-spacing: 4px; font-weight: 600; }
+  .title-band .subtitle { margin-top: 4px; font-size: 10.5px; color: #475569; }
+  .title-band .subtitle .dot { color: #94a3b8; margin: 0 6px; }
+
+  /* Top KPI cards */
+  .top-cards {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .card .lbl { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
+  .card .val { font-size: 19px; font-weight: 700; margin-top: 4px; }
+  .card .sub { font-size: 9.5px; color: #94a3b8; margin-top: 2px; }
+  .card.summary { display: flex; gap: 14px; align-items: center; background: #fff7ed; border-color: #fed7aa; }
+  .card.summary .icon {
+    width: 50px; height: 50px; border-radius: 12px;
+    background: #ffedd5; color: #9a3412;
+    display: grid; place-items: center;
+    font-size: 22px;
+  }
+  .card.summary .title { font-size: 13px; font-weight: 700; color: #9a3412; }
+  .card.summary .desc  { font-size: 10px; color: #c2410c; margin-top: 2px; }
+
+  /* Status pills */
+  .pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .pill {
+    border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .pill .lbl { font-size: 9.5px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
+  .pill .val { font-size: 15px; font-weight: 600; }
+  .pill.healthy .lbl, .pill.healthy .val { color: #047857; }
+  .pill.watch   .lbl, .pill.watch   .val { color: #b45309; }
+  .pill.critical .lbl, .pill.critical .val { color: #b91c1c; }
+  .pill.target  .lbl, .pill.target  .val { color: #1d4ed8; }
+
+  /* Table */
+  table { width: 100%; margin-top: 14px; border-collapse: collapse; font-size: 11.5px; }
+  thead th {
+    text-align: left; text-transform: uppercase;
+    font-size: 10px; letter-spacing: 1px; color: #475569; font-weight: 600;
+    padding: 12px 10px; border-bottom: 1px solid #e5e7eb; background: #fafbfc;
+  }
+  thead th.right, tbody td.right { text-align: right; }
+  tbody td {
+    padding: 12px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle;
+  }
+  tbody tr:hover { background: #fafbfc; }
+  tbody tr.warn  { background: #fffaf3; }
+  tbody tr.crit  { background: #fff1f2; }
+
+  .camp .code { font-weight: 700; }
+  .camp .name { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+
+  .num { font-variant-numeric: tabular-nums; }
+  .neg { color: #dc2626; }
+
+  /* Wastage bar */
+  .wastage-cell { min-width: 200px; }
+  .wastage-row { display: flex; align-items: center; gap: 10px; }
+  .wastage-pct { font-weight: 700; font-variant-numeric: tabular-nums; width: 48px; text-align: right; }
+  .bar-track {
+    flex: 1; height: 8px; border-radius: 999px; background: #f1f5f9; overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #10b981 0%, #14b8a6 100%);
+  }
+  .bar-fill.warn { background: linear-gradient(90deg, #f59e0b 0%, #ea580c 100%); }
+  .bar-fill.crit { background: linear-gradient(90deg, #ef4444 0%, #b91c1c 100%); }
+  .target-mark {
+    position: absolute; top: -2px; bottom: -2px;
+    width: 2px; background: #1d4ed8;
+    left: 50%; /* 5% of max 10% scale shown as half */
+  }
+
+  .status {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600;
+  }
+  .status.healthy { color: #059669; background: #ecfdf5; }
+  .status.watch   { color: #b45309; background: #fffbeb; }
+  .status.critical{ color: #b91c1c; background: #fef2f2; }
+
+  .trend { font-size: 10px; font-variant-numeric: tabular-nums; }
+  .trend.up   { color: #b91c1c; }
+  .trend.down { color: #059669; }
+
+  /* Footer */
+  .footer {
+    margin-top: auto; padding-top: 14px; border-top: 1px solid #cbd5e1;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #475569;
+    font-weight: 500;
+  }
+  .footer .legend span { margin-right: 14px; }
+  .footer .legend .healthy { color: #059669; }
+  .footer .legend .watch   { color: #b45309; }
+  .footer .legend .critical{ color: #b91c1c; }
+  .footer .legend .target  { color: #1d4ed8; }
+</style>
+</head>
+<body>
+<section class="page">
+
+  <header class="brand-bar">
+    <div class="brand-left">
+      <div class="brand-logo">MO</div>
+      <div>
+        <div class="brand-name">MEALOPS</div>
+        <div class="brand-sub">Meal Tracking System</div>
+        <div class="brand-tag">UAE Labour Camps</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="row"><span>Period</span><span>10-May → 16-May-2026</span></div>
+      <div class="row"><span>Scope</span><span>All Camps · 7 days</span></div>
+      <div class="row"><span>Generated</span><span>16-May-2026 14:22</span></div>
+    </div>
+  </header>
+
+  <div class="title-band">
+    <h1>WASTAGE &amp; VARIANCE</h1>
+    <div class="subtitle">Estimated minus served <span class="dot">•</span> % wastage by camp <span class="dot">•</span> target ≤ 5%</div>
+  </div>
+
+  <div class="top-cards">
+    <div class="card summary">
+      <div class="icon">⚠</div>
+      <div>
+        <div class="title">17.5% Weekly Wastage</div>
+        <div class="desc">3,920 portions discarded out of 22,340 estimated</div>
+        <div class="desc" style="margin-top:6px;">↑ 2.3% vs prior 7-day window</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="lbl">Estimated</div>
+      <div class="val">156,380</div>
+      <div class="sub">7-day total</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Served</div>
+      <div class="val">128,940</div>
+      <div class="sub">82.5% of est.</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Wastage</div>
+      <div class="val neg">27,440</div>
+      <div class="sub">↑ 2.3% w/w</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Avg %</div>
+      <div class="val">17.5%</div>
+      <div class="sub">Target ≤ 5%</div>
+    </div>
+  </div>
+
+  <div class="pills">
+    <div class="pill healthy">  <span class="lbl">Healthy (≤5%)</span>     <span class="val">1 camp</span></div>
+    <div class="pill watch">    <span class="lbl">Watch (5–10%)</span>    <span class="val">2 camps</span></div>
+    <div class="pill critical"> <span class="lbl">Critical (&gt;10%)</span> <span class="val">3 camps</span></div>
+    <div class="pill target">   <span class="lbl">Target</span>            <span class="val">≤ 5%</span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 130px;">Camp</th>
+        <th>Site</th>
+        <th class="right">Estimated</th>
+        <th class="right">Served</th>
+        <th class="right">Wastage</th>
+        <th>% Wastage</th>
+        <th class="right">vs Last Week</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="camp"><div class="code">RAK-01</div><div class="name">Al Hamra Camp</div></td>
+        <td>Al Hamra Mall Ext.</td>
+        <td class="right num">15,036</td>
+        <td class="right num">14,490</td>
+        <td class="right num neg">546</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill" style="width:36%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">3.6%</div>
+          </div>
+        </td>
+        <td class="right trend down num">↓ 0.4%</td>
+        <td><span class="status healthy">Healthy</span></td>
+      </tr>
+      <tr class="warn">
+        <td class="camp"><div class="code">AD-01</div><div class="name">Al Reem Camp</div></td>
+        <td>Reem Tower Project</td>
+        <td class="right num">25,172</td>
+        <td class="right num">23,212</td>
+        <td class="right num neg">1,960</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill warn" style="width:78%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">7.8%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 1.2%</td>
+        <td><span class="status watch">Watch</span></td>
+      </tr>
+      <tr class="warn">
+        <td class="camp"><div class="code">AJM-03</div><div class="name">Ajman Central Camp</div></td>
+        <td>Corniche Towers</td>
+        <td class="right num">26,796</td>
+        <td class="right num">24,360</td>
+        <td class="right num neg">2,436</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill warn" style="width:91%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">9.1%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 0.8%</td>
+        <td><span class="status watch">Watch</span></td>
+      </tr>
+      <tr class="crit">
+        <td class="camp"><div class="code">DXB-04</div><div class="name">Marina Workers Village</div></td>
+        <td>Marina Heights</td>
+        <td class="right num">19,894</td>
+        <td class="right num">16,940</td>
+        <td class="right num neg">2,954</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill crit" style="width:148%; max-width:100%;"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">14.8%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 3.1%</td>
+        <td><span class="status critical">Critical</span></td>
+      </tr>
+      <tr class="crit">
+        <td class="camp"><div class="code">SHJ-02</div><div class="name">Sharjah Industrial Camp</div></td>
+        <td>Industrial Park 7</td>
+        <td class="right num">31,668</td>
+        <td class="right num">26,460</td>
+        <td class="right num neg">5,208</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill crit" style="width:100%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">16.4%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 2.4%</td>
+        <td><span class="status critical">Critical</span></td>
+      </tr>
+      <tr class="crit">
+        <td class="camp"><div class="code">AUH-09</div><div class="name">Mussafah Labour Camp</div></td>
+        <td>Mussafah Bridge</td>
+        <td class="right num">42,834</td>
+        <td class="right num">31,675</td>
+        <td class="right num neg">11,159</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill crit" style="width:100%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">26.1%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 5.7%</td>
+        <td><span class="status critical">Critical</span></td>
+      </tr>
+      <tr style="background: #f8fafc; font-weight: 600;">
+        <td>TOTAL</td>
+        <td>6 camps</td>
+        <td class="right num">161,400</td>
+        <td class="right num">137,137</td>
+        <td class="right num neg">24,263</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill crit" style="width:100%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">15.0%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 2.3%</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="footer">
+    <div class="legend">
+      <span><span class="healthy">●</span> Healthy ≤ 5%</span>
+      <span><span class="watch">●</span> Watch 5–10%</span>
+      <span><span class="critical">●</span> Critical &gt; 10%</span>
+      <span><span class="target">│</span> Target line on bar</span>
+    </div>
+    <div>Powered by <strong style="color:#0f172a">MealOps</strong></div>
+    <div>Page 1 of 2</div>
+  </footer>
+
+</section>
+
+<!-- ====================== PAGE 2 ====================== -->
+<section class="page">
+
+  <h2 class="page-cont-title">7-DAY DAILY BREAKDOWN <span>— 10-May → 16-May-2026</span></h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 130px;">Day</th>
+        <th class="right">Estimated</th>
+        <th class="right">Served</th>
+        <th class="right">Wastage</th>
+        <th>% Wastage</th>
+        <th class="right">vs Prev Day</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="day"><div class="date">10 May</div><div class="name">Monday</div></td>
+        <td class="right num">22,100</td>
+        <td class="right num">21,240</td>
+        <td class="right num neg">860</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill" style="width:39%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">3.9%</div>
+          </div>
+        </td>
+        <td class="right trend num neu">—</td>
+        <td><span class="status healthy">Healthy</span></td>
+      </tr>
+      <tr>
+        <td class="day"><div class="date">11 May</div><div class="name">Tuesday</div></td>
+        <td class="right num">22,300</td>
+        <td class="right num">21,680</td>
+        <td class="right num neg">620</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill" style="width:28%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">2.8%</div>
+          </div>
+        </td>
+        <td class="right trend down num">↓ 1.1%</td>
+        <td><span class="status healthy">Healthy</span></td>
+      </tr>
+      <tr>
+        <td class="day"><div class="date">12 May</div><div class="name">Wednesday</div></td>
+        <td class="right num">22,000</td>
+        <td class="right num">20,940</td>
+        <td class="right num neg">1,060</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill" style="width:48%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">4.8%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 2.0%</td>
+        <td><span class="status healthy">Healthy</span></td>
+      </tr>
+      <tr>
+        <td class="day"><div class="date">13 May</div><div class="name">Thursday</div></td>
+        <td class="right num">22,500</td>
+        <td class="right num">22,110</td>
+        <td class="right num neg">390</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill" style="width:17%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">1.7%</div>
+          </div>
+        </td>
+        <td class="right trend down num">↓ 3.1%</td>
+        <td><span class="status healthy">Healthy</span></td>
+      </tr>
+      <tr class="warn">
+        <td class="day"><div class="date">14 May</div><div class="name">Friday</div></td>
+        <td class="right num">21,800</td>
+        <td class="right num">19,820</td>
+        <td class="right num neg">1,980</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill warn" style="width:91%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">9.1%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 7.4%</td>
+        <td><span class="status watch">Watch</span></td>
+      </tr>
+      <tr class="crit">
+        <td class="day"><div class="date">15 May</div><div class="name">Saturday</div></td>
+        <td class="right num">22,340</td>
+        <td class="right num">18,420</td>
+        <td class="right num neg">3,920</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill crit" style="width:100%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">17.5%</div>
+          </div>
+        </td>
+        <td class="right trend up num">↑ 8.4%</td>
+        <td><span class="status critical">Critical</span></td>
+      </tr>
+      <tr>
+        <td class="day"><div class="date">16 May</div><div class="name">Sunday · in progress</div></td>
+        <td class="right num">22,200</td>
+        <td class="right num">9,180</td>
+        <td class="right num neu">—</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"></div>
+            <div class="wastage-pct">—</div>
+          </div>
+        </td>
+        <td class="right trend num neu">—</td>
+        <td><span class="status" style="background:#f1f5f9; color:#64748b;">Pending</span></td>
+      </tr>
+      <tr style="background: #f8fafc; font-weight: 600;">
+        <td>7-DAY TOTAL</td>
+        <td class="right num">155,240</td>
+        <td class="right num">133,390</td>
+        <td class="right num neg">8,830</td>
+        <td class="wastage-cell">
+          <div class="wastage-row">
+            <div class="bar-track"><div class="bar-fill warn" style="width:69%"></div><div class="target-mark"></div></div>
+            <div class="wastage-pct">5.9%</div>
+          </div>
+        </td>
+        <td class="right trend num">—</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="footer">
+    <div class="legend">
+      <span><span class="healthy">●</span> Healthy ≤ 5%</span>
+      <span><span class="watch">●</span> Watch 5–10%</span>
+      <span><span class="critical">●</span> Critical &gt; 10%</span>
+      <span><span class="target">│</span> Target line on bar</span>
+    </div>
+    <div>Powered by <strong style="color:#0f172a">MealOps</strong></div>
+    <div>Page 2 of 2</div>
+  </footer>
+
+</section>
+</body>
+</html>

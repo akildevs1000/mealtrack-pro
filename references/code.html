@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MealOps - Login</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "error-container": "#93000a",
+                    "surface-container": "#191f31",
+                    "surface": "#0c1324",
+                    "on-tertiary-fixed": "#360f00",
+                    "on-surface": "#dce1fb",
+                    "primary": "#b4c5ff",
+                    "on-surface-variant": "#c3c6d7",
+                    "on-secondary-fixed": "#001a42",
+                    "surface-dim": "#0c1324",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "surface-variant": "#2e3447",
+                    "secondary-fixed": "#d8e2ff",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "surface-container-low": "#151b2d",
+                    "on-error-container": "#ffdad6",
+                    "on-primary": "#002a78",
+                    "inverse-on-surface": "#2a3043",
+                    "surface-bright": "#33394c",
+                    "on-secondary-container": "#e6ecff",
+                    "surface-container-highest": "#2e3447",
+                    "inverse-primary": "#0053db",
+                    "outline-variant": "#434655",
+                    "primary-fixed": "#dbe1ff",
+                    "on-error": "#690005",
+                    "on-tertiary": "#581e00",
+                    "tertiary-fixed": "#ffdbcd",
+                    "on-secondary-fixed-variant": "#004395",
+                    "secondary": "#adc6ff",
+                    "surface-container-lowest": "#070d1f",
+                    "on-primary-container": "#eeefff",
+                    "surface-tint": "#b4c5ff",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "primary-container": "#2563eb",
+                    "surface-container-high": "#23293c",
+                    "inverse-surface": "#dce1fb",
+                    "on-secondary": "#002e6a",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "on-tertiary-container": "#ffede6",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "background": "#0c1324",
+                    "outline": "#8d90a0",
+                    "on-background": "#dce1fb",
+                    "tertiary": "#ffb596",
+                    "tertiary-container": "#bc4800",
+                    "secondary-container": "#0566d9",
+                    "on-primary-fixed": "#00174b",
+                    "error": "#ffb4ab"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "base": "8px",
+                    "lg": "48px",
+                    "gutter": "24px",
+                    "xs": "4px",
+                    "sm": "12px",
+                    "margin-desktop": "40px",
+                    "md": "24px",
+                    "xl": "80px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+</head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col items-center justify-center p-gutter lg:p-margin-desktop relative overflow-hidden font-body-md">
+<!-- Ambient Background Glows -->
+<div class="absolute top-[-20%] left-[-10%] w-[60vw] h-[60vw] bg-primary-container/10 rounded-full blur-[150px] pointer-events-none z-0"></div>
+<div class="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] bg-primary-container/5 rounded-full blur-[150px] pointer-events-none z-0"></div>
+<!-- Subtle Grid Pattern overlay -->
+<div class="absolute inset-0 z-0 opacity-10" style="background-image: radial-gradient(circle at 1px 1px, #dce1fb 1px, transparent 0); background-size: 32px 32px;"></div>
+<!-- Main Login Card -->
+<main class="w-full max-w-[1100px] flex flex-col bg-surface/80 backdrop-blur-2xl border border-[rgba(59,130,246,0.35)] rounded-[28px] shadow-[0_0_30px_rgba(37,99,235,0.1)] relative z-10 overflow-hidden">
+<div class="flex flex-col lg:flex-row w-full">
+<!-- Left Panel: Branding & Illustration -->
+<section class="w-full lg:w-5/12 bg-gradient-to-br from-primary-container/20 to-transparent p-lg flex flex-col items-center justify-center relative border-r border-outline-variant/30 hidden md:flex min-h-[600px]">
+<div class="flex flex-col items-center text-center z-10 mb-lg">
+<div class="w-20 h-20 bg-primary-container rounded-full flex items-center justify-center mb-md shadow-[0_0_20px_rgba(37,99,235,0.4)] border-t border-white/20">
+<span class="material-symbols-outlined text-[40px] text-on-primary-container fill">restaurant</span>
+</div>
+<h1 class="font-display-lg text-display-lg text-on-surface mb-xs">MealOps</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Smart operations. Better meals.</p>
+</div>
+<div class="flex-grow flex items-center justify-center w-full max-w-[280px] z-10">
+<img alt="MealOps 3D food illustration" class="w-full h-auto object-contain drop-shadow-[0_20px_20px_rgba(0,0,0,0.5)]" data-alt="A high-end, premium 3D illustration of a sleek, dark blue food serving cloche and a stylized modern bowl with geometric leaf garnishes. The models are rendered with sophisticated matte textures and illuminated by dramatic, soft blue cinematic edge lighting against a deep navy background. The style is ultra-modern, corporate, and polished, matching an Apple-level aesthetic for an enterprise food logistics platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhGfh1aL8CiKP_7TDtsYFppV8UvdYxS5GikW_5Q9xWBChWihgM29Kilyx7t8U2n6--caqrRsASCSrh7StgsNEOi5zjjc3qqyjJYL6-4-1PwAKGWMLq5yjsgpEMUoc8EI6Jb8r06xAcikQLHPJnBKJxNy7_NQ7og1mnPPCaxs9Tgw3U-9KHRfgtSL4NOXXzqSr28dyW9zI3Gs7QLfd4zTBbjL6p7lm6eYsmji3K94U7hsv_YlCWDNGA7ZxTZjzaoJSqPnM77UOVMTzS"/>
+</div>
+<div class="mt-lg flex items-center gap-2 text-primary font-label-sm text-label-sm z-10 bg-surface-container/50 px-4 py-2 rounded-full border border-primary/20">
+<span class="material-symbols-outlined text-[16px] fill">verified_user</span>
+<span>Secure. Reliable. Always.</span>
+</div>
+</section>
+<!-- Right Panel: Login Form -->
+<section class="w-full lg:w-7/12 p-gutter lg:p-xl flex flex-col justify-center">
+<div class="mb-lg">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-xs">Welcome back</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Sign in to continue to MealOps</p>
+</div>
+<form class="flex flex-col gap-md">
+<!-- Username -->
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant" for="username">Username</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">person</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl py-sm pl-[44px] pr-4 text-on-surface font-body-md placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200" id="username" placeholder="admin" type="text"/>
+</div>
+</div>
+<!-- Password -->
+<div class="flex flex-col gap-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant" for="password">Password</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">lock</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl py-sm pl-[44px] pr-[44px] text-on-surface font-body-md placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200" id="password" placeholder="••••••••" type="password"/>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+<!-- Options -->
+<div class="flex items-center justify-between mt-xs">
+<label class="flex items-center gap-2 cursor-pointer group">
+<input checked="" class="rounded bg-surface-container-lowest border-outline-variant text-primary-container focus:ring-primary focus:ring-offset-surface w-4 h-4 cursor-pointer" type="checkbox"/>
+<span class="font-label-md text-label-md text-on-surface-variant group-hover:text-on-surface transition-colors">Remember me</span>
+</label>
+<a class="font-label-md text-label-md text-primary hover:text-primary-fixed transition-colors" href="#">Forgot password?</a>
+</div>
+<!-- Sign In Button -->
+<button class="mt-4 w-full bg-primary-container text-on-primary-container font-label-md text-label-md py-sm rounded-xl flex items-center justify-center gap-2 border-t border-white/20 shadow-[0_0_15px_rgba(37,99,235,0.2)] hover:shadow-[0_0_25px_rgba(37,99,235,0.4)] hover:bg-inverse-primary transition-all duration-300" type="submit">
+<span class="material-symbols-outlined">login</span>
+                        Sign in
+                    </button>
+<!-- Divider -->
+<div class="flex items-center gap-4 my-2">
+<div class="h-px bg-outline-variant/50 flex-grow"></div>
+<span class="font-label-sm text-label-sm text-outline">or</span>
+<div class="h-px bg-outline-variant/50 flex-grow"></div>
+</div>
+<!-- SSO Button -->
+<button class="w-full bg-transparent border border-primary/50 text-primary font-label-md text-label-md py-sm rounded-xl flex items-center justify-center gap-2 hover:bg-primary/5 transition-all duration-300" type="button">
+<span class="material-symbols-outlined">shield_person</span>
+                        Sign in with SSO
+                    </button>
+</form>
+</section>
+</div>
+<!-- Bottom Demo Accounts Strip -->
+<div class="w-full bg-surface-container/40 border-t border-outline-variant/30 p-md flex flex-wrap lg:flex-nowrap items-center gap-gutter">
+<div class="flex items-center gap-3 pr-gutter border-r border-outline-variant/30 shrink-0">
+<div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center text-primary border border-primary/20">
+<span class="material-symbols-outlined">group</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Demo accounts</span>
+</div>
+<div class="flex flex-wrap lg:flex-nowrap gap-gutter flex-grow">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface">admin / password123</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant opacity-80">Full access</span>
+</div>
+<div class="hidden md:block w-px h-8 bg-outline-variant/30"></div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface">sara.op / password123</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant opacity-80">Operator</span>
+</div>
+<div class="hidden md:block w-px h-8 bg-outline-variant/30"></div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface">khalid.ad01 / password123</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant opacity-80">Camp Manager (AD-01)</span>
+</div>
+</div>
+<a class="font-label-sm text-label-sm text-primary flex items-center gap-1 hover:text-primary-fixed transition-colors ml-auto shrink-0 mt-4 lg:mt-0" href="#">
+                View all roles
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</main>
+<!-- Page Footer -->
+<footer class="mt-lg flex flex-col md:flex-row items-center justify-center gap-md text-center w-full max-w-[1100px] z-10 relative">
+<span class="font-label-sm text-label-sm text-on-surface-variant opacity-60">© 2025 MealOps. All rights reserved.</span>
+<div class="flex items-center gap-1 text-on-surface-variant opacity-60">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+<span class="font-label-sm text-label-sm">Your data is protected</span>
+</div>
+</footer>
+</body></html>

@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Scan Activity Log — MealOps</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f3f4f6; }
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .page {
+    width: 297mm;
+    min-height: 210mm;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 14mm 16mm 12mm 16mm;
+    display: flex;
+    flex-direction: column;
+  }
+  .page + .page { margin-top: 16px; }
+  @media print {
+    .page { page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+  }
+  .page-cont-title {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    letter-spacing: 3px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .page-cont-title span {
+    color: #94a3b8;
+    font-weight: 400;
+    letter-spacing: 1px;
+    margin-left: 6px;
+  }
+
+  /* Branding bar */
+  .brand-bar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; }
+  .brand-left { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+    color: #fff; font-weight: 700; font-size: 14px;
+    display: grid; place-items: center; letter-spacing: .5px;
+  }
+  .brand-name { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
+  .brand-sub  { font-size: 9.5px; color: #64748b; letter-spacing: 1.2px; text-transform: uppercase; }
+  .brand-tag  { font-size: 9.5px; color: #64748b; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+
+  .meta { text-align: right; font-size: 10px; line-height: 1.55; }
+  .meta .row span:first-child { color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin-right: 8px; font-size: 9px; }
+  .meta .row span:last-child  { color: #0f172a; font-weight: 600; }
+
+  /* Title band */
+  .title-band {
+    background: #efeaff;
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-top: 4px;
+    text-align: center;
+  }
+  .title-band h1 { margin: 0; font-size: 18px; letter-spacing: 4px; font-weight: 600; }
+  .title-band .subtitle { margin-top: 4px; font-size: 10.5px; color: #475569; }
+  .title-band .subtitle .dot { color: #94a3b8; margin: 0 6px; }
+
+  /* KPI pills */
+  .pills { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 14px; }
+  .pill {
+    border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .pill .lbl { font-size: 9.5px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
+  .pill .val { font-size: 15px; font-weight: 600; }
+  .pill.total    .lbl, .pill.total    .val { color: #334155; }
+  .pill.eligible .lbl, .pill.eligible .val { color: #047857; }
+  .pill.served   .lbl, .pill.served   .val { color: #c2410c; }
+  .pill.wrong    .lbl, .pill.wrong    .val { color: #b91c1c; }
+  .pill.noteligible .lbl, .pill.noteligible .val { color: #b45309; }
+  .pill.expired  .lbl, .pill.expired  .val { color: #6d28d9; }
+  .pill.duplicate.lbl, .pill.duplicate .val { color: #1d4ed8; }
+
+  /* Table */
+  table { width: 100%; margin-top: 14px; border-collapse: collapse; font-size: 11.5px; }
+  thead th {
+    text-align: left; text-transform: uppercase;
+    font-size: 10px; letter-spacing: 1px; color: #475569; font-weight: 600;
+    padding: 12px 10px; border-bottom: 1px solid #e5e7eb; background: #fafbfc;
+  }
+  tbody td {
+    padding: 10px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle;
+  }
+  tbody tr:hover { background: #fafbfc; }
+  tbody tr.warn  { background: #fff7ed; }
+  tbody tr.crit  { background: #fef7f7; }
+  tbody tr.note  { background: #fffbeb; }
+
+  .time {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: #0f172a;
+  }
+  .time .micro { font-size: 9px; color: #94a3b8; margin-left: 2px; font-weight: 400; }
+
+  .pill-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 9px; letter-spacing: .8px; text-transform: uppercase; font-weight: 600;
+  }
+  .pill-tag.bf { background: #fffbeb; color: #b45309; }
+  .pill-tag.ln { background: #fef2f2; color: #b91c1c; }
+  .pill-tag.dn { background: #f5f3ff; color: #6d28d9; }
+
+  .device { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+
+  .status {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600;
+  }
+  .status.eligible { color: #059669; background: #ecfdf5; }
+  .status.served   { color: #c2410c; background: #fff7ed; }
+  .status.wrong    { color: #b91c1c; background: #fef2f2; }
+  .status.notelig  { color: #b45309; background: #fffbeb; }
+  .status.expired  { color: #6d28d9; background: #f5f3ff; }
+
+  /* Footer */
+  .footer {
+    margin-top: auto; padding-top: 14px; border-top: 1px solid #cbd5e1;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #475569;
+    font-weight: 500;
+  }
+  .footer .legend span { margin-right: 14px; }
+  .footer .legend .eligible { color: #059669; }
+  .footer .legend .served   { color: #c2410c; }
+  .footer .legend .wrong    { color: #b91c1c; }
+</style>
+</head>
+<body>
+<section class="page">
+
+  <header class="brand-bar">
+    <div class="brand-left">
+      <div class="brand-logo">MO</div>
+      <div>
+        <div class="brand-name">MEALOPS</div>
+        <div class="brand-sub">Meal Tracking System</div>
+        <div class="brand-tag">UAE Labour Camps</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="row"><span>Date</span><span>16-May-2026</span></div>
+      <div class="row"><span>Window</span><span>00:00 — 14:22</span></div>
+      <div class="row"><span>Generated</span><span>16-May-2026 14:22</span></div>
+    </div>
+  </header>
+
+  <div class="title-band">
+    <h1>SCAN ACTIVITY LOG</h1>
+    <div class="subtitle">Every QR scan with status and operator <span class="dot">•</span> chronological, most recent first</div>
+  </div>
+
+  <div class="pills">
+    <div class="pill total">       <span class="lbl">Total Scans</span>    <span class="val">18,521</span></div>
+    <div class="pill eligible">    <span class="lbl">Eligible</span>       <span class="val">17,892</span></div>
+    <div class="pill served">      <span class="lbl">Already Served</span> <span class="val">324</span></div>
+    <div class="pill wrong">       <span class="lbl">Wrong Camp</span>     <span class="val">81</span></div>
+    <div class="pill noteligible"> <span class="lbl">Not Eligible</span>   <span class="val">156</span></div>
+    <div class="pill expired">     <span class="lbl">Expired</span>        <span class="val">21</span></div>
+    <div class="pill duplicate">   <span class="lbl">Duplicates</span>     <span class="val">47</span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 90px;">Time</th>
+        <th style="width: 100px;">Labour ID</th>
+        <th>Employee</th>
+        <th>Camp</th>
+        <th>Meal</th>
+        <th>Device / Operator</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="time">12:42:08</span></td>
+        <td><strong>LB-22481</strong></td>
+        <td>Mohammed Rafiq</td>
+        <td>AD-01 — Al Reem Camp</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-AD01-A<div class="device">Ahmed Al Mansouri</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">12:42:01</span></td>
+        <td><strong>LB-19022</strong></td>
+        <td>Suresh Kumar</td>
+        <td>DXB-04 — Marina Workers Village</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-DXB04<div class="device">Rajesh Pillai</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr class="warn">
+        <td><span class="time">12:41:55</span></td>
+        <td><strong>LB-31108</strong></td>
+        <td>Anwar Hussain</td>
+        <td>SHJ-02 — Sharjah Industrial Camp</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-SHJ02-A<div class="device">Khalid Al Suwaidi</div></td>
+        <td><span class="status served">Already Served</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">12:41:40</span></td>
+        <td><strong>LB-44012</strong></td>
+        <td>Ramesh Babu</td>
+        <td>AUH-09 — Mussafah Labour Camp</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-AUH09-A<div class="device">Imran Sheikh</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr class="crit">
+        <td><span class="time">12:41:22</span></td>
+        <td><strong>LB-29980</strong></td>
+        <td>Bilal Ahmed</td>
+        <td>AD-01 — Al Reem Camp</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-AD01-B<div class="device">Ahmed Al Mansouri</div></td>
+        <td><span class="status wrong">Wrong Camp</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">12:41:09</span></td>
+        <td><strong>LB-12245</strong></td>
+        <td>Vinod Sharma</td>
+        <td>RAK-01 — Al Hamra Camp</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-RAK01<div class="device">Fatima Al Hosani</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr class="note">
+        <td><span class="time">12:40:51</span></td>
+        <td><strong>LB-55981</strong></td>
+        <td>Iqbal Khan</td>
+        <td>AJM-03 — Ajman Central Camp</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-AJM03<div class="device">Bilal Ahmed</div></td>
+        <td><span class="status notelig">Not Eligible</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">12:40:33</span></td>
+        <td><strong>LB-77821</strong></td>
+        <td>Tariq Mahmood</td>
+        <td>DXB-04 — Marina Workers Village</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-DXB04<div class="device">Rajesh Pillai</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">12:40:18</span></td>
+        <td><strong>LB-88334</strong></td>
+        <td>Sanjay Patel</td>
+        <td>SHJ-02 — Sharjah Industrial Camp</td>
+        <td><span class="pill-tag ln">Lunch</span></td>
+        <td>Scanner-SHJ02-A<div class="device">Khalid Al Suwaidi</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="footer">
+    <div class="legend">
+      <span><span class="eligible">●</span> Eligible</span>
+      <span><span class="served">●</span> Already Served</span>
+      <span><span class="wrong">●</span> Wrong Camp</span>
+      <span>● Not Eligible / Expired</span>
+    </div>
+    <div>Powered by <strong style="color:#0f172a">MealOps</strong></div>
+    <div>Page 1 of 2</div>
+  </footer>
+
+</section>
+
+<!-- ====================== PAGE 2 ====================== -->
+<section class="page">
+
+  <h2 class="page-cont-title">SCAN ACTIVITY LOG <span>— continued · Breakfast &amp; Dinner sessions</span></h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 90px;">Time</th>
+        <th style="width: 100px;">Labour ID</th>
+        <th>Employee</th>
+        <th>Camp</th>
+        <th>Meal</th>
+        <th>Device / Operator</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="time">07:32:14</span></td>
+        <td><strong>LB-22481</strong></td>
+        <td>Mohammed Rafiq</td>
+        <td>AD-01 — Al Reem Camp</td>
+        <td><span class="pill-tag bf">Breakfast</span></td>
+        <td>Scanner-AD01-A<div class="device">Ahmed Al Mansouri</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">07:31:58</span></td>
+        <td><strong>LB-19022</strong></td>
+        <td>Suresh Kumar</td>
+        <td>DXB-04 — Marina Workers Village</td>
+        <td><span class="pill-tag bf">Breakfast</span></td>
+        <td>Scanner-DXB04<div class="device">Rajesh Pillai</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr style="background: #fdf4ff;">
+        <td><span class="time">07:28:42</span></td>
+        <td><strong>LB-12999</strong></td>
+        <td>Hassan Ali</td>
+        <td>AD-01 — Al Reem Camp</td>
+        <td><span class="pill-tag bf">Breakfast</span></td>
+        <td>Scanner-AD01-A<div class="device">Ahmed Al Mansouri</div></td>
+        <td><span class="status expired">Expired</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">07:15:33</span></td>
+        <td><strong>LB-31108</strong></td>
+        <td>Anwar Hussain</td>
+        <td>SHJ-02 — Sharjah Industrial Camp</td>
+        <td><span class="pill-tag bf">Breakfast</span></td>
+        <td>Scanner-SHJ02-A<div class="device">Khalid Al Suwaidi</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">06:48:21</span></td>
+        <td><strong>LB-44012</strong></td>
+        <td>Ramesh Babu</td>
+        <td>AUH-09 — Mussafah Labour Camp</td>
+        <td><span class="pill-tag bf">Breakfast</span></td>
+        <td>Scanner-AUH09-A<div class="device">Imran Sheikh</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">19:42:55</span></td>
+        <td><strong>LB-22481</strong></td>
+        <td>Mohammed Rafiq</td>
+        <td>AD-01 — Al Reem Camp</td>
+        <td><span class="pill-tag dn">Dinner</span></td>
+        <td>Scanner-AD01-A<div class="device">Ahmed Al Mansouri</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr class="warn">
+        <td><span class="time">19:38:14</span></td>
+        <td><strong>LB-12245</strong></td>
+        <td>Vinod Sharma</td>
+        <td>RAK-01 — Al Hamra Camp</td>
+        <td><span class="pill-tag dn">Dinner</span></td>
+        <td>Scanner-RAK01<div class="device">Fatima Al Hosani</div></td>
+        <td><span class="status served">Already Served</span></td>
+      </tr>
+      <tr>
+        <td><span class="time">19:28:50</span></td>
+        <td><strong>LB-31108</strong></td>
+        <td>Anwar Hussain</td>
+        <td>SHJ-02 — Sharjah Industrial Camp</td>
+        <td><span class="pill-tag dn">Dinner</span></td>
+        <td>Scanner-SHJ02-A<div class="device">Khalid Al Suwaidi</div></td>
+        <td><span class="status eligible">Eligible</span></td>
+      </tr>
+      <tr class="crit">
+        <td><span class="time">19:11:02</span></td>
+        <td><strong>LB-88334</strong></td>
+        <td>Sanjay Patel</td>
+        <td>AJM-03 — Ajman Central Camp</td>
+        <td><span class="pill-tag dn">Dinner</span></td>
+        <td>Scanner-AJM03<div class="device">Bilal Ahmed</div></td>
+        <td><span class="status wrong">Wrong Camp</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="footer">
+    <div class="legend">
+      <span><span class="eligible">●</span> Eligible</span>
+      <span><span class="served">●</span> Already Served</span>
+      <span><span class="wrong">●</span> Wrong Camp</span>
+      <span>● Not Eligible / Expired</span>
+    </div>
+    <div>Powered by <strong style="color:#0f172a">MealOps</strong></div>
+    <div>Page 2 of 2</div>
+  </footer>
+
+</section>
+</body>
+</html>

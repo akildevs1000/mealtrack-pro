@@ -1,0 +1,235 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --radius: 0.875rem;
+  --background: oklch(0.985 0.003 240);
+  --foreground: oklch(0.18 0.03 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.03 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.03 250);
+  --primary: oklch(0.55 0.18 250);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-glow: oklch(0.7 0.18 250);
+  --secondary: oklch(0.96 0.01 250);
+  --secondary-foreground: oklch(0.22 0.04 250);
+  --muted: oklch(0.96 0.01 250);
+  --muted-foreground: oklch(0.5 0.02 250);
+  --accent: oklch(0.72 0.16 165);
+  --accent-foreground: oklch(0.15 0.03 165);
+  --warning: oklch(0.78 0.16 75);
+  --success: oklch(0.7 0.17 160);
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(0.92 0.01 250);
+  --input: oklch(0.92 0.01 250);
+  --ring: oklch(0.55 0.18 250);
+  --chart-1: oklch(0.6 0.2 250);
+  --chart-2: oklch(0.7 0.16 165);
+  --chart-3: oklch(0.75 0.16 75);
+  --chart-4: oklch(0.65 0.22 25);
+  --chart-5: oklch(0.55 0.15 300);
+  --sidebar: oklch(0.22 0.04 255);
+  --sidebar-foreground: oklch(0.95 0.01 250);
+  --sidebar-primary: oklch(0.7 0.18 250);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.28 0.04 255);
+  --sidebar-accent-foreground: oklch(0.95 0.01 250);
+  --sidebar-border: oklch(0.3 0.03 255);
+  --sidebar-ring: oklch(0.7 0.18 250);
+  --gradient-primary: linear-gradient(135deg, oklch(0.55 0.18 250), oklch(0.7 0.18 250));
+  --gradient-accent: linear-gradient(135deg, oklch(0.55 0.18 250), oklch(0.7 0.16 165));
+  --gradient-warm: linear-gradient(135deg, oklch(0.7 0.17 35), oklch(0.78 0.16 75));
+  --shadow-elegant: 0 10px 30px -12px oklch(0.55 0.18 250 / 0.25);
+  --shadow-card: 0 1px 3px oklch(0.18 0.03 250 / 0.06), 0 8px 24px -8px oklch(0.18 0.03 250 / 0.08);
+  --shadow-glow: 0 0 40px oklch(0.7 0.18 250 / 0.35);
+}
+
+.dark {
+  --background: oklch(0.16 0.025 255);
+  --foreground: oklch(0.96 0.01 250);
+  --card: oklch(0.22 0.03 255);
+  --card-foreground: oklch(0.96 0.01 250);
+  --popover: oklch(0.22 0.03 255);
+  --popover-foreground: oklch(0.96 0.01 250);
+  --primary: oklch(0.7 0.18 250);
+  --primary-foreground: oklch(0.15 0.03 250);
+  --primary-glow: oklch(0.78 0.16 250);
+  --secondary: oklch(0.28 0.03 255);
+  --secondary-foreground: oklch(0.96 0.01 250);
+  --muted: oklch(0.28 0.03 255);
+  --muted-foreground: oklch(0.7 0.02 250);
+  --accent: oklch(0.72 0.16 165);
+  --accent-foreground: oklch(0.15 0.03 165);
+  --warning: oklch(0.78 0.16 75);
+  --success: oklch(0.72 0.17 160);
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.7 0.18 250);
+  --chart-1: oklch(0.7 0.18 250);
+  --chart-2: oklch(0.72 0.16 165);
+  --chart-3: oklch(0.78 0.16 75);
+  --chart-4: oklch(0.7 0.2 25);
+  --chart-5: oklch(0.65 0.18 300);
+  --sidebar: oklch(0.18 0.03 255);
+  --sidebar-foreground: oklch(0.95 0.01 250);
+  --sidebar-primary: oklch(0.7 0.18 250);
+  --sidebar-primary-foreground: oklch(0.15 0.03 250);
+  --sidebar-accent: oklch(0.25 0.03 255);
+  --sidebar-accent-foreground: oklch(0.95 0.01 250);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.7 0.18 250);
+  --gradient-primary: linear-gradient(135deg, oklch(0.6 0.2 250), oklch(0.75 0.16 250));
+  --gradient-accent: linear-gradient(135deg, oklch(0.6 0.2 250), oklch(0.72 0.16 165));
+  --gradient-warm: linear-gradient(135deg, oklch(0.65 0.2 35), oklch(0.78 0.16 75));
+  --shadow-elegant: 0 10px 30px -12px oklch(0 0 0 / 0.5);
+  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.3), 0 8px 24px -8px oklch(0 0 0 / 0.4);
+  --shadow-glow: 0 0 40px oklch(0.7 0.18 250 / 0.45);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@theme inline {
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-primary-glow: var(--primary-glow);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+}
+
+@layer utilities {
+  .gradient-primary { background-image: var(--gradient-primary); }
+  .gradient-accent { background-image: var(--gradient-accent); }
+  .gradient-warm { background-image: var(--gradient-warm); }
+  .shadow-elegant { box-shadow: var(--shadow-elegant); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
+  .glass {
+    background: color-mix(in oklab, var(--card) 70%, transparent);
+    backdrop-filter: blur(12px);
+    border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  }
+}
+
+@media print {
+  @page { size: 53.98mm 85.6mm; margin: 0; }
+
+  /* Collapse the document to exactly one card-sized page. Without these
+     constraints the full app layout still occupies many pages worth of
+     height, so the printer emits blank trailing pages. */
+  html, body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 53.98mm !important;
+    height: 85.6mm !important;
+    min-height: 0 !important;
+    max-height: 85.6mm !important;
+    overflow: hidden !important;
+  }
+
+  /* Hide everything... */
+  body * { visibility: hidden !important; }
+
+  /* ...then re-show only the card and its descendants. */
+  #print-card-area,
+  #print-card-area * { visibility: visible !important; }
+
+  /* Pin the card to the page corner at exact card dimensions. */
+  #print-card-area {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 53.98mm !important;
+    height: 85.6mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    overflow: hidden !important;
+  }
+
+  .access-card {
+    width: 53.98mm !important;
+    height: 85.6mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    page-break-after: avoid;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

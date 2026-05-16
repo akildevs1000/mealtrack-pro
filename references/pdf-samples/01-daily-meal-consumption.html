@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Daily Meal Consumption — MealOps</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f3f4f6; }
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .page {
+    width: 297mm;
+    min-height: 210mm;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 14mm 16mm 12mm 16mm;
+    display: flex;
+    flex-direction: column;
+  }
+  .page + .page { margin-top: 16px; }
+  @media print {
+    .page { page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+  }
+  .page-cont-title {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    letter-spacing: 3px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .page-cont-title span {
+    color: #94a3b8;
+    font-weight: 400;
+    letter-spacing: 1px;
+    margin-left: 6px;
+  }
+
+  /* ---------- Branding bar ---------- */
+  .brand-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 10px;
+  }
+  .brand-left { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    display: grid;
+    place-items: center;
+    letter-spacing: .5px;
+  }
+  .brand-name { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
+  .brand-sub  { font-size: 9.5px; color: #64748b; letter-spacing: 1.2px; text-transform: uppercase; }
+  .brand-tag  { font-size: 9.5px; color: #64748b; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+
+  .meta { text-align: right; font-size: 10px; line-height: 1.55; }
+  .meta .row span:first-child { color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin-right: 8px; font-size: 9px; }
+  .meta .row span:last-child  { color: #0f172a; font-weight: 600; }
+
+  /* ---------- Title band ---------- */
+  .title-band {
+    background: #efeaff;
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-top: 4px;
+    text-align: center;
+  }
+  .title-band h1 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: 4px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+  .title-band .subtitle {
+    margin-top: 4px;
+    font-size: 10.5px;
+    color: #475569;
+  }
+  .title-band .subtitle .dot { color: #94a3b8; margin: 0 6px; }
+
+  /* ---------- KPI pill row ---------- */
+  .pills {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .pill {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .pill .lbl { font-size: 9.5px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
+  .pill .val { font-size: 15px; font-weight: 600; color: #0f172a; }
+  .pill.served   .lbl, .pill.served   .val { color: #047857; }
+  .pill.estimated.lbl, .pill.estimated .val { color: #1d4ed8; }
+  .pill.breakfast .lbl, .pill.breakfast .val { color: #b45309; }
+  .pill.lunch    .lbl, .pill.lunch    .val { color: #b91c1c; }
+  .pill.dinner   .lbl, .pill.dinner   .val { color: #6d28d9; }
+  .pill.variance .lbl, .pill.variance .val { color: #c2410c; }
+  .pill.wastage  .lbl, .pill.wastage  .val { color: #475569; }
+
+  /* ---------- Table ---------- */
+  table {
+    width: 100%;
+    margin-top: 14px;
+    border-collapse: collapse;
+    font-size: 11.5px;
+  }
+  thead th {
+    text-align: left;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: #475569;
+    font-weight: 600;
+    padding: 12px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #fafbfc;
+  }
+  thead th.right, tbody td.right { text-align: right; }
+  tbody td {
+    padding: 11px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+  tbody tr:hover { background: #fafbfc; }
+  tbody tr.warn  { background: #fffaf3; }
+  tbody tr.crit  { background: #fff1f2; }
+
+  td .main { font-weight: 600; color: #0f172a; }
+  td .sub  { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+
+  .num { font-variant-numeric: tabular-nums; }
+  .pos { color: #059669; font-weight: 600; }
+  .neg { color: #dc2626; font-weight: 600; }
+  .neu { color: #64748b; }
+
+  .status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .status.ok    { color: #059669; background: #ecfdf5; }
+  .status.warn  { color: #c2410c; background: #fff7ed; }
+  .status.crit  { color: #b91c1c; background: #fef2f2; }
+
+  /* ---------- Footer ---------- */
+  .footer {
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #475569;
+    font-weight: 500;
+  }
+  .footer .legend span { margin-right: 14px; }
+  .footer .legend .ok    { color: #059669; }
+  .footer .legend .warn  { color: #c2410c; }
+  .footer .legend .crit  { color: #b91c1c; }
+</style>
+</head>
+<body>
+<section class="page">
+
+  <!-- BRANDING BAR -->
+  <header class="brand-bar">
+    <div class="brand-left">
+      <div class="brand-logo">MO</div>
+      <div>
+        <div class="brand-name">MEALOPS</div>
+        <div class="brand-sub">Meal Tracking System</div>
+        <div class="brand-tag">UAE Labour Camps</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="row"><span>Period</span><span>16-May-2026</span></div>
+      <div class="row"><span>Scope</span><span>All Camps</span></div>
+      <div class="row"><span>Generated</span><span>16-May-2026 14:22</span></div>
+    </div>
+  </header>
+
+  <!-- TITLE BAND -->
+  <div class="title-band">
+    <h1>DAILY MEAL CONSUMPTION</h1>
+    <div class="subtitle">16-May-2026 <span class="dot">•</span> Saturday <span class="dot">•</span> Per-camp served vs estimated by meal session</div>
+  </div>
+
+  <!-- KPI PILLS -->
+  <div class="pills">
+    <div class="pill served">    <span class="lbl">Served</span>     <span class="val">18,420</span></div>
+    <div class="pill estimated"> <span class="lbl">Estimated</span>  <span class="val">22,340</span></div>
+    <div class="pill breakfast"> <span class="lbl">Breakfast</span>  <span class="val">5,240</span></div>
+    <div class="pill lunch">     <span class="lbl">Lunch</span>      <span class="val">7,820</span></div>
+    <div class="pill dinner">    <span class="lbl">Dinner</span>     <span class="val">5,360</span></div>
+    <div class="pill variance">  <span class="lbl">Variance</span>   <span class="val">−3,920</span></div>
+    <div class="pill wastage">   <span class="lbl">Wastage %</span>  <span class="val">17.5%</span></div>
+  </div>
+
+  <!-- TABLE -->
+  <table>
+    <thead>
+      <tr>
+        <th>Camp</th>
+        <th>Site</th>
+        <th class="right">Breakfast</th>
+        <th class="right">Lunch</th>
+        <th class="right">Dinner</th>
+        <th class="right">Total Served</th>
+        <th class="right">Estimated</th>
+        <th class="right">Variance</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><div class="main">AD-01</div><div class="sub">Al Reem Camp</div></td>
+        <td>Reem Tower Project</td>
+        <td class="right num">1,054</td>
+        <td class="right num">1,240</td>
+        <td class="right num">1,141</td>
+        <td class="right num"><strong>3,435</strong></td>
+        <td class="right num">3,596</td>
+        <td class="right num neg">−161</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr>
+        <td><div class="main">DXB-04</div><div class="sub">Marina Workers Village</div></td>
+        <td>Marina Heights</td>
+        <td class="right num">833</td>
+        <td class="right num">980</td>
+        <td class="right num">902</td>
+        <td class="right num"><strong>2,715</strong></td>
+        <td class="right num">2,842</td>
+        <td class="right num neg">−127</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr class="warn">
+        <td><div class="main">SHJ-02</div><div class="sub">Sharjah Industrial Camp</div></td>
+        <td>Industrial Park 7</td>
+        <td class="right num">1,326</td>
+        <td class="right num">1,560</td>
+        <td class="right num">1,435</td>
+        <td class="right num"><strong>4,321</strong></td>
+        <td class="right num">4,524</td>
+        <td class="right num neg">−203</td>
+        <td><span class="status warn">Watch</span></td>
+      </tr>
+      <tr class="crit">
+        <td><div class="main">AUH-09</div><div class="sub">Mussafah Labour Camp</div></td>
+        <td>Mussafah Bridge</td>
+        <td class="right num">1,794</td>
+        <td class="right num">2,110</td>
+        <td class="right num">1,941</td>
+        <td class="right num"><strong>5,845</strong></td>
+        <td class="right num">6,119</td>
+        <td class="right num neg">−274</td>
+        <td><span class="status crit">Offline</span></td>
+      </tr>
+      <tr>
+        <td><div class="main">RAK-01</div><div class="sub">Al Hamra Camp</div></td>
+        <td>Al Hamra Mall Ext.</td>
+        <td class="right num">629</td>
+        <td class="right num">740</td>
+        <td class="right num">681</td>
+        <td class="right num"><strong>2,050</strong></td>
+        <td class="right num">2,146</td>
+        <td class="right num neg">−96</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr>
+        <td><div class="main">AJM-03</div><div class="sub">Ajman Central Camp</div></td>
+        <td>Corniche Towers</td>
+        <td class="right num">1,122</td>
+        <td class="right num">1,320</td>
+        <td class="right num">1,214</td>
+        <td class="right num"><strong>3,656</strong></td>
+        <td class="right num">3,828</td>
+        <td class="right num neg">−172</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr style="background: #f8fafc; font-weight: 600;">
+        <td>TOTAL</td>
+        <td>6 camps</td>
+        <td class="right num">6,758</td>
+        <td class="right num">7,950</td>
+        <td class="right num">7,314</td>
+        <td class="right num">22,022</td>
+        <td class="right num">23,055</td>
+        <td class="right num neg">−1,033</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="legend">
+      <span><span class="ok">●</span> Healthy ≤ 5% variance</span>
+      <span><span class="warn">●</span> Watch 5–10%</span>
+      <span><span class="crit">●</span> Critical &gt; 10%</span>
+    </div>
+    <div>Powered by <strong style="color:#0f172a">MealOps</strong></div>
+    <div>Page 1 of 2</div>
+  </footer>
+
+</section>
+
+<!-- ====================== PAGE 2 ====================== -->
+<section class="page">
+
+  <h2 class="page-cont-title">DAILY MEAL CONSUMPTION <span>— Previous Day · 15-May-2026 · Friday</span></h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Camp</th>
+        <th>Site</th>
+        <th class="right">Breakfast</th>
+        <th class="right">Lunch</th>
+        <th class="right">Dinner</th>
+        <th class="right">Total Served</th>
+        <th class="right">Estimated</th>
+        <th class="right">Variance</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><div class="main">AD-01</div><div class="sub">Al Reem Camp</div></td>
+        <td>Reem Tower Project</td>
+        <td class="right num">1,098</td>
+        <td class="right num">1,240</td>
+        <td class="right num">1,180</td>
+        <td class="right num"><strong>3,518</strong></td>
+        <td class="right num">3,596</td>
+        <td class="right num neg">−78</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr>
+        <td><div class="main">DXB-04</div><div class="sub">Marina Workers Village</div></td>
+        <td>Marina Heights</td>
+        <td class="right num">861</td>
+        <td class="right num">972</td>
+        <td class="right num">919</td>
+        <td class="right num"><strong>2,752</strong></td>
+        <td class="right num">2,842</td>
+        <td class="right num neg">−90</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr>
+        <td><div class="main">SHJ-02</div><div class="sub">Sharjah Industrial Camp</div></td>
+        <td>Industrial Park 7</td>
+        <td class="right num">1,372</td>
+        <td class="right num">1,548</td>
+        <td class="right num">1,464</td>
+        <td class="right num"><strong>4,384</strong></td>
+        <td class="right num">4,524</td>
+        <td class="right num neg">−140</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr class="warn">
+        <td><div class="main">AUH-09</div><div class="sub">Mussafah Labour Camp</div></td>
+        <td>Mussafah Bridge</td>
+        <td class="right num">1,820</td>
+        <td class="right num">2,094</td>
+        <td class="right num">1,980</td>
+        <td class="right num"><strong>5,894</strong></td>
+        <td class="right num">6,119</td>
+        <td class="right num neg">−225</td>
+        <td><span class="status warn">Watch</span></td>
+      </tr>
+      <tr>
+        <td><div class="main">RAK-01</div><div class="sub">Al Hamra Camp</div></td>
+        <td>Al Hamra Mall Ext.</td>
+        <td class="right num">645</td>
+        <td class="right num">735</td>
+        <td class="right num">692</td>
+        <td class="right num"><strong>2,072</strong></td>
+        <td class="right num">2,146</td>
+        <td class="right num neg">−74</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr>
+        <td><div class="main">AJM-03</div><div class="sub">Ajman Central Camp</div></td>
+        <td>Corniche Towers</td>
+        <td class="right num">1,150</td>
+        <td class="right num">1,308</td>
+        <td class="right num">1,239</td>
+        <td class="right num"><strong>3,697</strong></td>
+        <td class="right num">3,828</td>
+        <td class="right num neg">−131</td>
+        <td><span class="status ok">Healthy</span></td>
+      </tr>
+      <tr style="background: #f8fafc; font-weight: 600;">
+        <td>TOTAL</td>
+        <td>6 camps</td>
+        <td class="right num">6,946</td>
+        <td class="right num">7,897</td>
+        <td class="right num">7,474</td>
+        <td class="right num">22,317</td>
+        <td class="right num">23,055</td>
+        <td class="right num neg">−738</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="footer">
+    <div class="legend">
+      <span><span class="ok">●</span> Healthy ≤ 5% variance</span>
+      <span><span class="warn">●</span> Watch 5–10%</span>
+      <span><span class="crit">●</span> Critical &gt; 10%</span>
+    </div>
+    <div>Powered by <strong style="color:#0f172a">MealOps</strong></div>
+    <div>Page 2 of 2</div>
+  </footer>
+
+</section>
+</body>
+</html>
