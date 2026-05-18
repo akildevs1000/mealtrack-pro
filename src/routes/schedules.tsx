@@ -37,6 +37,7 @@ import {
   X,
   AlertCircle,
   Loader2,
+  ShieldCheck,
 } from "lucide-react";
 
 export const Route = createFileRoute("/schedules")({
@@ -110,7 +111,10 @@ function validateSchedule(s: Schedule, all: Schedule[]): Issue[] {
 }
 
 function SchedulesPage() {
-  const { currentUser } = useSession();
+  const session = useSession();
+  const canView = session.can("automation", "view");
+  const canEdit = session.can("automation", "edit");
+  const canDelete = session.can("automation", "delete");
   const { data: users = [] } = useAppUsers();
   const adminRecipients = useMemo(
     () =>
@@ -130,7 +134,15 @@ function SchedulesPage() {
   const [ftpOpen, setFtpOpen] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "operator";
+  if (!canView) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-12 text-center">
+        <ShieldCheck className="size-10 mx-auto text-muted-foreground" />
+        <h2 className="mt-4 font-display text-lg font-semibold">Restricted</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Your role does not have access to automation.</p>
+      </div>
+    );
+  }
 
   function add() {
     const body: ScheduleInput = {
@@ -201,7 +213,7 @@ function SchedulesPage() {
             <Server className="size-3.5" /> FTP settings
             {ftpConfig && <span className="ml-0.5 size-1.5 rounded-full bg-emerald-500" />}
           </button>
-          {isAdmin && (
+          {canEdit && (
             <button
               onClick={add}
               disabled={createSchedule.isPending}
@@ -246,7 +258,8 @@ function SchedulesPage() {
               onRemove={() => remove(s.id)}
               onSendNow={() => sendNow(s)}
               onOpenFtpSettings={() => setFtpOpen(true)}
-              readOnly={!isAdmin}
+              readOnly={!canEdit}
+              canDelete={canDelete}
               running={runSchedule.isPending && runSchedule.variables === s.id}
             />
           ))}
@@ -316,6 +329,7 @@ function ScheduleCard({
   onSendNow,
   onOpenFtpSettings,
   readOnly,
+  canDelete,
   running,
 }: {
   schedule: Schedule;
@@ -327,6 +341,7 @@ function ScheduleCard({
   onSendNow: () => void;
   onOpenFtpSettings: () => void;
   readOnly: boolean;
+  canDelete: boolean;
   running: boolean;
 }) {
   const next = s.nextRunAt ? new Date(s.nextRunAt) : null;
@@ -618,7 +633,7 @@ function ScheduleCard({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {!readOnly && (
+          {canDelete && (
             <button
               onClick={onRemove}
               className="h-8 px-2.5 rounded-md text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 inline-flex items-center gap-1.5"

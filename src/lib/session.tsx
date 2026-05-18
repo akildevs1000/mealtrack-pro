@@ -4,7 +4,7 @@ import { api, setToken } from "./api";
 export type Role = "admin" | "operator" | "user" | "manager";
 export type TabKey =
   | "overview" | "scanner" | "camps" | "employees" | "managers"
-  | "forecast" | "devices" | "reports" | "users";
+  | "forecast" | "devices" | "reports" | "automation" | "users";
 
 export type Perm = { view: boolean; edit: boolean; delete: boolean };
 export type RolePermissions = Record<TabKey, Perm>;
@@ -28,6 +28,7 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: "forecast", label: "Forecast" },
   { key: "devices", label: "Devices" },
   { key: "reports", label: "Reports" },
+  { key: "automation", label: "Automation" },
   { key: "users", label: "User Profiles" },
 ];
 
@@ -69,10 +70,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       let perms = emptyMatrix();
       try {
         const matrix = await api<Record<string, Record<string, Perm>>>("/users/permissions/all");
-        // Backfill any missing tabs with NONE
+        // Only override what the API actually returned. For tabs the DB
+        // hasn't been seeded with yet, keep the emptyMatrix() defaults
+        // (admin: ALL, others: NONE) so a freshly-deployed tab isn't dead
+        // for admins until ensureDefaultPermissions catches up.
         for (const role of Object.keys(perms) as Role[]) {
           for (const t of TABS) {
-            perms[role][t.key] = matrix[role]?.[t.key] ?? NONE;
+            const apiPerm = matrix[role]?.[t.key];
+            if (apiPerm) perms[role][t.key] = apiPerm;
           }
         }
       } catch {
@@ -157,17 +162,20 @@ function defaultPermsFor(role: Role): Record<Role, RolePermissions> {
   if (role === "operator") {
     apply("operator", {
       overview: VIEW, scanner: EDIT, camps: EDIT, employees: EDIT,
-      managers: VIEW, forecast: EDIT, devices: EDIT, reports: VIEW, users: NONE,
+      managers: VIEW, forecast: EDIT, devices: EDIT, reports: VIEW,
+      automation: EDIT, users: NONE,
     });
   } else if (role === "user") {
     apply("user", {
       overview: VIEW, scanner: VIEW, camps: VIEW, employees: VIEW,
-      managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW, users: NONE,
+      managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
+      automation: NONE, users: NONE,
     });
   } else if (role === "manager") {
     apply("manager", {
       overview: VIEW, scanner: EDIT, camps: VIEW, employees: VIEW,
-      managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW, users: NONE,
+      managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
+      automation: NONE, users: NONE,
     });
   }
   return m;

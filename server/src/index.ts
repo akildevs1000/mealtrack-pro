@@ -18,6 +18,7 @@ import schedulesRouter from "./routes/schedules.js";
 import ftpConfigRouter from "./routes/ftp-config.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 import { startScheduler } from "./scheduler/worker.js";
+import { ensureDefaultPermissions } from "./lib/ensure-permissions.js";
 
 const app = express();
 const PORT = Number(process.env.PORT || 5044);
@@ -46,8 +47,15 @@ app.use("/api/ftp-config", ftpConfigRouter);
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
+  // Backfill any newly-added (role, tab) rows so the live DB stays in sync
+  // with source after a deploy — no destructive re-seed needed.
+  try {
+    await ensureDefaultPermissions();
+  } catch (e) {
+    console.error("[permissions] ensureDefaultPermissions failed", e);
+  }
   // Boot the in-process cron only after the HTTP server is up so any startup
   // crashes still surface a useful "listening on…" line first.
   startScheduler();

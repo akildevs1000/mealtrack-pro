@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   AlertCircle,
   BarChart3,
-  CalendarClock,
 } from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import {
@@ -350,12 +349,6 @@ function ReportsPage() {
             className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium"
           >
             <BarChart3 className="size-4" /> Open drilldown
-          </Link>
-          <Link
-            to="/schedules"
-            className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium"
-          >
-            <CalendarClock className="size-4" /> Scheduled reports
           </Link>
           <button
             onClick={exportPdf}

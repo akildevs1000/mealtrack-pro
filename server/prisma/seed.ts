@@ -86,7 +86,7 @@ const managers = [
   { name: "Bilal Ahmed", username: "bilal.ahmed", password: "Ajm@n!Cent03", pin: "5555", email: "bilal.a@mealops.ae", phone: "+971 54 220 9981", emiratesId: "784-1987-4456789-5", campCode: "AJM-03", role: "CampManager", shift: "FullDay", joinDate: new Date("2022-05-14"), expiryDate: addDays(15), status: "Suspended", avatar: "BA", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
 ];
 
-const TABS = ["overview", "scanner", "camps", "employees", "managers", "forecast", "devices", "reports", "users"];
+const TABS = ["overview", "scanner", "camps", "employees", "managers", "forecast", "devices", "reports", "automation", "users"];
 
 const ALL = { view: true, edit: true, delete: true };
 const VIEW = { view: true, edit: false, delete: false };
@@ -97,15 +97,18 @@ const rolePerms: Record<Role, Record<string, typeof ALL>> = {
   admin: Object.fromEntries(TABS.map((t) => [t, ALL])) as any,
   operator: {
     overview: VIEW, scanner: EDIT, camps: EDIT, employees: EDIT,
-    managers: VIEW, forecast: EDIT, devices: EDIT, reports: VIEW, users: NONE,
+    managers: VIEW, forecast: EDIT, devices: EDIT, reports: VIEW,
+    automation: EDIT, users: NONE,
   },
   user: {
     overview: VIEW, scanner: VIEW, camps: VIEW, employees: VIEW,
-    managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW, users: NONE,
+    managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
+    automation: NONE, users: NONE,
   },
   manager: {
     overview: VIEW, scanner: EDIT, camps: VIEW, employees: VIEW,
-    managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW, users: NONE,
+    managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
+    automation: NONE, users: NONE,
   },
 };
 
