@@ -22,7 +22,7 @@ npx prisma migrate dev --name init
 #    role permissions and ~600 sample scans)
 npm run seed
 
-# 5. Start the API (defaults to http://localhost:4000)
+# 5. Start the API (defaults to http://localhost:5044)
 npm run dev
 ```
 

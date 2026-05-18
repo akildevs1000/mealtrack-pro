@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import * as XLSX from "xlsx";
 
-const BASE = "http://localhost:4000/api";
+const BASE = "http://localhost:5044/api";
 
 async function login(username: string, password: string) {
   const r = await fetch(`${BASE}/auth/login`, {

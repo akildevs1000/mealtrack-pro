@@ -1,12 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
-import { camps, employees, recentScans } from "@/lib/mock-data";
 import { FileBarChart, FileSpreadsheet, FileText, Filter, Server, Download, Search, X, CheckCircle2, AlertCircle, BarChart3, ScanLine, CalendarClock } from "lucide-react";
 import { useCampScope } from "@/lib/session";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import {
+  useCamps,
+  useReportConsumption,
+  useReportCamps,
+  useReportWastage,
+  useReportScans,
+  useReportEmployees,
+} from "@/lib/hooks";
 import * as XLSX from "xlsx";
-import { ReportPreview, type ReportType, type MealFilter } from "@/components/app/ReportPreview";
+import { ReportPreview, REPORT_CSS, type ReportType, type MealFilter, type ReportData } from "@/components/app/ReportPreview";
+import { ReportsLiveView } from "@/components/app/ReportsLiveView";
 
 export const Route = createFileRoute("/reports")({
   component: ReportsPage,
@@ -23,13 +29,17 @@ const reportTypes: { id: ReportType; title: string; desc: string }[] = [
 ];
 
 const todayIso = new Date().toISOString().slice(0, 10);
-const weekAgoIso = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+const monthAgoIso = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
 
 function ReportsPage() {
   const scope = useCampScope();
-  const visibleCamps = useMemo(() => (scope ? camps.filter((c) => scope.includes(c.code)) : camps), [scope]);
+  const { data: campsApi } = useCamps();
+  const visibleCamps = useMemo(
+    () => (scope ? (campsApi ?? []).filter((c) => scope.includes(c.code)) : (campsApi ?? [])),
+    [scope, campsApi],
+  );
   const [active, setActive] = useState<ReportType>("consumption");
-  const [from, setFrom] = useState(weekAgoIso);
+  const [from, setFrom] = useState(monthAgoIso);
   const [to, setTo] = useState(todayIso);
   const [camp, setCamp] = useState(scope ? scope[0] : "all");
   const [meal, setMeal] = useState<Meal>("All");
@@ -37,9 +47,17 @@ function ReportsPage() {
   const [query, setQuery] = useState("");
   const [ftpOpen, setFtpOpen] = useState(false);
   const [ftpResult, setFtpResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  const data = useMemo(() => buildRows(active, { camp, meal, status, query }), [active, camp, meal, status, query]);
+  const campParam = camp !== "all" ? camp : undefined;
+  // Fire only the query matching the active report. The others stay disabled.
+  const consumption = useReportConsumption({ from, to, campCode: campParam });
+  const camps = useReportCamps({ from, to, campCode: campParam });
+  const wastage = useReportWastage({ from, to, campCode: campParam });
+  const scans = useReportScans({ from, to, campCode: campParam, meal, status, q: query });
+  const employees = useReportEmployees({ campCode: campParam, status, q: query });
+
   const previewFilters = useMemo(
     () => ({ from, to, camp, meal, status, query }),
     [from, to, camp, meal, status, query],
@@ -48,51 +66,113 @@ function ReportsPage() {
   const reportName = `${active}_${from}_to_${to}${camp !== "all" ? "_" + camp : ""}`;
   const title = reportTypes.find((r) => r.id === active)!.title;
 
-  const [pdfBusy, setPdfBusy] = useState(false);
+  const scopeLabel = scope
+    ? scope.length === 1
+      ? scope[0]
+      : `${scope.length} camps`
+    : campParam ?? "All Camps";
 
-  async function exportPdf() {
+  const { data, loading, headers, exportRows } = useMemo<{
+    data: ReportData | null;
+    loading: boolean;
+    headers: string[];
+    exportRows: (string | number)[][];
+  }>(() => {
+    if (active === "consumption") {
+      const rows = consumption.data?.rows ?? [];
+      return {
+        data: { kind: "consumption", rows },
+        loading: consumption.isLoading,
+        headers: ["Camp", "Site", "Breakfast", "Lunch", "Dinner", "Total Served", "Estimated", "Variance"],
+        exportRows: rows.map((r) => [r.code, r.site, r.breakfast, r.lunch, r.dinner, r.served, r.estimated, r.variance]),
+      };
+    }
+    if (active === "camp") {
+      const rows = camps.data?.rows ?? [];
+      return {
+        data: { kind: "camp", rows },
+        loading: camps.isLoading,
+        headers: ["Code", "Name", "Site", "Employees", "Served", "Coverage %", "Balance", "Duplicates", "Online", "Devices"],
+        exportRows: rows.map((r) => [r.code, r.name, r.site, r.employees, r.served, r.coverage, r.balance, r.duplicates, r.online ? "Online" : "Offline", `${r.devicesOnline}/${r.devicesTotal}`]),
+      };
+    }
+    if (active === "wastage") {
+      const rows = wastage.data?.rows ?? [];
+      return {
+        data: { kind: "wastage", rows },
+        loading: wastage.isLoading,
+        headers: ["Camp", "Site", "Estimated", "Served", "Wastage", "% Wastage", "Status"],
+        exportRows: rows.map((r) => [r.code, r.site, r.estimated, r.served, r.wastage, `${r.pct.toFixed(1)}%`, r.status]),
+      };
+    }
+    if (active === "scans") {
+      const rows = scans.data ?? [];
+      return {
+        data: { kind: "scans", rows },
+        loading: scans.isLoading,
+        headers: ["Date", "Time", "Labour ID", "Name", "Camp", "Meal", "Status"],
+        exportRows: rows.map((s) => [s.date, s.time, s.labourId, s.name, s.camp, s.meal, s.status]),
+      };
+    }
+    // employee
+    const rows = employees.data ?? [];
+    return {
+      data: { kind: "employee", rows },
+      loading: employees.isLoading,
+      headers: ["Labour ID", "Name", "Camp", "Company", "Designation", "Status", "Breakfast", "Lunch", "Dinner"],
+      exportRows: rows.map((e) => [e.labourId, e.name, e.camp, e.company, e.designation, e.status, e.breakfast ? "Yes" : "No", e.lunch ? "Yes" : "No", e.dinner ? "Yes" : "No"]),
+    };
+  }, [active, consumption.data, consumption.isLoading, camps.data, camps.isLoading, wastage.data, wastage.isLoading, scans.data, scans.isLoading, employees.data, employees.isLoading]);
+
+  function exportPdf() {
     const node = previewRef.current?.querySelector(".mo-report") as HTMLElement | null;
     if (!node) return;
     setPdfBusy(true);
     try {
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-        windowWidth: node.scrollWidth,
-        windowHeight: node.scrollHeight,
-      });
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      if (imgHeight <= pageHeight) {
-        doc.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
-      } else {
-        // multi-page: slice the image vertically
-        let remaining = imgHeight;
-        let yOffset = 0;
-        while (remaining > 0) {
-          doc.addImage(imgData, "JPEG", 0, -yOffset, imgWidth, imgHeight);
-          remaining -= pageHeight;
-          if (remaining > 0) {
-            doc.addPage();
-            yOffset += pageHeight;
-          }
-        }
+      // Open the report in an isolated print window. The browser uses its own
+      // rendering engine (identical to the live preview) so the printed PDF is
+      // a pixel-perfect copy. The user picks "Save as PDF" in the dialog.
+      const win = window.open("", "_blank", "width=1200,height=900");
+      if (!win) {
+        alert("Allow pop-ups for this site to download the PDF.");
+        return;
       }
-      doc.save(`${reportName}.pdf`);
+      // Grab every .mo-report section in order (the report may have been
+      // pre-paginated into multiple sections — e.g. Employee Master, Scan
+      // Activity Log). Each section becomes its own printed page.
+      const wrap = previewRef.current!;
+      const sections = wrap.querySelectorAll<HTMLElement>(".mo-report");
+      const sectionsHtml = Array.from(sections).map((s) => s.outerHTML).join("");
+
+      win.document.write(`<!doctype html><html><head><meta charset="utf-8"/><title>${reportName}</title>
+        <style>
+          @page { size: A4 landscape; margin: 0; }
+          html, body { margin: 0; padding: 0; background: #ffffff; }
+          ${REPORT_CSS}
+          .mo-report-wrap { background: #ffffff; padding: 0; border-radius: 0; }
+          .mo-report {
+            box-shadow: none;
+            margin: 0 auto;
+            width: 297mm !important;
+            height: 210mm !important;
+            min-height: 210mm !important;
+            max-height: 210mm !important;
+            overflow: hidden !important;
+          }
+          .mo-report + .mo-report { margin-top: 0; }
+          .mo-report tbody tr { page-break-inside: avoid; break-inside: avoid; }
+          @media screen { body { background: #f3f4f6; padding: 16px; } .mo-report + .mo-report { margin-top: 16px; } }
+        </style></head><body>${sectionsHtml}
+        <script>window.addEventListener("load", () => { setTimeout(() => { window.focus(); window.print(); }, 200); });<\/script>
+        </body></html>`);
+      win.document.close();
     } finally {
       setPdfBusy(false);
     }
   }
 
   function exportExcel() {
-    const ws = XLSX.utils.aoa_to_sheet([data.headers, ...data.rows]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...exportRows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 28));
     XLSX.writeFile(wb, `${reportName}.xlsx`);
@@ -117,10 +197,10 @@ function ReportsPage() {
           <Link to="/schedules" className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
             <CalendarClock className="size-4" /> Scheduled reports
           </Link>
-          <button onClick={exportPdf} disabled={pdfBusy} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium disabled:opacity-60">
+          <button onClick={exportPdf} disabled={pdfBusy || loading} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium disabled:opacity-60">
             <FileText className="size-4" /> {pdfBusy ? "Generating…" : "Download PDF"}
           </button>
-          <button onClick={exportExcel} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
+          <button onClick={exportExcel} disabled={loading} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium disabled:opacity-60">
             <FileSpreadsheet className="size-4" /> Download Excel
           </button>
           <button onClick={() => { setFtpOpen(true); setFtpResult(null); }} className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-3.5 py-2 text-sm font-semibold shadow-glow">
@@ -195,7 +275,10 @@ function ReportsPage() {
         </div>
       </div>
 
-      {/* Offscreen render — used as source for the PDF export */}
+      {/* Live dark-theme view (KPI tiles + table) */}
+      <ReportsLiveView data={data} loading={loading} />
+
+      {/* Offscreen white-doc render — used only as the source for the PDF export */}
       <div
         ref={previewRef}
         aria-hidden="true"
@@ -208,7 +291,7 @@ function ReportsPage() {
           zIndex: -1,
         }}
       >
-        <ReportPreview type={active} filters={previewFilters} scopeCodes={scope} />
+        <ReportPreview type={active} filters={previewFilters} scopeLabel={scopeLabel} data={data} loading={loading} />
       </div>
 
       {ftpOpen && (
@@ -318,71 +401,4 @@ function FtpDialog({ fileName, onClose, onResult }: { fileName: string; onClose:
       </div>
     </div>
   );
-}
-
-// ---------------- Row builders ----------------
-
-function buildRows(type: ReportType, f: { camp: string; meal: Meal; status: string; query: string }): { headers: string[]; rows: (string | number)[][] } {
-  const q = f.query.toLowerCase();
-
-  if (type === "consumption") {
-    const headers = ["Camp", "Site", "Breakfast", "Lunch", "Dinner", "Total Served", "Estimated", "Variance"];
-    const rows = camps
-      .filter((c) => f.camp === "all" || c.code === f.camp)
-      .map((c) => {
-        const b = Math.round(c.employees * 0.85);
-        const l = c.employees;
-        const d = Math.round(c.employees * 0.92);
-        const total = b + l + d;
-        const est = Math.round(c.employees * 2.9);
-        return [c.code, c.site, b, l, d, total, est, est - total];
-      });
-    return { headers, rows };
-  }
-
-  if (type === "employee") {
-    const headers = ["Labour ID", "Name", "Camp", "Company", "Designation", "Status", "Breakfast", "Lunch", "Dinner"];
-    const rows = employees
-      .filter((e) => f.camp === "all" || e.camp === f.camp)
-      .filter((e) => f.status === "all" || e.status === f.status)
-      .filter((e) => !q || e.name.toLowerCase().includes(q) || e.labourId.toLowerCase().includes(q))
-      .map((e) => [e.labourId, e.name, e.camp, e.company, e.designation, e.status, e.breakfast ? "Yes" : "No", e.lunch ? "Yes" : "No", e.dinner ? "Yes" : "No"]);
-    return { headers, rows };
-  }
-
-  if (type === "scans") {
-    const headers = ["Time", "Labour ID", "Name", "Camp", "Meal", "Status"];
-    const rows = recentScans
-      .filter((s) => f.camp === "all" || s.camp === f.camp)
-      .filter((s) => f.meal === "All" || s.meal === f.meal)
-      .filter((s) => f.status === "all" || s.status === f.status)
-      .filter((s) => !q || s.name.toLowerCase().includes(q) || s.labourId.toLowerCase().includes(q))
-      .map((s) => [s.time, s.labourId, s.name, s.camp, s.meal, s.status]);
-    return { headers, rows };
-  }
-
-  if (type === "camp") {
-    const headers = ["Code", "Name", "Site", "Employees", "Online", "Served Today", "Balance", "Duplicates"];
-    const rows = camps
-      .filter((c) => f.camp === "all" || c.code === f.camp)
-      .map((c) => {
-        const served = Math.round(c.employees * 2.5);
-        const balance = Math.round(c.employees * 0.4);
-        const dup = c.employees % 11;
-        return [c.code, c.name, c.site, c.employees, c.online ? "Online" : "Offline", served, balance, dup];
-      });
-    return { headers, rows };
-  }
-
-  // wastage
-  const headers = ["Camp", "Estimated", "Served", "Wastage", "% Wastage"];
-  const rows = camps
-    .filter((c) => f.camp === "all" || c.code === f.camp)
-    .map((c) => {
-      const est = Math.round(c.employees * 2.9);
-      const served = Math.round(c.employees * 2.5);
-      const w = est - served;
-      return [c.code, est, served, w, ((w / est) * 100).toFixed(1) + "%"];
-    });
-  return { headers, rows };
 }

@@ -226,32 +226,114 @@ async function main() {
   }
   console.log(`[seed] role permissions: ${Object.keys(rolePerms).length} roles x ${TABS.length} tabs`);
 
-  // Seed some recent scans (last 24h) so /overview has data
-  const existingScanCount = await prisma.scan.count();
-  if (existingScanCount === 0) {
-    const meals: ("Breakfast" | "Lunch" | "Dinner")[] = ["Breakfast", "Lunch", "Dinner"];
-    const statuses: ("Eligible" | "AlreadyServed" | "NotEligible" | "WrongCamp" | "Expired")[] =
-      ["Eligible", "Eligible", "Eligible", "Eligible", "AlreadyServed", "NotEligible", "WrongCamp"];
-    const names = ["Mohammed Rafiq", "Suresh Kumar", "Anwar Hussain", "Ramesh Babu", "Bilal Ahmed", "Vinod Sharma", "Iqbal Khan", "Tariq Mahmood"];
-    const scans: any[] = [];
-    for (let i = 0; i < 600; i++) {
-      const c = camps[i % camps.length];
-      const t = new Date();
-      t.setHours(5 + Math.floor(Math.random() * 17), Math.floor(Math.random() * 60), Math.floor(Math.random() * 60), 0);
-      t.setDate(t.getDate() - Math.floor(Math.random() * 7));
-      scans.push({
-        time: t,
-        name: names[i % names.length],
-        labourId: `LB-${20000 + i * 7}`,
-        campCode: c.code,
-        meal: meals[Math.floor(Math.random() * meals.length)],
-        status: statuses[Math.floor(Math.random() * statuses.length)],
-      });
+  // Seed ~30 days of scans across all camps so reports have realistic data.
+  // Idempotent: if scans already span more than 14 days, we skip; otherwise reseed.
+  const oldestScan = await prisma.scan.findFirst({ orderBy: { time: "asc" } });
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+  const hasMonthData = oldestScan && oldestScan.time < cutoff;
+
+  if (!hasMonthData) {
+    if (oldestScan) {
+      await prisma.scan.deleteMany({});
+      console.log("[seed] clearing existing scans to reseed with 30-day window");
     }
-    await prisma.scan.createMany({ data: scans });
-    console.log(`[seed] scans: ${scans.length}`);
+
+    const meals = ["Breakfast", "Lunch", "Dinner"] as const;
+    const names = [
+      "Mohammed Rafiq", "Suresh Kumar", "Anwar Hussain", "Ramesh Babu", "Bilal Ahmed",
+      "Vinod Sharma", "Iqbal Khan", "Tariq Mahmood", "Sanjay Patel", "Imran Sheikh",
+      "Ravi Verma", "Karim Aslam", "Naveen Kumar", "Faisal Iqbal", "Pradeep Singh",
+      "Mohammed Asif", "Wasim Akram", "Hari Krishnan", "Vimal Raj", "Younis Ahmed",
+    ];
+
+    // Meal time windows (hour ranges, Dubai-ish). Scans bunch around these.
+    const mealWindow = (m: typeof meals[number]) =>
+      m === "Breakfast" ? { start: 6, end: 9 }
+        : m === "Lunch" ? { start: 12, end: 14 }
+          : { start: 19, end: 22 };
+
+    // Coverage tuning: smaller share of headcount per meal so we don't blow up.
+    // Per camp per meal per day = round(employees * coverageRate * statusMultiplier)
+    // Per-meal coverage: ~30% of headcount per meal per camp per day.
+    // Across 3 meals ≈ 0.9 × employees served per day — matches a realistic
+    // ~90% daily-attendance pattern when compared against the server's
+    // `estimated = employees × days` (one expected portion per employee per day).
+    const COVERAGE = 0.30;
+
+    const all: any[] = [];
+    const DAYS = 30;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let d = 0; d < DAYS; d++) {
+      const day = new Date(today);
+      day.setDate(today.getDate() - d);
+
+      // Saturday & Sunday (weekend in some camps) — slightly less coverage
+      const dow = day.getDay();
+      const weekendFactor = dow === 5 || dow === 6 ? 0.85 : 1.0;
+
+      for (const c of camps) {
+        // Each camp can have a daily fluctuation factor
+        const dailyJitter = 0.85 + Math.random() * 0.3;
+        const offlinePenalty = c.online ? 1 : 0.55; // offline camp still has some scans (manual queue) but lower
+
+        for (const meal of meals) {
+          const win = mealWindow(meal);
+          const count = Math.max(
+            10,
+            Math.round(c.employees * COVERAGE * weekendFactor * dailyJitter * offlinePenalty),
+          );
+
+          for (let i = 0; i < count; i++) {
+            const hour = win.start + Math.random() * (win.end - win.start);
+            const t = new Date(day);
+            t.setHours(Math.floor(hour), Math.floor((hour % 1) * 60), Math.floor(Math.random() * 60), 0);
+
+            // 90% Eligible, 4% AlreadyServed (duplicates), 3% NotEligible, 2% WrongCamp, 1% Expired
+            const r = Math.random();
+            const status =
+              r < 0.90 ? "Eligible"
+                : r < 0.94 ? "AlreadyServed"
+                  : r < 0.97 ? "NotEligible"
+                    : r < 0.99 ? "WrongCamp"
+                      : "Expired";
+
+            const nameIdx = (i + d * 7 + c.code.charCodeAt(0)) % names.length;
+            // Stable labour ID per employee slot per camp so duplicates can happen across days
+            const empSlot = i % Math.max(50, Math.floor(c.employees / 3));
+            const labourId = `LB-${(c.code.charCodeAt(0) * 1000 + c.code.charCodeAt(c.code.length - 1) * 10 + empSlot)
+              .toString()
+              .padStart(5, "0")}`;
+
+            all.push({
+              time: t,
+              name: names[nameIdx],
+              labourId,
+              campCode: c.code,
+              meal,
+              status,
+            });
+          }
+        }
+      }
+    }
+
+    // Bulk insert in chunks to avoid blowing prisma's max payload
+    const CHUNK = 5000;
+    for (let i = 0; i < all.length; i += CHUNK) {
+      await prisma.scan.createMany({ data: all.slice(i, i + CHUNK) });
+    }
+    const oldest = all.reduce((acc, s) => (s.time < acc ? s.time : acc), all[0].time);
+    const newest = all.reduce((acc, s) => (s.time > acc ? s.time : acc), all[0].time);
+    console.log(
+      `[seed] scans: ${all.length} across ${DAYS} days ` +
+      `(${oldest.toISOString().slice(0, 10)} → ${newest.toISOString().slice(0, 10)})`,
+    );
   } else {
-    console.log(`[seed] scans already exist (${existingScanCount}) — skipping`);
+    const total = await prisma.scan.count();
+    console.log(`[seed] scans already span >14 days (${total} rows) — skipping reseed. Run prisma:reset to refresh.`);
   }
 
   console.log("[seed] done.");

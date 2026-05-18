@@ -7,7 +7,7 @@ const TOKEN_KEY = "mealops.token.v1";
 
 export const API_BASE =
   (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE) ||
-  "http://localhost:4000/api";
+  "http://localhost:5044/api";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

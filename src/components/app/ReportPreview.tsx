@@ -1,5 +1,10 @@
-import { useMemo } from "react";
-import { camps as allCamps, employees, recentScans, type Camp, type Employee, type Scan } from "@/lib/mock-data";
+import type {
+  ReportConsumptionRow,
+  ReportCampRow,
+  ReportWastageRow,
+  ReportScanRow,
+  ReportEmployeeRow,
+} from "@/lib/hooks";
 
 export type ReportType = "consumption" | "employee" | "scans" | "camp" | "wastage";
 export type MealFilter = "All" | "Breakfast" | "Lunch" | "Dinner";
@@ -13,10 +18,19 @@ export type ReportFilters = {
   query: string;
 };
 
+export type ReportData =
+  | { kind: "consumption"; rows: ReportConsumptionRow[] }
+  | { kind: "camp"; rows: ReportCampRow[] }
+  | { kind: "wastage"; rows: ReportWastageRow[] }
+  | { kind: "scans"; rows: ReportScanRow[] }
+  | { kind: "employee"; rows: ReportEmployeeRow[] };
+
 type Props = {
   type: ReportType;
   filters: ReportFilters;
-  scopeCodes: string[] | null;
+  scopeLabel: string;
+  data: ReportData | null;
+  loading?: boolean;
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -50,64 +64,6 @@ function initials(name: string) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-}
-
-function applyCampScope<T extends { camp?: string; code?: string }>(rows: T[], scopeCodes: string[] | null, key: "camp" | "code"): T[] {
-  if (!scopeCodes) return rows;
-  return rows.filter((r) => scopeCodes.includes((r as Record<string, string>)[key]));
-}
-
-export function ReportPreview({ type, filters, scopeCodes }: Props) {
-  const meta = REPORT_META[type];
-  const scopeLabel = scopeCodes
-    ? scopeCodes.length === 1
-      ? scopeCodes[0]
-      : `${scopeCodes.length} camps`
-    : filters.camp !== "all"
-      ? filters.camp
-      : "All Camps";
-
-  return (
-    <div className="mo-report-wrap">
-      <style>{REPORT_CSS}</style>
-      <section className="mo-report">
-        <header className="brand-bar">
-          <div className="brand-left">
-            <div className="brand-logo">MO</div>
-            <div>
-              <div className="brand-name">MEALOPS</div>
-              <div className="brand-sub">Meal Tracking System</div>
-              <div className="brand-tag">UAE Labour Camps</div>
-            </div>
-          </div>
-          <div className="meta">
-            <div className="row"><span>{meta.metaLeft}</span><span>{fmtDate(filters.to)}</span></div>
-            <div className="row"><span>Scope</span><span>{scopeLabel}</span></div>
-            <div className="row"><span>Generated</span><span>{fmtNow()}</span></div>
-          </div>
-        </header>
-
-        <div className="title-band">
-          <h1>{meta.title}</h1>
-          <div className="subtitle">
-            {fmtDate(filters.to)} <span className="dot">•</span> {fmtDayName(filters.to)} <span className="dot">•</span> {meta.subtitle}
-          </div>
-        </div>
-
-        {type === "consumption" && <ConsumptionBody filters={filters} scopeCodes={scopeCodes} />}
-        {type === "employee" && <EmployeeBody filters={filters} scopeCodes={scopeCodes} />}
-        {type === "scans" && <ScansBody filters={filters} scopeCodes={scopeCodes} />}
-        {type === "camp" && <CampBody filters={filters} scopeCodes={scopeCodes} />}
-        {type === "wastage" && <WastageBody filters={filters} scopeCodes={scopeCodes} />}
-
-        <footer className="footer">
-          <div className="legend">{meta.legend}</div>
-          <div>Powered by <strong style={{ color: "#0f172a" }}>MealOps</strong></div>
-          <div>{filters.from} → {filters.to}</div>
-        </footer>
-      </section>
-    </div>
-  );
 }
 
 const REPORT_META: Record<ReportType, { title: string; subtitle: string; metaLeft: string; legend: React.ReactNode }> = {
@@ -175,25 +131,94 @@ const REPORT_META: Record<ReportType, { title: string; subtitle: string; metaLef
   },
 };
 
-// ---------------- Consumption ----------------
-function ConsumptionBody({ filters, scopeCodes }: { filters: ReportFilters; scopeCodes: string[] | null }) {
-  const rows = useMemo(() => {
-    let list: Camp[] = scopeCodes ? allCamps.filter((c) => scopeCodes.includes(c.code)) : allCamps;
-    if (filters.camp !== "all") list = list.filter((c) => c.code === filters.camp);
-    return list.map((c) => {
-      const breakfast = Math.round(c.employees * 0.85);
-      const lunch = c.employees;
-      const dinner = Math.round(c.employees * 0.92);
-      const served = breakfast + lunch + dinner;
-      const estimated = Math.round(c.employees * 2.9);
-      const variance = served - estimated;
-      const wastagePct = ((estimated - served) / estimated) * 100;
-      const status: "ok" | "warn" | "crit" =
-        wastagePct <= 5 ? "ok" : wastagePct <= 10 ? "warn" : "crit";
-      return { camp: c, breakfast, lunch, dinner, served, estimated, variance, status };
-    });
-  }, [filters.camp, scopeCodes]);
+// ---------------- Shared shell ----------------
 
+function BrandBar({ type, filters, scopeLabel }: { type: ReportType; filters: ReportFilters; scopeLabel: string }) {
+  const meta = REPORT_META[type];
+  return (
+    <header className="brand-bar">
+      <div className="brand-left">
+        <div className="brand-logo">MO</div>
+        <div>
+          <div className="brand-name">MEALOPS</div>
+          <div className="brand-sub">Meal Tracking System</div>
+          <div className="brand-tag">UAE Labour Camps</div>
+        </div>
+      </div>
+      <div className="meta">
+        <div className="row"><span>{meta.metaLeft}</span><span>{fmtDate(filters.to)}</span></div>
+        <div className="row"><span>Scope</span><span>{scopeLabel}</span></div>
+        <div className="row"><span>Generated</span><span>{fmtNow()}</span></div>
+      </div>
+    </header>
+  );
+}
+
+function TitleBand({ type, filters }: { type: ReportType; filters: ReportFilters }) {
+  const meta = REPORT_META[type];
+  return (
+    <div className="title-band">
+      <h1>{meta.title}</h1>
+      <div className="subtitle">
+        {fmtDate(filters.to)} <span className="dot">•</span> {fmtDayName(filters.to)} <span className="dot">•</span> {meta.subtitle}
+      </div>
+    </div>
+  );
+}
+
+function PageFooter({ type, pageNum, totalPages }: { type: ReportType; pageNum: number; totalPages: number }) {
+  return (
+    <footer className="footer">
+      <div className="legend">{REPORT_META[type].legend}</div>
+      <div>Powered by <strong style={{ color: "#0f172a" }}>MealOps</strong></div>
+      <div>Page {pageNum} of {totalPages}</div>
+    </footer>
+  );
+}
+
+function ContinuationTitle({ type, range }: { type: ReportType; range: string }) {
+  return (
+    <h2 className="page-cont-title">
+      {REPORT_META[type].title} <span>— continued · {range}</span>
+    </h2>
+  );
+}
+
+// ---------------- Main entry ----------------
+
+export function ReportPreview({ type, filters, scopeLabel, data, loading }: Props) {
+  return (
+    <div className="mo-report-wrap">
+      <style>{REPORT_CSS}</style>
+      {loading || !data ? (
+        <section className="mo-report">
+          <BrandBar type={type} filters={filters} scopeLabel={scopeLabel} />
+          <TitleBand type={type} filters={filters} />
+          <div style={{ padding: "32px 12px", textAlign: "center", color: "#64748b" }}>
+            {loading ? "Loading data…" : "No data."}
+          </div>
+          <PageFooter type={type} pageNum={1} totalPages={1} />
+        </section>
+      ) : data.kind === "consumption" ? (
+        <ConsumptionReport rows={data.rows} type={type} filters={filters} scopeLabel={scopeLabel} />
+      ) : data.kind === "camp" ? (
+        <CampReport rows={data.rows} type={type} filters={filters} scopeLabel={scopeLabel} />
+      ) : data.kind === "wastage" ? (
+        <WastageReport rows={data.rows} type={type} filters={filters} scopeLabel={scopeLabel} />
+      ) : data.kind === "scans" ? (
+        <ScansReport rows={data.rows} type={type} filters={filters} scopeLabel={scopeLabel} />
+      ) : (
+        <EmployeeReport rows={data.rows} type={type} filters={filters} scopeLabel={scopeLabel} />
+      )}
+    </div>
+  );
+}
+
+type ShellProps = { type: ReportType; filters: ReportFilters; scopeLabel: string };
+
+// ---------------- Consumption (single page) ----------------
+
+function ConsumptionReport({ rows, type, filters, scopeLabel }: ShellProps & { rows: ReportConsumptionRow[] }) {
   const totals = rows.reduce(
     (acc, r) => ({
       breakfast: acc.breakfast + r.breakfast,
@@ -205,11 +230,18 @@ function ConsumptionBody({ filters, scopeCodes }: { filters: ReportFilters; scop
     }),
     { breakfast: 0, lunch: 0, dinner: 0, served: 0, estimated: 0, variance: 0 },
   );
-
   const wastage = totals.estimated > 0 ? ((totals.estimated - totals.served) / totals.estimated) * 100 : 0;
 
+  function classify(rowVariance: number, rowEstimated: number): "ok" | "warn" | "crit" {
+    const pct = rowEstimated > 0 ? (Math.abs(rowVariance) / rowEstimated) * 100 : 0;
+    return pct <= 5 ? "ok" : pct <= 10 ? "warn" : "crit";
+  }
+
   return (
-    <>
+    <section className="mo-report">
+      <BrandBar type={type} filters={filters} scopeLabel={scopeLabel} />
+      <TitleBand type={type} filters={filters} />
+
       <div className="pills cols-7">
         <Pill kind="served" label="Served" value={fmtNum(totals.served)} />
         <Pill kind="estimated" label="Estimated" value={fmtNum(totals.estimated)} />
@@ -235,25 +267,28 @@ function ConsumptionBody({ filters, scopeCodes }: { filters: ReportFilters; scop
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.camp.id} className={r.status === "warn" ? "warn" : r.status === "crit" ? "crit" : ""}>
-              <td><div className="main">{r.camp.code}</div><div className="sub">{r.camp.name}</div></td>
-              <td>{r.camp.site}</td>
-              <td className="right num">{fmtNum(r.breakfast)}</td>
-              <td className="right num">{fmtNum(r.lunch)}</td>
-              <td className="right num">{fmtNum(r.dinner)}</td>
-              <td className="right num"><strong>{fmtNum(r.served)}</strong></td>
-              <td className="right num">{fmtNum(r.estimated)}</td>
-              <td className={`right num ${r.variance < 0 ? "neg" : r.variance > 0 ? "pos" : "neu"}`}>
-                {r.variance < 0 ? "−" : r.variance > 0 ? "+" : ""}{fmtNum(Math.abs(r.variance))}
-              </td>
-              <td>
-                <span className={`status ${r.status === "ok" ? "ok" : r.status === "warn" ? "warn" : "crit"}`}>
-                  {r.status === "ok" ? "Healthy" : r.status === "warn" ? "Watch" : "Critical"}
-                </span>
-              </td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const status = classify(r.variance, r.estimated);
+            return (
+              <tr key={r.code} className={status === "warn" ? "warn" : status === "crit" ? "crit" : ""}>
+                <td><div className="main">{r.code}</div><div className="sub">{r.name}</div></td>
+                <td>{r.site}</td>
+                <td className="right num">{fmtNum(r.breakfast)}</td>
+                <td className="right num">{fmtNum(r.lunch)}</td>
+                <td className="right num">{fmtNum(r.dinner)}</td>
+                <td className="right num"><strong>{fmtNum(r.served)}</strong></td>
+                <td className="right num">{fmtNum(r.estimated)}</td>
+                <td className={`right num ${r.variance < 0 ? "neg" : r.variance > 0 ? "pos" : "neu"}`}>
+                  {r.variance < 0 ? "−" : r.variance > 0 ? "+" : ""}{fmtNum(Math.abs(r.variance))}
+                </td>
+                <td>
+                  <span className={`status ${status === "ok" ? "ok" : status === "warn" ? "warn" : "crit"}`}>
+                    {status === "ok" ? "Healthy" : status === "warn" ? "Watch" : "Critical"}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
           {rows.length === 0 && <EmptyRow span={9} />}
           {rows.length > 0 && (
             <tr style={{ background: "#f8fafc", fontWeight: 600 }}>
@@ -264,28 +299,350 @@ function ConsumptionBody({ filters, scopeCodes }: { filters: ReportFilters; scop
               <td className="right num">{fmtNum(totals.dinner)}</td>
               <td className="right num">{fmtNum(totals.served)}</td>
               <td className="right num">{fmtNum(totals.estimated)}</td>
-              <td className="right num neg">−{fmtNum(Math.abs(totals.variance))}</td>
+              <td className={`right num ${totals.variance < 0 ? "neg" : "pos"}`}>
+                {totals.variance < 0 ? "−" : "+"}{fmtNum(Math.abs(totals.variance))}
+              </td>
               <td></td>
             </tr>
           )}
         </tbody>
       </table>
+
+      <PageFooter type={type} pageNum={1} totalPages={1} />
+    </section>
+  );
+}
+
+// ---------------- Camp (paginated) ----------------
+
+const CAMP_ROWS_FIRST_PAGE = 5;
+const CAMP_ROWS_PER_PAGE = 9;
+
+function CampReport({ rows, type, filters, scopeLabel }: ShellProps & { rows: ReportCampRow[] }) {
+  const totals = rows.reduce(
+    (acc, r) => ({
+      employees: acc.employees + r.employees,
+      served: acc.served + r.served,
+      estimated: acc.estimated + r.estimated,
+      balance: acc.balance + r.balance,
+      duplicates: acc.duplicates + r.duplicates,
+      online: acc.online + (r.online ? 1 : 0),
+      offline: acc.offline + (r.online ? 0 : 1),
+      devicesOnline: acc.devicesOnline + r.devicesOnline,
+      devicesTotal: acc.devicesTotal + r.devicesTotal,
+    }),
+    { employees: 0, served: 0, estimated: 0, balance: 0, duplicates: 0, online: 0, offline: 0, devicesOnline: 0, devicesTotal: 0 },
+  );
+  const coverageAvg = totals.estimated > 0 ? Math.round((totals.served / totals.estimated) * 100) : 0;
+
+  const chunks: ReportCampRow[][] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const size = chunks.length === 0 ? CAMP_ROWS_FIRST_PAGE : CAMP_ROWS_PER_PAGE;
+    chunks.push(rows.slice(i, i + size));
+    i += size;
+  }
+  if (chunks.length === 0) chunks.push([]);
+  const totalPages = chunks.length;
+
+  return (
+    <>
+      {chunks.map((chunk, idx) => {
+        const isFirst = idx === 0;
+        const isLast = idx === chunks.length - 1;
+        const startIdx = chunks.slice(0, idx).reduce((s, c) => s + c.length, 0);
+        const endIdx = startIdx + chunk.length;
+        return (
+          <section key={idx} className="mo-report" style={!isFirst ? { pageBreakBefore: "always", breakBefore: "page" } : undefined}>
+            {isFirst ? (
+              <>
+                <BrandBar type={type} filters={filters} scopeLabel={scopeLabel} />
+                <TitleBand type={type} filters={filters} />
+
+                <div className="top-cards cols-4">
+                  <div className="card summary">
+                    <div className="icon">🏢</div>
+                    <div>
+                      <div className="title">{rows.length} Active Camp{rows.length === 1 ? "" : "s"}</div>
+                      <div className="desc">Across Abu Dhabi, Dubai, Sharjah, Ajman, RAK</div>
+                      <div className="desc" style={{ marginTop: 6 }}>{totals.devicesOnline} of {totals.devicesTotal} scanner devices online</div>
+                    </div>
+                  </div>
+                  <div className="card">
+                    <div className="lbl">Online %</div>
+                    <div className="val">{totals.devicesTotal > 0 ? Math.round((totals.devicesOnline / totals.devicesTotal) * 100) : 0}%</div>
+                    <div className="sub">{totals.devicesOnline} / {totals.devicesTotal} devices</div>
+                  </div>
+                  <div className="card">
+                    <div className="lbl">Total Served</div>
+                    <div className="val">{fmtNum(totals.served)}</div>
+                    <div className="sub">{coverageAvg}% of estimated</div>
+                  </div>
+                  <div className="card">
+                    <div className="lbl">Score</div>
+                    <div className="val">{coverageAvg}%</div>
+                    <div className="sub">vs estimated demand</div>
+                  </div>
+                </div>
+
+                <div className="pills cols-6">
+                  <Pill kind="camp-online" label="Online" value={String(totals.online)} />
+                  <Pill kind="camp-offline" label="Offline" value={String(totals.offline)} />
+                  <Pill kind="camp-employees" label="Employees" value={fmtNum(totals.employees)} />
+                  <Pill kind="camp-served" label="Served" value={fmtNum(totals.served)} />
+                  <Pill kind="camp-balance" label="Balance" value={fmtNum(totals.balance)} />
+                  <Pill kind="camp-dup" label="Duplicates" value={fmtNum(totals.duplicates)} />
+                </div>
+              </>
+            ) : (
+              <ContinuationTitle type={type} range={`${startIdx + 1}–${endIdx} of ${rows.length}`} />
+            )}
+
+            <CampTable rows={chunk} showTotal={isLast} totals={totals} coverageAvg={coverageAvg} totalRowsCount={rows.length} />
+            <PageFooter type={type} pageNum={idx + 1} totalPages={totalPages} />
+          </section>
+        );
+      })}
     </>
   );
 }
 
-// ---------------- Employee ----------------
-function EmployeeBody({ filters, scopeCodes }: { filters: ReportFilters; scopeCodes: string[] | null }) {
-  const list = useMemo<Employee[]>(() => {
-    const q = filters.query.toLowerCase();
-    let rows = applyCampScope(employees, scopeCodes, "camp");
-    if (filters.camp !== "all") rows = rows.filter((e) => e.camp === filters.camp);
-    if (filters.status !== "all") rows = rows.filter((e) => e.status === filters.status);
-    if (q) rows = rows.filter((e) => e.name.toLowerCase().includes(q) || e.labourId.toLowerCase().includes(q));
-    return rows;
-  }, [filters.camp, filters.status, filters.query, scopeCodes]);
+function CampTable({ rows, showTotal, totals, coverageAvg, totalRowsCount }: {
+  rows: ReportCampRow[];
+  showTotal: boolean;
+  totals: { employees: number; served: number; balance: number; duplicates: number; devicesOnline: number; devicesTotal: number };
+  coverageAvg: number;
+  totalRowsCount: number;
+}) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th style={{ width: 130 }}>Camp</th>
+          <th>Site</th>
+          <th className="right">Employees</th>
+          <th className="right">Served</th>
+          <th className="bar-cell">Coverage</th>
+          <th className="right">Balance</th>
+          <th className="center">Duplicates</th>
+          <th className="center">Devices</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const fill = r.coverage >= 85 ? "" : r.coverage >= 75 ? "warn" : "crit";
+          return (
+            <tr key={r.code} className={r.online ? "" : "offline"}>
+              <td className="camp"><div className="code">{r.code}</div><div className="name">{r.name}</div></td>
+              <td>{r.site}</td>
+              <td className="right num">{fmtNum(r.employees)}</td>
+              <td className="right num">{fmtNum(r.served)}</td>
+              <td className="bar-cell">
+                <div className="num">{r.coverage}%</div>
+                <div className="bar-track"><div className={`bar-fill ${fill}`} style={{ width: `${Math.min(r.coverage, 100)}%` }} /></div>
+              </td>
+              <td className="right num">{fmtNum(r.balance)}</td>
+              <td className="center num">{fmtNum(r.duplicates)}</td>
+              <td className="center">{r.devicesOnline} / {r.devicesTotal}</td>
+              <td><span className={`status ${r.online ? "online" : "offline"}`}>{r.online ? "Online" : "Offline"}</span></td>
+            </tr>
+          );
+        })}
+        {rows.length === 0 && <EmptyRow span={9} />}
+        {showTotal && totalRowsCount > 0 && (
+          <tr style={{ background: "#f8fafc", fontWeight: 600 }}>
+            <td>TOTAL</td>
+            <td>{totalRowsCount} camp{totalRowsCount === 1 ? "" : "s"}</td>
+            <td className="right num">{fmtNum(totals.employees)}</td>
+            <td className="right num">{fmtNum(totals.served)}</td>
+            <td className="bar-cell"><div className="num">{coverageAvg}%</div></td>
+            <td className="right num">{fmtNum(totals.balance)}</td>
+            <td className="center num">{fmtNum(totals.duplicates)}</td>
+            <td className="center">{totals.devicesOnline} / {totals.devicesTotal}</td>
+            <td></td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
 
-  const counts = list.reduce(
+// ---------------- Wastage (paginated) ----------------
+
+const WASTAGE_ROWS_FIRST_PAGE = 5;
+const WASTAGE_ROWS_PER_PAGE = 9;
+
+function WastageReport({ rows, type, filters, scopeLabel }: ShellProps & { rows: ReportWastageRow[] }) {
+  const sorted = [...rows].sort((a, b) => a.pct - b.pct);
+  const totals = sorted.reduce(
+    (acc, r) => ({
+      estimated: acc.estimated + r.estimated,
+      served: acc.served + r.served,
+      wastage: acc.wastage + r.wastage,
+      healthy: acc.healthy + (r.status === "healthy" ? 1 : 0),
+      watch: acc.watch + (r.status === "watch" ? 1 : 0),
+      critical: acc.critical + (r.status === "critical" ? 1 : 0),
+    }),
+    { estimated: 0, served: 0, wastage: 0, healthy: 0, watch: 0, critical: 0 },
+  );
+  const totalPct = totals.estimated > 0 ? (totals.wastage / totals.estimated) * 100 : 0;
+
+  const chunks: ReportWastageRow[][] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    const size = chunks.length === 0 ? WASTAGE_ROWS_FIRST_PAGE : WASTAGE_ROWS_PER_PAGE;
+    chunks.push(sorted.slice(i, i + size));
+    i += size;
+  }
+  if (chunks.length === 0) chunks.push([]);
+  const totalPages = chunks.length;
+
+  return (
+    <>
+      {chunks.map((chunk, idx) => {
+        const isFirst = idx === 0;
+        const isLast = idx === chunks.length - 1;
+        const startIdx = chunks.slice(0, idx).reduce((s, c) => s + c.length, 0);
+        const endIdx = startIdx + chunk.length;
+        return (
+          <section key={idx} className="mo-report" style={!isFirst ? { pageBreakBefore: "always", breakBefore: "page" } : undefined}>
+            {isFirst ? (
+              <>
+                <BrandBar type={type} filters={filters} scopeLabel={scopeLabel} />
+                <TitleBand type={type} filters={filters} />
+
+                <div className="top-cards cols-5">
+                  <div className="card summary wastage">
+                    <div className="icon">⚠</div>
+                    <div>
+                      <div className="title">{totalPct.toFixed(1)}% Wastage</div>
+                      <div className="desc">{fmtNum(totals.wastage)} portions discarded out of {fmtNum(totals.estimated)} estimated</div>
+                      <div className="desc" style={{ marginTop: 6 }}>Target ≤ 5%</div>
+                    </div>
+                  </div>
+                  <div className="card">
+                    <div className="lbl">Estimated</div>
+                    <div className="val">{fmtNum(totals.estimated)}</div>
+                    <div className="sub">period total</div>
+                  </div>
+                  <div className="card">
+                    <div className="lbl">Served</div>
+                    <div className="val">{fmtNum(totals.served)}</div>
+                    <div className="sub">{totals.estimated > 0 ? ((totals.served / totals.estimated) * 100).toFixed(1) : 0}% of est.</div>
+                  </div>
+                  <div className="card">
+                    <div className="lbl">Wastage</div>
+                    <div className="val neg">{fmtNum(totals.wastage)}</div>
+                    <div className="sub">portions</div>
+                  </div>
+                  <div className="card">
+                    <div className="lbl">Avg %</div>
+                    <div className="val">{totalPct.toFixed(1)}%</div>
+                    <div className="sub">Target ≤ 5%</div>
+                  </div>
+                </div>
+
+                <div className="pills cols-4">
+                  <Pill kind="w-healthy" label="Healthy (≤5%)" value={`${totals.healthy} camp${totals.healthy === 1 ? "" : "s"}`} />
+                  <Pill kind="w-watch" label="Watch (5–10%)" value={`${totals.watch} camp${totals.watch === 1 ? "" : "s"}`} />
+                  <Pill kind="w-crit" label="Critical (>10%)" value={`${totals.critical} camp${totals.critical === 1 ? "" : "s"}`} />
+                  <Pill kind="w-target" label="Target" value="≤ 5%" />
+                </div>
+              </>
+            ) : (
+              <ContinuationTitle type={type} range={`${startIdx + 1}–${endIdx} of ${sorted.length}`} />
+            )}
+
+            <WastageTable rows={chunk} showTotal={isLast} totals={totals} totalPct={totalPct} totalRowsCount={sorted.length} />
+            <PageFooter type={type} pageNum={idx + 1} totalPages={totalPages} />
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
+function WastageTable({ rows, showTotal, totals, totalPct, totalRowsCount }: {
+  rows: ReportWastageRow[];
+  showTotal: boolean;
+  totals: { estimated: number; served: number; wastage: number };
+  totalPct: number;
+  totalRowsCount: number;
+}) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th style={{ width: 130 }}>Camp</th>
+          <th>Site</th>
+          <th className="right">Estimated</th>
+          <th className="right">Served</th>
+          <th className="right">Wastage</th>
+          <th>% Wastage</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const fill = r.status === "healthy" ? "" : r.status === "watch" ? "warn" : "crit";
+          const widthPct = Math.min((r.pct / 10) * 50, 100);
+          return (
+            <tr key={r.code} className={r.status === "watch" ? "warn" : r.status === "critical" ? "crit" : ""}>
+              <td className="camp"><div className="code">{r.code}</div><div className="name">{r.name}</div></td>
+              <td>{r.site}</td>
+              <td className="right num">{fmtNum(r.estimated)}</td>
+              <td className="right num">{fmtNum(r.served)}</td>
+              <td className="right num neg">{fmtNum(r.wastage)}</td>
+              <td className="wastage-cell">
+                <div className="wastage-row">
+                  <div className="bar-track">
+                    <div className={`bar-fill ${fill}`} style={{ width: `${widthPct}%` }} />
+                    <div className="target-mark" />
+                  </div>
+                  <div className="wastage-pct">{r.pct.toFixed(1)}%</div>
+                </div>
+              </td>
+              <td>
+                <span className={`status ${r.status === "healthy" ? "healthy" : r.status === "watch" ? "watch" : "critical"}`}>
+                  {r.status === "healthy" ? "Healthy" : r.status === "watch" ? "Watch" : "Critical"}
+                </span>
+              </td>
+            </tr>
+          );
+        })}
+        {rows.length === 0 && <EmptyRow span={7} />}
+        {showTotal && totalRowsCount > 0 && (
+          <tr style={{ background: "#f8fafc", fontWeight: 600 }}>
+            <td>TOTAL</td>
+            <td>{totalRowsCount} camp{totalRowsCount === 1 ? "" : "s"}</td>
+            <td className="right num">{fmtNum(totals.estimated)}</td>
+            <td className="right num">{fmtNum(totals.served)}</td>
+            <td className="right num neg">{fmtNum(totals.wastage)}</td>
+            <td className="wastage-cell">
+              <div className="wastage-row">
+                <div className="bar-track">
+                  <div className="bar-fill crit" style={{ width: `${Math.min((totalPct / 10) * 50, 100)}%` }} />
+                  <div className="target-mark" />
+                </div>
+                <div className="wastage-pct">{totalPct.toFixed(1)}%</div>
+              </div>
+            </td>
+            <td></td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+// ---------------- Employee (paginated) ----------------
+
+const EMPLOYEE_ROWS_FIRST_PAGE = 7;
+const EMPLOYEE_ROWS_PER_PAGE = 10;
+
+function EmployeeReport({ rows, type, filters, scopeLabel }: ShellProps & { rows: ReportEmployeeRow[] }) {
+  const counts = rows.reduce(
     (acc, e) => {
       acc.total += 1;
       if (e.status === "Active") acc.active += 1;
@@ -299,81 +656,105 @@ function EmployeeBody({ filters, scopeCodes }: { filters: ReportFilters; scopeCo
     { total: 0, active: 0, leave: 0, vacation: 0, inactive: 0, threeMeal: 0, companies: new Set<string>() },
   );
 
+  const chunks: ReportEmployeeRow[][] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const size = chunks.length === 0 ? EMPLOYEE_ROWS_FIRST_PAGE : EMPLOYEE_ROWS_PER_PAGE;
+    chunks.push(rows.slice(i, i + size));
+    i += size;
+  }
+  if (chunks.length === 0) chunks.push([]);
+  const totalPages = chunks.length;
+
   return (
     <>
-      <div className="pills cols-7">
-        <Pill kind="emp-total" label="Total" value={fmtNum(counts.total)} />
-        <Pill kind="emp-active" label="Active" value={fmtNum(counts.active)} />
-        <Pill kind="emp-leave" label="Leave" value={fmtNum(counts.leave)} />
-        <Pill kind="emp-vacation" label="Vacation" value={fmtNum(counts.vacation)} />
-        <Pill kind="emp-inactive" label="Inactive" value={fmtNum(counts.inactive)} />
-        <Pill kind="emp-eligible" label="3-Meal" value={fmtNum(counts.threeMeal)} />
-        <Pill kind="emp-companies" label="Companies" value={String(counts.companies.size)} />
-      </div>
+      {chunks.map((chunk, idx) => {
+        const isFirst = idx === 0;
+        const startIdx = chunks.slice(0, idx).reduce((s, c) => s + c.length, 0);
+        const endIdx = startIdx + chunk.length;
+        return (
+          <section key={idx} className="mo-report" style={!isFirst ? { pageBreakBefore: "always", breakBefore: "page" } : undefined}>
+            {isFirst ? (
+              <>
+                <BrandBar type={type} filters={filters} scopeLabel={scopeLabel} />
+                <TitleBand type={type} filters={filters} />
+                <div className="pills cols-7">
+                  <Pill kind="emp-total" label="Total" value={fmtNum(counts.total)} />
+                  <Pill kind="emp-active" label="Active" value={fmtNum(counts.active)} />
+                  <Pill kind="emp-leave" label="Leave" value={fmtNum(counts.leave)} />
+                  <Pill kind="emp-vacation" label="Vacation" value={fmtNum(counts.vacation)} />
+                  <Pill kind="emp-inactive" label="Inactive" value={fmtNum(counts.inactive)} />
+                  <Pill kind="emp-eligible" label="3-Meal" value={fmtNum(counts.threeMeal)} />
+                  <Pill kind="emp-companies" label="Companies" value={String(counts.companies.size)} />
+                </div>
+              </>
+            ) : (
+              <ContinuationTitle type={type} range={`${startIdx + 1}–${endIdx} of ${rows.length}`} />
+            )}
 
-      <table>
-        <thead>
-          <tr>
-            <th style={{ width: 100 }}>Labour ID</th>
-            <th>Employee</th>
-            <th>Camp</th>
-            <th>Company</th>
-            <th>Designation</th>
-            <th className="center">Breakfast</th>
-            <th className="center">Lunch</th>
-            <th className="center">Dinner</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.map((e, i) => {
-            const color = AVATAR_PALETTE[i % AVATAR_PALETTE.length];
-            return (
-              <tr key={e.id} className={e.status === "Inactive" ? "emp-inactive-row" : ""}>
-                <td><strong>{e.labourId}</strong></td>
-                <td>
-                  <div className="emp">
-                    <div className={`avatar ${color}`}>{initials(e.name)}</div>
-                    <div>
-                      <div className="name">{e.name}</div>
-                      <div className="id">{e.designation}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>{e.camp}</td>
-                <td>{e.company}</td>
-                <td>{e.designation}</td>
-                <td className={`center ${e.breakfast ? "meal-yes" : "meal-no"}`}>{e.breakfast ? "✓" : "—"}</td>
-                <td className={`center ${e.lunch ? "meal-yes" : "meal-no"}`}>{e.lunch ? "✓" : "—"}</td>
-                <td className={`center ${e.dinner ? "meal-yes" : "meal-no"}`}>{e.dinner ? "✓" : "—"}</td>
-                <td>
-                  <span className={`status emp-${e.status.toLowerCase()}`}>{e.status}</span>
-                </td>
-              </tr>
-            );
-          })}
-          {list.length === 0 && <EmptyRow span={9} />}
-        </tbody>
-      </table>
+            <EmployeeTable rows={chunk} startIndex={startIdx} />
+            <PageFooter type={type} pageNum={idx + 1} totalPages={totalPages} />
+          </section>
+        );
+      })}
     </>
   );
 }
 
-// ---------------- Scans ----------------
-function ScansBody({ filters, scopeCodes }: { filters: ReportFilters; scopeCodes: string[] | null }) {
-  const list = useMemo<Scan[]>(() => {
-    const q = filters.query.toLowerCase();
-    let rows = applyCampScope(recentScans, scopeCodes, "camp");
-    if (filters.camp !== "all") rows = rows.filter((s) => s.camp === filters.camp);
-    if (filters.meal !== "All") rows = rows.filter((s) => s.meal === filters.meal);
-    if (filters.status !== "all") rows = rows.filter((s) => s.status === filters.status);
-    if (q) rows = rows.filter((s) => s.name.toLowerCase().includes(q) || s.labourId.toLowerCase().includes(q));
-    return rows;
-  }, [filters.camp, filters.meal, filters.status, filters.query, scopeCodes]);
+function EmployeeTable({ rows, startIndex }: { rows: ReportEmployeeRow[]; startIndex: number }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th style={{ width: 100 }}>Labour ID</th>
+          <th>Employee</th>
+          <th>Camp</th>
+          <th>Company</th>
+          <th>Designation</th>
+          <th className="center">Breakfast</th>
+          <th className="center">Lunch</th>
+          <th className="center">Dinner</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((e, i) => {
+          const color = AVATAR_PALETTE[(startIndex + i) % AVATAR_PALETTE.length];
+          return (
+            <tr key={`${e.labourId}-${i}`} className={e.status === "Inactive" ? "emp-inactive-row" : ""}>
+              <td><strong>{e.labourId}</strong></td>
+              <td>
+                <div className="emp">
+                  <div className={`avatar ${color}`}>{initials(e.name)}</div>
+                  <div>
+                    <div className="name">{e.name}</div>
+                    <div className="id">{e.designation}</div>
+                  </div>
+                </div>
+              </td>
+              <td>{e.camp}</td>
+              <td>{e.company}</td>
+              <td>{e.designation}</td>
+              <td className={`center ${e.breakfast ? "meal-yes" : "meal-no"}`}>{e.breakfast ? "✓" : "—"}</td>
+              <td className={`center ${e.lunch ? "meal-yes" : "meal-no"}`}>{e.lunch ? "✓" : "—"}</td>
+              <td className={`center ${e.dinner ? "meal-yes" : "meal-no"}`}>{e.dinner ? "✓" : "—"}</td>
+              <td><span className={`status emp-${e.status.toLowerCase()}`}>{e.status}</span></td>
+            </tr>
+          );
+        })}
+        {rows.length === 0 && <EmptyRow span={9} />}
+      </tbody>
+    </table>
+  );
+}
 
-  const campsMap = useMemo(() => Object.fromEntries(allCamps.map((c) => [c.code, c.name])), []);
+// ---------------- Scans (paginated) ----------------
 
-  const counts = list.reduce(
+const SCANS_ROWS_FIRST_PAGE = 9;
+const SCANS_ROWS_PER_PAGE = 12;
+
+function ScansReport({ rows, type, filters, scopeLabel }: ShellProps & { rows: ReportScanRow[] }) {
+  const counts = rows.reduce(
     (acc, s) => {
       acc.total += 1;
       if (s.status === "Eligible") acc.eligible += 1;
@@ -386,323 +767,106 @@ function ScansBody({ filters, scopeCodes }: { filters: ReportFilters; scopeCodes
     { total: 0, eligible: 0, served: 0, wrong: 0, notEligible: 0, expired: 0 },
   );
 
-  return (
-    <>
-      <div className="pills cols-7">
-        <Pill kind="scan-total" label="Total Scans" value={fmtNum(counts.total)} />
-        <Pill kind="scan-eligible" label="Eligible" value={fmtNum(counts.eligible)} />
-        <Pill kind="scan-served" label="Already Served" value={fmtNum(counts.served)} />
-        <Pill kind="scan-wrong" label="Wrong Camp" value={fmtNum(counts.wrong)} />
-        <Pill kind="scan-notelig" label="Not Eligible" value={fmtNum(counts.notEligible)} />
-        <Pill kind="scan-expired" label="Expired" value={fmtNum(counts.expired)} />
-        <Pill kind="scan-dup" label="Duplicates" value="—" />
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th style={{ width: 90 }}>Time</th>
-            <th style={{ width: 100 }}>Labour ID</th>
-            <th>Employee</th>
-            <th>Camp</th>
-            <th>Meal</th>
-            <th>Device / Operator</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.map((s) => {
-            const tag = s.meal === "Breakfast" ? "bf" : s.meal === "Lunch" ? "ln" : "dn";
-            const rowClass =
-              s.status === "Already Served"
-                ? "warn"
-                : s.status === "Wrong Camp"
-                  ? "crit"
-                  : s.status === "Not Eligible"
-                    ? "note"
-                    : "";
-            const statusClass =
-              s.status === "Eligible"
-                ? "scan-eligible"
-                : s.status === "Already Served"
-                  ? "scan-served"
-                  : s.status === "Wrong Camp"
-                    ? "scan-wrong"
-                    : s.status === "Not Eligible"
-                      ? "scan-notelig"
-                      : "scan-expired";
-            return (
-              <tr key={s.id} className={rowClass}>
-                <td><span className="time">{s.time}</span></td>
-                <td><strong>{s.labourId}</strong></td>
-                <td>{s.name}</td>
-                <td>{s.camp}{campsMap[s.camp] ? ` — ${campsMap[s.camp]}` : ""}</td>
-                <td><span className={`pill-tag ${tag}`}>{s.meal}</span></td>
-                <td>Scanner-{s.camp}<div className="device">Operator</div></td>
-                <td><span className={`status ${statusClass}`}>{s.status}</span></td>
-              </tr>
-            );
-          })}
-          {list.length === 0 && <EmptyRow span={7} />}
-        </tbody>
-      </table>
-    </>
-  );
-}
-
-// ---------------- Camp Performance ----------------
-function CampBody({ filters, scopeCodes }: { filters: ReportFilters; scopeCodes: string[] | null }) {
-  const rows = useMemo(() => {
-    let list: Camp[] = scopeCodes ? allCamps.filter((c) => scopeCodes.includes(c.code)) : allCamps;
-    if (filters.camp !== "all") list = list.filter((c) => c.code === filters.camp);
-    return list.map((c) => {
-      const served = Math.round(c.employees * 2.5);
-      const estimated = Math.round(c.employees * 2.9);
-      const coverage = Math.round((served / estimated) * 100);
-      const balance = Math.round(c.employees * 0.4);
-      const duplicates = c.employees % 11;
-      return { c, served, estimated, coverage, balance, duplicates };
-    });
-  }, [filters.camp, scopeCodes]);
-
-  const totals = rows.reduce(
-    (acc, r) => ({
-      employees: acc.employees + r.c.employees,
-      served: acc.served + r.served,
-      estimated: acc.estimated + r.estimated,
-      balance: acc.balance + r.balance,
-      duplicates: acc.duplicates + r.duplicates,
-      online: acc.online + (r.c.online ? 1 : 0),
-      offline: acc.offline + (r.c.online ? 0 : 1),
-    }),
-    { employees: 0, served: 0, estimated: 0, balance: 0, duplicates: 0, online: 0, offline: 0 },
-  );
-  const coverageAvg = totals.estimated > 0 ? Math.round((totals.served / totals.estimated) * 100) : 0;
+  const chunks: ReportScanRow[][] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const size = chunks.length === 0 ? SCANS_ROWS_FIRST_PAGE : SCANS_ROWS_PER_PAGE;
+    chunks.push(rows.slice(i, i + size));
+    i += size;
+  }
+  if (chunks.length === 0) chunks.push([]);
+  const totalPages = chunks.length;
 
   return (
     <>
-      <div className="top-cards cols-4">
-        <div className="card summary">
-          <div className="icon">🏢</div>
-          <div>
-            <div className="title">{rows.length} Active Camp{rows.length === 1 ? "" : "s"}</div>
-            <div className="desc">Across Abu Dhabi, Dubai, Sharjah, Ajman, RAK</div>
-            <div className="desc" style={{ marginTop: 6 }}>{totals.online} of {rows.length} camps online</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="lbl">Online %</div>
-          <div className="val">{rows.length > 0 ? Math.round((totals.online / rows.length) * 100) : 0}%</div>
-          <div className="sub">{totals.online} / {rows.length} camps</div>
-        </div>
-        <div className="card">
-          <div className="lbl">Total Served</div>
-          <div className="val">{fmtNum(totals.served)}</div>
-          <div className="sub">{coverageAvg}% of estimated</div>
-        </div>
-        <div className="card">
-          <div className="lbl">Score</div>
-          <div className="val">{coverageAvg}%</div>
-          <div className="sub">vs estimated demand</div>
-        </div>
-      </div>
-
-      <div className="pills cols-6">
-        <Pill kind="camp-online" label="Online" value={String(totals.online)} />
-        <Pill kind="camp-offline" label="Offline" value={String(totals.offline)} />
-        <Pill kind="camp-employees" label="Employees" value={fmtNum(totals.employees)} />
-        <Pill kind="camp-served" label="Served" value={fmtNum(totals.served)} />
-        <Pill kind="camp-balance" label="Balance" value={fmtNum(totals.balance)} />
-        <Pill kind="camp-dup" label="Duplicates" value={String(totals.duplicates)} />
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th style={{ width: 130 }}>Camp</th>
-            <th>Site</th>
-            <th className="right">Employees</th>
-            <th className="right">Served Today</th>
-            <th className="bar-cell">Coverage</th>
-            <th className="right">Balance</th>
-            <th className="center">Duplicates</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => {
-            const fill = r.coverage >= 85 ? "" : r.coverage >= 75 ? "warn" : "crit";
-            return (
-              <tr key={r.c.id} className={r.c.online ? "" : "offline"}>
-                <td className="camp"><div className="code">{r.c.code}</div><div className="name">{r.c.name}</div></td>
-                <td>{r.c.site}</td>
-                <td className="right num">{fmtNum(r.c.employees)}</td>
-                <td className="right num">{fmtNum(r.served)}</td>
-                <td className="bar-cell">
-                  <div className="num">{r.coverage}%</div>
-                  <div className="bar-track"><div className={`bar-fill ${fill}`} style={{ width: `${Math.min(r.coverage, 100)}%` }} /></div>
-                </td>
-                <td className="right num">{fmtNum(r.balance)}</td>
-                <td className="center num">{r.duplicates}</td>
-                <td><span className={`status ${r.c.online ? "online" : "offline"}`}>{r.c.online ? "Online" : "Offline"}</span></td>
-              </tr>
-            );
-          })}
-          {rows.length === 0 && <EmptyRow span={8} />}
-          {rows.length > 0 && (
-            <tr style={{ background: "#f8fafc", fontWeight: 600 }}>
-              <td>TOTAL</td>
-              <td>{rows.length} camp{rows.length === 1 ? "" : "s"}</td>
-              <td className="right num">{fmtNum(totals.employees)}</td>
-              <td className="right num">{fmtNum(totals.served)}</td>
-              <td className="bar-cell"><div className="num">{coverageAvg}%</div></td>
-              <td className="right num">{fmtNum(totals.balance)}</td>
-              <td className="center num">{totals.duplicates}</td>
-              <td></td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </>
-  );
-}
-
-// ---------------- Wastage ----------------
-function WastageBody({ filters, scopeCodes }: { filters: ReportFilters; scopeCodes: string[] | null }) {
-  const rows = useMemo(() => {
-    let list: Camp[] = scopeCodes ? allCamps.filter((c) => scopeCodes.includes(c.code)) : allCamps;
-    if (filters.camp !== "all") list = list.filter((c) => c.code === filters.camp);
-    return list.map((c) => {
-      const estimated = Math.round(c.employees * 2.9 * 7); // 7-day window
-      const served = Math.round(c.employees * 2.5 * 7);
-      const wastage = estimated - served;
-      const pct = (wastage / estimated) * 100;
-      const status: "healthy" | "watch" | "critical" =
-        pct <= 5 ? "healthy" : pct <= 10 ? "watch" : "critical";
-      return { c, estimated, served, wastage, pct, status };
-    }).sort((a, b) => a.pct - b.pct);
-  }, [filters.camp, scopeCodes]);
-
-  const totals = rows.reduce(
-    (acc, r) => ({
-      estimated: acc.estimated + r.estimated,
-      served: acc.served + r.served,
-      wastage: acc.wastage + r.wastage,
-      healthy: acc.healthy + (r.status === "healthy" ? 1 : 0),
-      watch: acc.watch + (r.status === "watch" ? 1 : 0),
-      critical: acc.critical + (r.status === "critical" ? 1 : 0),
-    }),
-    { estimated: 0, served: 0, wastage: 0, healthy: 0, watch: 0, critical: 0 },
-  );
-  const totalPct = totals.estimated > 0 ? (totals.wastage / totals.estimated) * 100 : 0;
-
-  return (
-    <>
-      <div className="top-cards cols-5">
-        <div className="card summary wastage">
-          <div className="icon">⚠</div>
-          <div>
-            <div className="title">{totalPct.toFixed(1)}% Weekly Wastage</div>
-            <div className="desc">{fmtNum(totals.wastage)} portions discarded out of {fmtNum(totals.estimated)} estimated</div>
-            <div className="desc" style={{ marginTop: 6 }}>7-day window · target ≤ 5%</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="lbl">Estimated</div>
-          <div className="val">{fmtNum(totals.estimated)}</div>
-          <div className="sub">7-day total</div>
-        </div>
-        <div className="card">
-          <div className="lbl">Served</div>
-          <div className="val">{fmtNum(totals.served)}</div>
-          <div className="sub">{totals.estimated > 0 ? ((totals.served / totals.estimated) * 100).toFixed(1) : 0}% of est.</div>
-        </div>
-        <div className="card">
-          <div className="lbl">Wastage</div>
-          <div className="val neg">{fmtNum(totals.wastage)}</div>
-          <div className="sub">portions</div>
-        </div>
-        <div className="card">
-          <div className="lbl">Avg %</div>
-          <div className="val">{totalPct.toFixed(1)}%</div>
-          <div className="sub">Target ≤ 5%</div>
-        </div>
-      </div>
-
-      <div className="pills cols-4">
-        <Pill kind="w-healthy" label="Healthy (≤5%)" value={`${totals.healthy} camp${totals.healthy === 1 ? "" : "s"}`} />
-        <Pill kind="w-watch" label="Watch (5–10%)" value={`${totals.watch} camp${totals.watch === 1 ? "" : "s"}`} />
-        <Pill kind="w-crit" label="Critical (>10%)" value={`${totals.critical} camp${totals.critical === 1 ? "" : "s"}`} />
-        <Pill kind="w-target" label="Target" value="≤ 5%" />
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th style={{ width: 130 }}>Camp</th>
-            <th>Site</th>
-            <th className="right">Estimated</th>
-            <th className="right">Served</th>
-            <th className="right">Wastage</th>
-            <th>% Wastage</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => {
-            const fill = r.status === "healthy" ? "" : r.status === "watch" ? "warn" : "crit";
-            const widthPct = Math.min((r.pct / 10) * 50, 100); // 5% target → 50% bar
-            return (
-              <tr key={r.c.id} className={r.status === "watch" ? "warn" : r.status === "critical" ? "crit" : ""}>
-                <td className="camp"><div className="code">{r.c.code}</div><div className="name">{r.c.name}</div></td>
-                <td>{r.c.site}</td>
-                <td className="right num">{fmtNum(r.estimated)}</td>
-                <td className="right num">{fmtNum(r.served)}</td>
-                <td className="right num neg">{fmtNum(r.wastage)}</td>
-                <td className="wastage-cell">
-                  <div className="wastage-row">
-                    <div className="bar-track">
-                      <div className={`bar-fill ${fill}`} style={{ width: `${widthPct}%` }} />
-                      <div className="target-mark" />
-                    </div>
-                    <div className="wastage-pct">{r.pct.toFixed(1)}%</div>
-                  </div>
-                </td>
-                <td>
-                  <span className={`status ${r.status === "healthy" ? "healthy" : r.status === "watch" ? "watch" : "critical"}`}>
-                    {r.status === "healthy" ? "Healthy" : r.status === "watch" ? "Watch" : "Critical"}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-          {rows.length === 0 && <EmptyRow span={7} />}
-          {rows.length > 0 && (
-            <tr style={{ background: "#f8fafc", fontWeight: 600 }}>
-              <td>TOTAL</td>
-              <td>{rows.length} camp{rows.length === 1 ? "" : "s"}</td>
-              <td className="right num">{fmtNum(totals.estimated)}</td>
-              <td className="right num">{fmtNum(totals.served)}</td>
-              <td className="right num neg">{fmtNum(totals.wastage)}</td>
-              <td className="wastage-cell">
-                <div className="wastage-row">
-                  <div className="bar-track">
-                    <div className="bar-fill crit" style={{ width: `${Math.min((totalPct / 10) * 50, 100)}%` }} />
-                    <div className="target-mark" />
-                  </div>
-                  <div className="wastage-pct">{totalPct.toFixed(1)}%</div>
+      {chunks.map((chunk, idx) => {
+        const isFirst = idx === 0;
+        const startIdx = chunks.slice(0, idx).reduce((s, c) => s + c.length, 0);
+        const endIdx = startIdx + chunk.length;
+        return (
+          <section key={idx} className="mo-report" style={!isFirst ? { pageBreakBefore: "always", breakBefore: "page" } : undefined}>
+            {isFirst ? (
+              <>
+                <BrandBar type={type} filters={filters} scopeLabel={scopeLabel} />
+                <TitleBand type={type} filters={filters} />
+                <div className="pills cols-7">
+                  <Pill kind="scan-total" label="Total Scans" value={fmtNum(counts.total)} />
+                  <Pill kind="scan-eligible" label="Eligible" value={fmtNum(counts.eligible)} />
+                  <Pill kind="scan-served" label="Already Served" value={fmtNum(counts.served)} />
+                  <Pill kind="scan-wrong" label="Wrong Camp" value={fmtNum(counts.wrong)} />
+                  <Pill kind="scan-notelig" label="Not Eligible" value={fmtNum(counts.notEligible)} />
+                  <Pill kind="scan-expired" label="Expired" value={fmtNum(counts.expired)} />
+                  <Pill kind="scan-dup" label="Duplicates" value={fmtNum(counts.served)} />
                 </div>
-              </td>
-              <td></td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+              </>
+            ) : (
+              <ContinuationTitle type={type} range={`${startIdx + 1}–${endIdx} of ${rows.length}`} />
+            )}
+
+            <ScansTable rows={chunk} />
+            <PageFooter type={type} pageNum={idx + 1} totalPages={totalPages} />
+          </section>
+        );
+      })}
     </>
   );
 }
 
-// ---------------- Shared ----------------
+function ScansTable({ rows }: { rows: ReportScanRow[] }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th style={{ width: 100 }}>Date</th>
+          <th style={{ width: 90 }}>Time</th>
+          <th style={{ width: 100 }}>Labour ID</th>
+          <th>Employee</th>
+          <th>Camp</th>
+          <th>Meal</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((s) => {
+          const tag = s.meal === "Breakfast" ? "bf" : s.meal === "Lunch" ? "ln" : "dn";
+          const rowClass =
+            s.status === "Already Served"
+              ? "warn"
+              : s.status === "Wrong Camp"
+                ? "crit"
+                : s.status === "Not Eligible"
+                  ? "note"
+                  : "";
+          const statusClass =
+            s.status === "Eligible"
+              ? "scan-eligible"
+              : s.status === "Already Served"
+                ? "scan-served"
+                : s.status === "Wrong Camp"
+                  ? "scan-wrong"
+                  : s.status === "Not Eligible"
+                    ? "scan-notelig"
+                    : "scan-expired";
+          return (
+            <tr key={s.id} className={rowClass}>
+              <td>{s.date}</td>
+              <td><span className="time">{s.time}</span></td>
+              <td><strong>{s.labourId}</strong></td>
+              <td>{s.name}</td>
+              <td>{s.camp}</td>
+              <td><span className={`pill-tag ${tag}`}>{s.meal}</span></td>
+              <td><span className={`status ${statusClass}`}>{s.status}</span></td>
+            </tr>
+          );
+        })}
+        {rows.length === 0 && <EmptyRow span={7} />}
+      </tbody>
+    </table>
+  );
+}
+
+// ---------------- Shared bits ----------------
+
 function Pill({ kind, label, value }: { kind: string; label: string; value: string }) {
   return (
     <div className={`pill ${kind}`}>
@@ -727,6 +891,7 @@ export const REPORT_CSS = `
 .mo-report {
   width: 100%;
   max-width: 297mm;
+  min-height: 210mm;
   margin: 0 auto;
   background: #ffffff;
   padding: 14mm 16mm 12mm 16mm;
@@ -738,7 +903,25 @@ export const REPORT_CSS = `
   line-height: 1.45;
   box-sizing: border-box;
 }
+.mo-report + .mo-report { margin-top: 16px; }
 .mo-report *, .mo-report *::before, .mo-report *::after { box-sizing: border-box; }
+
+.mo-report .page-cont-title {
+  margin: 0 0 12px 0;
+  font-size: 12px;
+  letter-spacing: 3px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.mo-report .page-cont-title span {
+  color: #94a3b8;
+  font-weight: 400;
+  letter-spacing: 1px;
+  margin-left: 6px;
+}
 
 /* Branding bar */
 .mo-report .brand-bar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; }
@@ -791,7 +974,7 @@ export const REPORT_CSS = `
 .mo-report .pill .lbl { font-size: 9.5px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
 .mo-report .pill .val { font-size: 15px; font-weight: 600; color: #0f172a; }
 
-/* Consumption pill colors */
+/* Pill color variants */
 .mo-report .pill.served    .lbl, .mo-report .pill.served    .val { color: #047857; }
 .mo-report .pill.estimated .lbl, .mo-report .pill.estimated .val { color: #1d4ed8; }
 .mo-report .pill.breakfast .lbl, .mo-report .pill.breakfast .val { color: #b45309; }
@@ -800,7 +983,6 @@ export const REPORT_CSS = `
 .mo-report .pill.variance  .lbl, .mo-report .pill.variance  .val { color: #c2410c; }
 .mo-report .pill.wastage   .lbl, .mo-report .pill.wastage   .val { color: #475569; }
 
-/* Employee pill colors */
 .mo-report .pill.emp-total    .lbl, .mo-report .pill.emp-total    .val { color: #334155; }
 .mo-report .pill.emp-active   .lbl, .mo-report .pill.emp-active   .val { color: #047857; }
 .mo-report .pill.emp-leave    .lbl, .mo-report .pill.emp-leave    .val { color: #b45309; }
@@ -809,7 +991,6 @@ export const REPORT_CSS = `
 .mo-report .pill.emp-eligible .lbl, .mo-report .pill.emp-eligible .val { color: #6d28d9; }
 .mo-report .pill.emp-companies .lbl, .mo-report .pill.emp-companies .val { color: #c2410c; }
 
-/* Scan pill colors */
 .mo-report .pill.scan-total    .lbl, .mo-report .pill.scan-total    .val { color: #334155; }
 .mo-report .pill.scan-eligible .lbl, .mo-report .pill.scan-eligible .val { color: #047857; }
 .mo-report .pill.scan-served   .lbl, .mo-report .pill.scan-served   .val { color: #c2410c; }
@@ -818,7 +999,6 @@ export const REPORT_CSS = `
 .mo-report .pill.scan-expired  .lbl, .mo-report .pill.scan-expired  .val { color: #6d28d9; }
 .mo-report .pill.scan-dup      .lbl, .mo-report .pill.scan-dup      .val { color: #1d4ed8; }
 
-/* Camp pill colors */
 .mo-report .pill.camp-online    .lbl, .mo-report .pill.camp-online    .val { color: #047857; }
 .mo-report .pill.camp-offline   .lbl, .mo-report .pill.camp-offline   .val { color: #b91c1c; }
 .mo-report .pill.camp-employees .lbl, .mo-report .pill.camp-employees .val { color: #1d4ed8; }
@@ -826,13 +1006,12 @@ export const REPORT_CSS = `
 .mo-report .pill.camp-balance   .lbl, .mo-report .pill.camp-balance   .val { color: #b45309; }
 .mo-report .pill.camp-dup       .lbl, .mo-report .pill.camp-dup       .val { color: #6d28d9; }
 
-/* Wastage pill colors */
 .mo-report .pill.w-healthy .lbl, .mo-report .pill.w-healthy .val { color: #047857; }
 .mo-report .pill.w-watch   .lbl, .mo-report .pill.w-watch   .val { color: #b45309; }
 .mo-report .pill.w-crit    .lbl, .mo-report .pill.w-crit    .val { color: #b91c1c; }
 .mo-report .pill.w-target  .lbl, .mo-report .pill.w-target  .val { color: #1d4ed8; }
 
-/* Top cards (camp + wastage) */
+/* Top cards */
 .mo-report .top-cards { display: grid; gap: 10px; margin-top: 14px; }
 .mo-report .top-cards.cols-4 { grid-template-columns: 2fr 1fr 1fr 1fr; }
 .mo-report .top-cards.cols-5 { grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr; }
@@ -859,11 +1038,11 @@ export const REPORT_CSS = `
 .mo-report thead th {
   text-align: left; text-transform: uppercase;
   font-size: 10px; letter-spacing: 1px; color: #475569; font-weight: 600;
-  padding: 12px 10px; border-bottom: 1px solid #e5e7eb; background: #fafbfc;
+  padding: 12px 12px; border-bottom: 1px solid #e5e7eb; background: #fafbfc;
 }
 .mo-report thead th.right, .mo-report tbody td.right { text-align: right; }
 .mo-report thead th.center, .mo-report tbody td.center { text-align: center; }
-.mo-report tbody td { padding: 11px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.mo-report tbody td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
 .mo-report tbody tr:hover { background: #fafbfc; }
 .mo-report tbody tr.warn { background: #fffaf3; }
 .mo-report tbody tr.crit { background: #fff1f2; }
@@ -877,6 +1056,9 @@ export const REPORT_CSS = `
 .mo-report .pos { color: #059669; font-weight: 600; }
 .mo-report .neg { color: #dc2626; font-weight: 600; }
 .mo-report .neu { color: #64748b; }
+
+.mo-report .camp .code { font-weight: 700; }
+.mo-report .camp .name { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
 
 /* Employee avatars */
 .mo-report .emp { display: flex; align-items: center; gap: 10px; }
@@ -907,7 +1089,6 @@ export const REPORT_CSS = `
 .mo-report .pill-tag.bf { background: #fffbeb; color: #b45309; }
 .mo-report .pill-tag.ln { background: #fef2f2; color: #b91c1c; }
 .mo-report .pill-tag.dn { background: #f5f3ff; color: #6d28d9; }
-.mo-report .device { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
 
 /* Status badges */
 .mo-report .status {
@@ -948,9 +1129,13 @@ export const REPORT_CSS = `
 .mo-report .wastage-pct { font-weight: 700; font-variant-numeric: tabular-nums; width: 48px; text-align: right; }
 .mo-report .target-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #1d4ed8; left: 50%; }
 
-/* Footer */
+/* Footer — pinned to the bottom of each page section via the flex column's
+   auto top margin. The .mo-report sets display:flex; flex-direction:column +
+   min-height: 210mm so the footer ends up at the bottom of the A4 page. */
 .mo-report .footer {
-  margin-top: 18px; padding-top: 14px; border-top: 1px solid #cbd5e1;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid #cbd5e1;
   display: flex; justify-content: space-between; align-items: center;
   font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #475569;
   font-weight: 500;
@@ -971,6 +1156,8 @@ export const REPORT_CSS = `
 @media print {
   body { background: #fff !important; }
   .mo-report-wrap { background: #fff; padding: 0; }
-  .mo-report { box-shadow: none; }
+  .mo-report { box-shadow: none; page-break-after: always; break-after: page; }
+  .mo-report:last-child { page-break-after: auto; break-after: auto; }
+  .mo-report + .mo-report { margin-top: 0; }
 }
 `;

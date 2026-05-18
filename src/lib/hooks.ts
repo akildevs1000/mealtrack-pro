@@ -402,6 +402,79 @@ export function useScans(limit = 50) {
   });
 }
 
+// ---------------- Reports ----------------
+
+export type ReportConsumptionRow = {
+  code: string; name: string; site: string; employees: number;
+  breakfast: number; lunch: number; dinner: number;
+  served: number; estimated: number; variance: number;
+};
+export type ReportCampRow = {
+  code: string; name: string; site: string; employees: number;
+  served: number; estimated: number; coverage: number; balance: number; duplicates: number;
+  online: boolean; devicesOnline: number; devicesTotal: number;
+};
+export type ReportWastageRow = {
+  code: string; name: string; site: string;
+  estimated: number; served: number; wastage: number; pct: number;
+  status: "healthy" | "watch" | "critical";
+};
+export type ReportScanRow = {
+  id: string; time: string; date: string;
+  name: string; labourId: string; camp: string;
+  meal: "Breakfast" | "Lunch" | "Dinner";
+  status: "Eligible" | "Already Served" | "Not Eligible" | "Wrong Camp" | "Expired";
+};
+export type ReportEmployeeRow = {
+  labourId: string; name: string; camp: string; company: string; designation: string;
+  status: "Active" | "Leave" | "Vacation" | "Inactive";
+  breakfast: boolean; lunch: boolean; dinner: boolean;
+};
+
+type ReportRange<T> = { from: string; to: string; days: number; rows: T[] };
+
+function reportQs(p: Record<string, string | undefined>) {
+  const s = new URLSearchParams();
+  for (const [k, v] of Object.entries(p)) {
+    if (v !== undefined && v !== null && v !== "") s.set(k, v);
+  }
+  const out = s.toString();
+  return out ? `?${out}` : "";
+}
+
+export function useReportConsumption(p: { from: string; to: string; campCode?: string }) {
+  return useQuery({
+    queryKey: ["reports", "consumption", p],
+    queryFn: () => api<ReportRange<ReportConsumptionRow>>(`/reports/consumption${reportQs(p)}`),
+  });
+}
+export function useReportCamps(p: { from: string; to: string; campCode?: string }) {
+  return useQuery({
+    queryKey: ["reports", "camps", p],
+    queryFn: () => api<ReportRange<ReportCampRow>>(`/reports/camps${reportQs(p)}`),
+  });
+}
+export function useReportWastage(p: { from: string; to: string; campCode?: string }) {
+  return useQuery({
+    queryKey: ["reports", "wastage", p],
+    queryFn: () => api<ReportRange<ReportWastageRow>>(`/reports/wastage${reportQs(p)}`),
+  });
+}
+export function useReportScans(p: {
+  from: string; to: string; campCode?: string; meal?: string; status?: string; q?: string;
+}) {
+  return useQuery({
+    queryKey: ["reports", "scans", p],
+    queryFn: () => api<ReportScanRow[]>(`/reports/scans${reportQs(p)}`),
+  });
+}
+export function useReportEmployees(p: { campCode?: string; status?: string; q?: string }) {
+  return useQuery({
+    queryKey: ["reports", "employees", p],
+    queryFn: () => api<ReportEmployeeRow[]>(`/reports/employees${reportQs(p)}`),
+  });
+}
+
 // Overview / dashboard. Pass a camp code to narrow the dashboard to one camp.
 export function useOverview(campCode?: string | null) {
   const qs = campCode ? `?campCode=${encodeURIComponent(campCode)}` : "";

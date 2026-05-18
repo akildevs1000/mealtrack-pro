@@ -13,10 +13,11 @@ import scansRouter from "./routes/scans.js";
 import overviewRouter from "./routes/overview.js";
 import auditRouter from "./routes/audit.js";
 import scannerRouter from "./routes/scanner.js";
+import reportsRouter from "./routes/reports.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 
 const app = express();
-const PORT = Number(process.env.PORT || 4000);
+const PORT = Number(process.env.PORT || 5044);
 
 const origins = (process.env.CORS_ORIGIN || "*").split(",").map((s) => s.trim());
 app.use(cors({ origin: origins.includes("*") ? true : origins, credentials: true }));
@@ -35,6 +36,7 @@ app.use("/api/scans", scansRouter);
 app.use("/api/overview", overviewRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/scanner", scannerRouter);
+app.use("/api/reports", reportsRouter);
 
 app.use(notFound);
 app.use(errorHandler);
