@@ -1,6 +1,10 @@
-import { Router } from "express";
+import { Router, json } from "express";
+import { Readable } from "node:stream";
+import { Client as FtpClient } from "basic-ftp";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth } from "../middleware/auth.js";
+import { fetchTypedReportData, type ReportType } from "../lib/report-data.js";
+import { buildStyledPdfBuffer } from "../lib/report-pdf-styled.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -279,6 +283,166 @@ router.get("/employees", async (req, res, next) => {
       }
     }
     res.json(rows.slice(0, limit));
+  } catch (e) { next(e); }
+});
+
+// ---------------- /reports/push-ftp ----------------
+// Uploads one or more report files to an FTP server using credentials supplied
+// in the request. The client encodes each file as base64 to keep the payload as
+// a single JSON request (no extra multer dependency). Per-route body limit is
+// bumped to 25mb because PDFs can be sizeable.
+
+type FtpUploadFile = {
+  name: string;
+  // base64 (no data: prefix). The browser produces this via FileReader / Buffer.
+  contentBase64: string;
+};
+
+type FtpUploadBody = {
+  host: string;
+  port?: number | string;
+  user: string;
+  password: string;
+  // Optional. Trailing slash is normalised. Defaults to "/".
+  remotePath?: string;
+  // FTPS toggle. Defaults to false (plain FTP on port 21).
+  secure?: boolean;
+  files: FtpUploadFile[];
+};
+
+function sanitiseRemoteName(name: string): string {
+  // Strip any path components — we never trust client-supplied paths in filenames.
+  const base = name.split(/[\\/]/).pop() || "report.bin";
+  return base.replace(/[^\w.\-]+/g, "_");
+}
+
+router.post("/push-ftp", json({ limit: "25mb" }), async (req, res, next) => {
+  try {
+    const body = req.body as Partial<FtpUploadBody>;
+    if (!body || typeof body !== "object") {
+      return res.status(400).json({ error: "Invalid body" });
+    }
+    const host = String(body.host || "").trim();
+    const user = String(body.user || "").trim();
+    const password = String(body.password || "");
+    const port = Number(body.port ?? 21) || 21;
+    const secure = body.secure === true;
+    const remotePath = (body.remotePath && String(body.remotePath).trim()) || "/";
+    const files = Array.isArray(body.files) ? body.files : [];
+
+    if (!host) return res.status(400).json({ error: "Missing FTP host" });
+    if (!user) return res.status(400).json({ error: "Missing FTP username" });
+    if (!password) return res.status(400).json({ error: "Missing FTP password" });
+    if (files.length === 0) return res.status(400).json({ error: "No files to upload" });
+
+    const client = new FtpClient(30_000);
+    client.ftp.verbose = false;
+    const uploaded: { name: string; bytes: number; remote: string }[] = [];
+
+    try {
+      await client.access({ host, port, user, password, secure });
+
+      if (remotePath && remotePath !== "/" && remotePath !== ".") {
+        // ensureDir creates the full path if it doesn't exist and CDs into it.
+        await client.ensureDir(remotePath);
+      }
+
+      for (const f of files) {
+        if (!f || typeof f.name !== "string" || typeof f.contentBase64 !== "string") {
+          throw new Error("Malformed file entry");
+        }
+        const safeName = sanitiseRemoteName(f.name);
+        const buf = Buffer.from(f.contentBase64, "base64");
+        if (buf.length === 0) throw new Error(`File "${safeName}" is empty`);
+        await client.uploadFrom(Readable.from(buf), safeName);
+        uploaded.push({
+          name: safeName,
+          bytes: buf.length,
+          remote: `${remotePath.replace(/\/$/, "")}/${safeName}`,
+        });
+      }
+
+      res.json({
+        ok: true,
+        host,
+        port,
+        user,
+        remotePath,
+        uploaded,
+      });
+    } finally {
+      client.close();
+    }
+  } catch (e: unknown) {
+    // basic-ftp throws plain Errors — surface the message to the client so the
+    // dialog can show the actual reason (auth, network, path not creatable…).
+    const msg = e instanceof Error ? e.message : "FTP upload failed";
+    res.status(502).json({ error: msg });
+  }
+});
+
+// ---------------- /reports/render-pdf ----------------
+// Renders the same styled PDF the scheduler uses, but on demand for the
+// /reports page's Download PDF button. Filters mirror the GET data endpoints.
+
+const REPORT_TYPES: ReportType[] = ["consumption", "employee", "scans", "camp", "wastage"];
+
+router.get("/render-pdf", async (req, res, next) => {
+  try {
+    const type = String(req.query.type ?? "") as ReportType;
+    if (!REPORT_TYPES.includes(type)) {
+      return res.status(400).json({ error: "Invalid report type" });
+    }
+    const from = parseFrom(req.query.from);
+    const to = parseTo(req.query.to);
+    const scope = campScopeOf(req);
+    const campParam = typeof req.query.camp === "string" && req.query.camp !== "all"
+      ? req.query.camp
+      : undefined;
+    // Effective camp restriction: intersect manager scope with explicit filter.
+    let campCodes: string[] | null = null;
+    if (campParam) {
+      if (scope && !scope.includes(campParam)) campCodes = []; // no overlap → empty result
+      else campCodes = [campParam];
+    } else if (scope) {
+      campCodes = scope;
+    }
+
+    const meal = typeof req.query.meal === "string" ? req.query.meal : undefined;
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : undefined;
+
+    const data = await fetchTypedReportData(type, { from, to }, {
+      campCodes,
+      meal,
+      status,
+      q: q || undefined,
+    });
+
+    const fromIso = from.toISOString().slice(0, 10);
+    const toIso = to.toISOString().slice(0, 10);
+    const scopeLabel = campParam ?? (scope
+      ? (scope.length === 1 ? scope[0]! : `${scope.length} camps`)
+      : "All Camps");
+
+    const buffer = await buildStyledPdfBuffer({
+      type,
+      filters: {
+        from: fromIso, to: toIso,
+        camp: campParam ?? "all",
+        meal: (meal as "All" | "Breakfast" | "Lunch" | "Dinner" | undefined) ?? "All",
+        status: status ?? "all",
+        query: q ?? "",
+      },
+      scopeLabel,
+      data,
+    });
+
+    const filename = `${type}_${fromIso}_to_${toIso}${campParam ? "_" + campParam : ""}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", String(buffer.length));
+    res.end(buffer);
   } catch (e) { next(e); }
 });
 

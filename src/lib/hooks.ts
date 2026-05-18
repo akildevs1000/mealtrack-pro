@@ -404,32 +404,23 @@ export function useScans(limit = 50) {
 
 // ---------------- Reports ----------------
 
-export type ReportConsumptionRow = {
-  code: string; name: string; site: string; employees: number;
-  breakfast: number; lunch: number; dinner: number;
-  served: number; estimated: number; variance: number;
-};
-export type ReportCampRow = {
-  code: string; name: string; site: string; employees: number;
-  served: number; estimated: number; coverage: number; balance: number; duplicates: number;
-  online: boolean; devicesOnline: number; devicesTotal: number;
-};
-export type ReportWastageRow = {
-  code: string; name: string; site: string;
-  estimated: number; served: number; wastage: number; pct: number;
-  status: "healthy" | "watch" | "critical";
-};
-export type ReportScanRow = {
-  id: string; time: string; date: string;
-  name: string; labourId: string; camp: string;
-  meal: "Breakfast" | "Lunch" | "Dinner";
-  status: "Eligible" | "Already Served" | "Not Eligible" | "Wrong Camp" | "Expired";
-};
-export type ReportEmployeeRow = {
-  labourId: string; name: string; camp: string; company: string; designation: string;
-  status: "Active" | "Leave" | "Vacation" | "Inactive";
-  breakfast: boolean; lunch: boolean; dinner: boolean;
-};
+// Row types are defined in the neutral types file so the server-side renderer
+// can import them without dragging in this hooks module's React Query deps.
+export type {
+  ReportConsumptionRow,
+  ReportCampRow,
+  ReportWastageRow,
+  ReportScanRow,
+  ReportEmployeeRow,
+} from "@/components/app/report-preview-types";
+
+import type {
+  ReportConsumptionRow,
+  ReportCampRow,
+  ReportWastageRow,
+  ReportScanRow,
+  ReportEmployeeRow,
+} from "@/components/app/report-preview-types";
 
 type ReportRange<T> = { from: string; to: string; days: number; rows: T[] };
 
@@ -481,5 +472,120 @@ export function useOverview(campCode?: string | null) {
   return useQuery({
     queryKey: ["overview", campCode ?? "all"],
     queryFn: () => api<Overview>(`/overview${qs}`),
+  });
+}
+
+// ---------------- Scheduled reports + FTP config ----------------
+
+export type ScheduleReportType = "consumption" | "employee" | "scans" | "camp" | "wastage";
+export type ScheduleFormat = "pdf" | "excel" | "both";
+export type ScheduleFrequency = "daily" | "weekly" | "monthly";
+export type ScheduleDestination = "email" | "ftp";
+export type ScheduleRunStatus = "success" | "failed";
+
+export type Schedule = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  reportType: ScheduleReportType;
+  format: ScheduleFormat;
+  frequency: ScheduleFrequency;
+  time: string;
+  weekday: number | null;
+  dayOfMonth: number | null;
+  destination: ScheduleDestination;
+  recipientIds: string[];
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastRunStatus: ScheduleRunStatus | null;
+  lastRunDetail: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ScheduleInput = Omit<
+  Schedule,
+  "id" | "createdAt" | "updatedAt" | "nextRunAt" | "lastRunAt" | "lastRunStatus" | "lastRunDetail"
+>;
+
+export type FtpConfigView = {
+  host: string;
+  port: number;
+  user: string;
+  hasPassword: boolean;
+  remotePath: string;
+  secure: boolean;
+  updatedAt: string;
+} | null;
+
+export type FtpConfigInput = {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  remotePath: string;
+  secure?: boolean;
+};
+
+export function useSchedules() {
+  return useQuery({ queryKey: ["schedules"], queryFn: () => api<Schedule[]>("/schedules") });
+}
+
+export function useCreateSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ScheduleInput) =>
+      api<Schedule>("/schedules", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedules"] }),
+  });
+}
+
+export function useUpdateSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...patch }: { id: string } & Partial<ScheduleInput>) =>
+      api<Schedule>(`/schedules/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedules"] }),
+  });
+}
+
+export function useDeleteSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/schedules/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedules"] }),
+  });
+}
+
+export function useRunSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<{ ok: boolean; detail: string; uploaded?: { name: string; bytes: number }[] }>(
+        `/schedules/${id}/run`,
+        { method: "POST" },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedules"] }),
+  });
+}
+
+export function useFtpConfig() {
+  return useQuery({ queryKey: ["ftp-config"], queryFn: () => api<FtpConfigView>("/ftp-config") });
+}
+
+export function useSaveFtpConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: FtpConfigInput) =>
+      api<FtpConfigView>("/ftp-config", { method: "PUT", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ftp-config"] }),
+  });
+}
+
+export function useDeleteFtpConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ ok: boolean }>("/ftp-config", { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ftp-config"] }),
   });
 }

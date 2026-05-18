@@ -247,3 +247,76 @@ model AuditLog {
 
   @@index([at])
 }
+
+// Singleton FTP config used by scheduled FTP delivery. Only one row is expected
+// at a time; the API upserts to id="default". Password is stored plaintext —
+// see README for the encryption-at-rest TODO.
+model FtpConfig {
+  id         String   @id @default("default")
+  host       String
+  port       Int      @default(21)
+  user       String
+  password   String
+  remotePath String   @default("/")
+  secure     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+enum ScheduleFrequency {
+  daily
+  weekly
+  monthly
+}
+
+enum ScheduleReportType {
+  consumption
+  employee
+  scans
+  camp
+  wastage
+}
+
+enum ScheduleFormat {
+  pdf
+  excel
+  both
+}
+
+enum ScheduleDestination {
+  email
+  ftp
+}
+
+enum ScheduleRunStatus {
+  success
+  failed
+}
+
+model Schedule {
+  id            String              @id @default(cuid())
+  name          String
+  enabled       Boolean             @default(false)
+  reportType    ScheduleReportType
+  format        ScheduleFormat
+  frequency     ScheduleFrequency
+  // "HH:MM" — interpreted in the server's local timezone.
+  time          String
+  // 0 = Sun .. 6 = Sat (weekly only)
+  weekday       Int?
+  // 1..28 (monthly only)
+  dayOfMonth    Int?
+  destination   ScheduleDestination @default(email)
+  // Stored as a flat array of User IDs; ignored when destination = ftp.
+  recipientIds  String[]            @default([])
+  // Used by the cron worker to avoid re-firing within the same minute and to
+  // skip schedules whose next slot is in the future.
+  nextRunAt     DateTime?
+  lastRunAt     DateTime?
+  lastRunStatus ScheduleRunStatus?
+  lastRunDetail String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([enabled, nextRunAt])
+}

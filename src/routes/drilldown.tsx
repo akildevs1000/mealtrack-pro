@@ -173,9 +173,9 @@ function DrilldownPage() {
               ))}
             </select>
           </div>
-          <button onClick={exportPdf} className="h-9 px-4 rounded-lg gradient-primary text-primary-foreground text-xs font-semibold shadow-elegant inline-flex items-center gap-2">
+          {/* <button onClick={exportPdf} className="h-9 px-4 rounded-lg gradient-primary text-primary-foreground text-xs font-semibold shadow-elegant inline-flex items-center gap-2">
             <Download className="size-3.5" /> Export PDF
-          </button>
+          </button> */}
         </div>
       </div>
 

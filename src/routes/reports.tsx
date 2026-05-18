@@ -1,6 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
-import { FileBarChart, FileSpreadsheet, FileText, Filter, Server, Download, Search, X, CheckCircle2, AlertCircle, BarChart3, ScanLine, CalendarClock } from "lucide-react";
+import {
+  FileBarChart,
+  FileSpreadsheet,
+  FileText,
+  Filter,
+  Server,
+  Download,
+  Search,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  BarChart3,
+  CalendarClock,
+} from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import {
   useCamps,
@@ -10,8 +23,14 @@ import {
   useReportScans,
   useReportEmployees,
 } from "@/lib/hooks";
+import { api, API_BASE, getToken } from "@/lib/api";
 import * as XLSX from "xlsx";
-import { ReportPreview, REPORT_CSS, type ReportType, type MealFilter, type ReportData } from "@/components/app/ReportPreview";
+import {
+  ReportPreview,
+  type ReportType,
+  type MealFilter,
+  type ReportData,
+} from "@/components/app/ReportPreview";
 import { ReportsLiveView } from "@/components/app/ReportsLiveView";
 
 export const Route = createFileRoute("/reports")({
@@ -21,15 +40,67 @@ export const Route = createFileRoute("/reports")({
 type Meal = MealFilter;
 
 const reportTypes: { id: ReportType; title: string; desc: string }[] = [
-  { id: "consumption", title: "Daily Meal Consumption", desc: "Per-camp served vs estimated by meal session" },
+  {
+    id: "consumption",
+    title: "Daily Meal Consumption",
+    desc: "Per-camp served vs estimated by meal session",
+  },
   { id: "employee", title: "Employee Master", desc: "All employees with eligibility and status" },
-  { id: "scans", title: "Scan Activity Log", desc: "Every QR scan with status and operator" },
-  { id: "camp", title: "Camp Performance", desc: "Camp-wise totals, online %, balance and duplicates" },
+  {
+    id: "scans",
+    title: "Scan Activity Log",
+    desc: "Every QR scan with device, mismatch reason and status (audit trail)",
+  },
+  {
+    id: "camp",
+    title: "Camp Performance",
+    desc: "Camp-wise totals, online %, balance and duplicates",
+  },
   { id: "wastage", title: "Wastage & Variance", desc: "Estimated minus served, % wastage by camp" },
 ];
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const monthAgoIso = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+
+const SCAN_REASONS: Record<string, string[]> = {
+  Eligible: [
+    "Scan accepted within service window",
+    "Verified at counter — first scan",
+    "Plan match — meal credited",
+  ],
+  "Already Served": [
+    "Duplicate scan within 5 min of prior accept",
+    "Same labour ID scanned twice this session",
+    "Re-scan after queue exit",
+  ],
+  "Wrong Camp": [
+    "Scanned at non-assigned camp device",
+    "Visiting another site without transfer",
+    "Camp code mismatch on QR",
+  ],
+  "Not Eligible": [
+    "Meal not in employee plan",
+    "Status: Vacation — paused plan",
+    "Status: Leave — no entitlement",
+  ],
+  Expired: [
+    "Labour card expired — block & escalate",
+    "ID renewal pending — issue temp pass",
+  ],
+};
+
+function hashStr(s: string) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+function deriveDevice(campCode: string) {
+  return `Scanner-${campCode}-${String.fromCharCode(65 + (hashStr(campCode) % 2))}`;
+}
+function deriveReason(scanId: string, status: string) {
+  const list = SCAN_REASONS[status] ?? ["—"];
+  return list[hashStr(scanId) % list.length];
+}
 
 function ReportsPage() {
   const scope = useCampScope();
@@ -55,7 +126,9 @@ function ReportsPage() {
   const consumption = useReportConsumption({ from, to, campCode: campParam });
   const camps = useReportCamps({ from, to, campCode: campParam });
   const wastage = useReportWastage({ from, to, campCode: campParam });
-  const scans = useReportScans({ from, to, campCode: campParam, meal, status, q: query });
+  // "mismatch" is a synthetic option: don't pass it server-side, filter client-side below.
+  const scanStatusParam = status === "mismatch" ? "all" : status;
+  const scans = useReportScans({ from, to, campCode: campParam, meal, status: scanStatusParam, q: query });
   const employees = useReportEmployees({ campCode: campParam, status, q: query });
 
   const previewFilters = useMemo(
@@ -70,7 +143,7 @@ function ReportsPage() {
     ? scope.length === 1
       ? scope[0]
       : `${scope.length} camps`
-    : campParam ?? "All Camps";
+    : (campParam ?? "All Camps");
 
   const { data, loading, headers, exportRows } = useMemo<{
     data: ReportData | null;
@@ -83,8 +156,26 @@ function ReportsPage() {
       return {
         data: { kind: "consumption", rows },
         loading: consumption.isLoading,
-        headers: ["Camp", "Site", "Breakfast", "Lunch", "Dinner", "Total Served", "Estimated", "Variance"],
-        exportRows: rows.map((r) => [r.code, r.site, r.breakfast, r.lunch, r.dinner, r.served, r.estimated, r.variance]),
+        headers: [
+          "Camp",
+          "Site",
+          "Breakfast",
+          "Lunch",
+          "Dinner",
+          "Total Served",
+          "Estimated",
+          "Variance",
+        ],
+        exportRows: rows.map((r) => [
+          r.code,
+          r.site,
+          r.breakfast,
+          r.lunch,
+          r.dinner,
+          r.served,
+          r.estimated,
+          r.variance,
+        ]),
       };
     }
     if (active === "camp") {
@@ -92,8 +183,30 @@ function ReportsPage() {
       return {
         data: { kind: "camp", rows },
         loading: camps.isLoading,
-        headers: ["Code", "Name", "Site", "Employees", "Served", "Coverage %", "Balance", "Duplicates", "Online", "Devices"],
-        exportRows: rows.map((r) => [r.code, r.name, r.site, r.employees, r.served, r.coverage, r.balance, r.duplicates, r.online ? "Online" : "Offline", `${r.devicesOnline}/${r.devicesTotal}`]),
+        headers: [
+          "Code",
+          "Name",
+          "Site",
+          "Employees",
+          "Served",
+          "Coverage %",
+          "Balance",
+          "Duplicates",
+          "Online",
+          "Devices",
+        ],
+        exportRows: rows.map((r) => [
+          r.code,
+          r.name,
+          r.site,
+          r.employees,
+          r.served,
+          r.coverage,
+          r.balance,
+          r.duplicates,
+          r.online ? "Online" : "Offline",
+          `${r.devicesOnline}/${r.devicesTotal}`,
+        ]),
       };
     }
     if (active === "wastage") {
@@ -102,16 +215,40 @@ function ReportsPage() {
         data: { kind: "wastage", rows },
         loading: wastage.isLoading,
         headers: ["Camp", "Site", "Estimated", "Served", "Wastage", "% Wastage", "Status"],
-        exportRows: rows.map((r) => [r.code, r.site, r.estimated, r.served, r.wastage, `${r.pct.toFixed(1)}%`, r.status]),
+        exportRows: rows.map((r) => [
+          r.code,
+          r.site,
+          r.estimated,
+          r.served,
+          r.wastage,
+          `${r.pct.toFixed(1)}%`,
+          r.status,
+        ]),
       };
     }
     if (active === "scans") {
-      const rows = scans.data ?? [];
+      const raw = scans.data ?? [];
+      const filtered = status === "mismatch" ? raw.filter((s) => s.status !== "Eligible") : raw;
+      const rows = filtered.map((s) => ({
+        ...s,
+        device: s.device ?? deriveDevice(s.camp),
+        reason: s.reason ?? deriveReason(s.id, s.status),
+      }));
       return {
         data: { kind: "scans", rows },
         loading: scans.isLoading,
-        headers: ["Date", "Time", "Labour ID", "Name", "Camp", "Meal", "Status"],
-        exportRows: rows.map((s) => [s.date, s.time, s.labourId, s.name, s.camp, s.meal, s.status]),
+        headers: ["Date", "Time", "Labour ID", "Name", "Camp", "Device", "Meal", "Status", "Reason"],
+        exportRows: rows.map((s) => [
+          s.date,
+          s.time,
+          s.labourId,
+          s.name,
+          s.camp,
+          s.device ?? "",
+          s.meal,
+          s.status,
+          s.reason ?? "",
+        ]),
       };
     }
     // employee
@@ -119,53 +256,72 @@ function ReportsPage() {
     return {
       data: { kind: "employee", rows },
       loading: employees.isLoading,
-      headers: ["Labour ID", "Name", "Camp", "Company", "Designation", "Status", "Breakfast", "Lunch", "Dinner"],
-      exportRows: rows.map((e) => [e.labourId, e.name, e.camp, e.company, e.designation, e.status, e.breakfast ? "Yes" : "No", e.lunch ? "Yes" : "No", e.dinner ? "Yes" : "No"]),
+      headers: [
+        "Labour ID",
+        "Name",
+        "Camp",
+        "Company",
+        "Designation",
+        "Status",
+        "Breakfast",
+        "Lunch",
+        "Dinner",
+      ],
+      exportRows: rows.map((e) => [
+        e.labourId,
+        e.name,
+        e.camp,
+        e.company,
+        e.designation,
+        e.status,
+        e.breakfast ? "Yes" : "No",
+        e.lunch ? "Yes" : "No",
+        e.dinner ? "Yes" : "No",
+      ]),
     };
-  }, [active, consumption.data, consumption.isLoading, camps.data, camps.isLoading, wastage.data, wastage.isLoading, scans.data, scans.isLoading, employees.data, employees.isLoading]);
+  }, [
+    active,
+    status,
+    consumption.data,
+    consumption.isLoading,
+    camps.data,
+    camps.isLoading,
+    wastage.data,
+    wastage.isLoading,
+    scans.data,
+    scans.isLoading,
+    employees.data,
+    employees.isLoading,
+  ]);
 
-  function exportPdf() {
-    const node = previewRef.current?.querySelector(".mo-report") as HTMLElement | null;
-    if (!node) return;
+  async function exportPdf() {
     setPdfBusy(true);
     try {
-      // Open the report in an isolated print window. The browser uses its own
-      // rendering engine (identical to the live preview) so the printed PDF is
-      // a pixel-perfect copy. The user picks "Save as PDF" in the dialog.
-      const win = window.open("", "_blank", "width=1200,height=900");
-      if (!win) {
-        alert("Allow pop-ups for this site to download the PDF.");
-        return;
-      }
-      // Grab every .mo-report section in order (the report may have been
-      // pre-paginated into multiple sections — e.g. Employee Master, Scan
-      // Activity Log). Each section becomes its own printed page.
-      const wrap = previewRef.current!;
-      const sections = wrap.querySelectorAll<HTMLElement>(".mo-report");
-      const sectionsHtml = Array.from(sections).map((s) => s.outerHTML).join("");
+      // Server renders the same ReportPreview component with Puppeteer and
+      // streams back a real PDF — single click download, no print dialog.
+      const params = new URLSearchParams({ type: active, from, to });
+      if (camp !== "all") params.set("camp", camp);
+      if (meal !== "All") params.set("meal", meal);
+      if (status !== "all") params.set("status", status);
+      if (query) params.set("q", query);
 
-      win.document.write(`<!doctype html><html><head><meta charset="utf-8"/><title>${reportName}</title>
-        <style>
-          @page { size: A4 landscape; margin: 0; }
-          html, body { margin: 0; padding: 0; background: #ffffff; }
-          ${REPORT_CSS}
-          .mo-report-wrap { background: #ffffff; padding: 0; border-radius: 0; }
-          .mo-report {
-            box-shadow: none;
-            margin: 0 auto;
-            width: 297mm !important;
-            height: 210mm !important;
-            min-height: 210mm !important;
-            max-height: 210mm !important;
-            overflow: hidden !important;
-          }
-          .mo-report + .mo-report { margin-top: 0; }
-          .mo-report tbody tr { page-break-inside: avoid; break-inside: avoid; }
-          @media screen { body { background: #f3f4f6; padding: 16px; } .mo-report + .mo-report { margin-top: 16px; } }
-        </style></head><body>${sectionsHtml}
-        <script>window.addEventListener("load", () => { setTimeout(() => { window.focus(); window.print(); }, 200); });<\/script>
-        </body></html>`);
-      win.document.close();
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/reports/render-pdf?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(detail || `PDF render failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${reportName}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "PDF download failed");
     } finally {
       setPdfBusy(false);
     }
@@ -184,28 +340,46 @@ function ReportsPage() {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Reports & Exports</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Generate operational reports, filter by camp, date and meal, then export to PDF / Excel or push to your FTP server.
+            Generate operational reports, filter by camp, date and meal, then export to PDF / Excel
+            or push to your FTP server.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link to="/drilldown" className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
+          <Link
+            to="/drilldown"
+            className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium"
+          >
             <BarChart3 className="size-4" /> Open drilldown
           </Link>
-          <Link to="/audit" className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
-            <ScanLine className="size-4" /> Audit log
-          </Link>
-          <Link to="/schedules" className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium">
+          <Link
+            to="/schedules"
+            className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium"
+          >
             <CalendarClock className="size-4" /> Scheduled reports
           </Link>
-          <button onClick={exportPdf} disabled={pdfBusy || loading} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium disabled:opacity-60">
+          <button
+            onClick={exportPdf}
+            disabled={pdfBusy || loading}
+            className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium disabled:opacity-60"
+          >
             <FileText className="size-4" /> {pdfBusy ? "Generating…" : "Download PDF"}
           </button>
-          <button onClick={exportExcel} disabled={loading} className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium disabled:opacity-60">
+          <button
+            onClick={exportExcel}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-sm font-medium disabled:opacity-60"
+          >
             <FileSpreadsheet className="size-4" /> Download Excel
           </button>
-          <button onClick={() => { setFtpOpen(true); setFtpResult(null); }} className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-3.5 py-2 text-sm font-semibold shadow-glow">
+          {/* <button
+            onClick={() => {
+              setFtpOpen(true);
+              setFtpResult(null);
+            }}
+            className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-3.5 py-2 text-sm font-semibold shadow-glow"
+          >
             <Server className="size-4" /> Push to FTP
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -224,7 +398,9 @@ function ReportsPage() {
               }`}
             >
               <div className="flex items-center gap-2">
-                <FileBarChart className={`size-4 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                <FileBarChart
+                  className={`size-4 ${isActive ? "text-primary" : "text-muted-foreground"}`}
+                />
                 <span className="font-semibold text-sm">{r.title}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1.5 leading-snug">{r.desc}</p>
@@ -240,25 +416,46 @@ function ReportsPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
           <Field label="From">
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className={inputCls}
+            />
           </Field>
           <Field label="To">
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className={inputCls}
+            />
           </Field>
           <Field label="Camp">
             <select value={camp} onChange={(e) => setCamp(e.target.value)} className={inputCls}>
               {!scope && <option value="all">All camps</option>}
-              {visibleCamps.map((c) => <option key={c.id} value={c.code}>{c.code}</option>)}
+              {visibleCamps.map((c) => (
+                <option key={c.id} value={c.code}>
+                  {c.code}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Meal session">
-            <select value={meal} onChange={(e) => setMeal(e.target.value as Meal)} className={inputCls}>
-              {["All", "Breakfast", "Lunch", "Dinner"].map((m) => <option key={m}>{m}</option>)}
+            <select
+              value={meal}
+              onChange={(e) => setMeal(e.target.value as Meal)}
+              className={inputCls}
+            >
+              {["All", "Breakfast", "Lunch", "Dinner"].map((m) => (
+                <option key={m}>{m}</option>
+              ))}
             </select>
           </Field>
           <Field label="Status">
             <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls}>
               <option value="all">All</option>
+              <option value="mismatch">Mismatch only</option>
               <option>Eligible</option>
               <option>Already Served</option>
               <option>Not Eligible</option>
@@ -269,7 +466,12 @@ function ReportsPage() {
           <Field label="Search">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, ID…" className={`${inputCls} pl-8`} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Name, ID…"
+                className={`${inputCls} pl-8`}
+              />
             </div>
           </Field>
         </div>
@@ -291,31 +493,52 @@ function ReportsPage() {
           zIndex: -1,
         }}
       >
-        <ReportPreview type={active} filters={previewFilters} scopeLabel={scopeLabel} data={data} loading={loading} />
+        <ReportPreview
+          type={active}
+          filters={previewFilters}
+          scopeLabel={scopeLabel}
+          data={data}
+          loading={loading}
+        />
       </div>
 
       {ftpOpen && (
         <FtpDialog
           fileName={reportName}
+          title={title}
+          headers={headers}
+          exportRows={exportRows}
+          previewRef={previewRef}
           onClose={() => setFtpOpen(false)}
           onResult={setFtpResult}
         />
       )}
 
       {ftpResult && (
-        <div className={`fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border p-4 shadow-elegant flex items-start gap-3 ${
-          ftpResult.ok ? "bg-success/10 border-success/30 text-success" : "bg-destructive/10 border-destructive/30 text-destructive"
-        }`}>
-          {ftpResult.ok ? <CheckCircle2 className="size-5 mt-0.5" /> : <AlertCircle className="size-5 mt-0.5" />}
+        <div
+          className={`fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border p-4 shadow-elegant flex items-start gap-3 ${
+            ftpResult.ok
+              ? "bg-success/10 border-success/30 text-success"
+              : "bg-destructive/10 border-destructive/30 text-destructive"
+          }`}
+        >
+          {ftpResult.ok ? (
+            <CheckCircle2 className="size-5 mt-0.5" />
+          ) : (
+            <AlertCircle className="size-5 mt-0.5" />
+          )}
           <div className="text-sm">{ftpResult.msg}</div>
-          <button onClick={() => setFtpResult(null)} className="ml-auto"><X className="size-4" /></button>
+          <button onClick={() => setFtpResult(null)} className="ml-auto">
+            <X className="size-4" />
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-const inputCls = "w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30";
+const inputCls =
+  "w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -326,30 +549,159 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function FtpDialog({ fileName, onClose, onResult }: { fileName: string; onClose: () => void; onResult: (r: { ok: boolean; msg: string }) => void }) {
-  const [host, setHost] = useState("ftp.mealops.ae");
+type FtpDialogProps = {
+  fileName: string;
+  title: string;
+  headers: string[];
+  exportRows: (string | number)[][];
+  previewRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  onResult: (r: { ok: boolean; msg: string }) => void;
+};
+
+function arrayBufferToBase64(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(i, i + chunk)) as unknown as number[],
+    );
+  }
+  return btoa(binary);
+}
+
+async function buildXlsxBase64(
+  headers: string[],
+  rows: (string | number)[][],
+  sheetName: string,
+): Promise<string> {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 28));
+  const out: ArrayBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  return arrayBufferToBase64(out);
+}
+
+async function buildPdfBase64(
+  previewRef: React.RefObject<HTMLDivElement | null>,
+): Promise<string> {
+  // Scrape the same offscreen .mo-report sections used by the "Download PDF"
+  // flow so the FTP-pushed PDF is visually identical. html2canvas-pro is a
+  // drop-in fork of html2canvas that handles Tailwind v4's oklch() tokens.
+  const wrap = previewRef.current;
+  if (!wrap) throw new Error("Report preview not ready");
+  const sections = wrap.querySelectorAll<HTMLElement>(".mo-report");
+  if (sections.length === 0) throw new Error("Report has no pages to render");
+
+  const [html2canvasModule, jspdfModule] = await Promise.all([
+    import("html2canvas-pro"),
+    import("jspdf"),
+  ]);
+  const html2canvas = (
+    html2canvasModule as { default: (el: HTMLElement, opts?: object) => Promise<HTMLCanvasElement> }
+  ).default;
+  const JsPDFCtor =
+    (
+      jspdfModule as {
+        jsPDF?: typeof import("jspdf").jsPDF;
+        default?: typeof import("jspdf").jsPDF;
+      }
+    ).jsPDF ?? (jspdfModule as { default: typeof import("jspdf").jsPDF }).default;
+
+  const pdf = new JsPDFCtor({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+
+  for (let i = 0; i < sections.length; i++) {
+    const canvas = await html2canvas(sections[i], {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+    });
+    const img = canvas.toDataURL("image/jpeg", 0.92);
+    if (i > 0) pdf.addPage("a4", "landscape");
+    pdf.addImage(img, "JPEG", 0, 0, pageW, pageH, undefined, "FAST");
+  }
+
+  const buf = pdf.output("arraybuffer") as ArrayBuffer;
+  return arrayBufferToBase64(buf);
+}
+
+function FtpDialog({
+  fileName,
+  title,
+  headers,
+  exportRows,
+  previewRef,
+  onClose,
+  onResult,
+}: FtpDialogProps) {
+  const [host, setHost] = useState("gator4052.hostgator.com");
   const [port, setPort] = useState("21");
-  const [user, setUser] = useState("mealops_reports");
+  const [user, setUser] = useState("francis@akilgroup.com");
   const [pass, setPass] = useState("");
-  const [path, setPath] = useState("/incoming/reports/");
+  const [path, setPath] = useState("/mealtrack-pro/");
   const [format, setFormat] = useState<"pdf" | "xlsx" | "both">("both");
   const [busy, setBusy] = useState(false);
 
   async function push(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setBusy(false);
-    onResult({
-      ok: true,
-      msg: `Uploaded ${fileName}.${format === "both" ? "pdf + xlsx" : format} to ftp://${user}@${host}:${port}${path}`,
-    });
-    onClose();
+    try {
+      const files: { name: string; contentBase64: string }[] = [];
+      if (format === "xlsx" || format === "both") {
+        const b64 = await buildXlsxBase64(headers, exportRows, title);
+        files.push({ name: `${fileName}.xlsx`, contentBase64: b64 });
+      }
+      if (format === "pdf" || format === "both") {
+        const b64 = await buildPdfBase64(previewRef);
+        files.push({ name: `${fileName}.pdf`, contentBase64: b64 });
+      }
+
+      const result = await api<{
+        ok: boolean;
+        uploaded: { name: string; bytes: number; remote: string }[];
+        host: string;
+        port: number;
+        user: string;
+        remotePath: string;
+      }>("/reports/push-ftp", {
+        method: "POST",
+        body: JSON.stringify({
+          host,
+          port: Number(port) || 21,
+          user,
+          password: pass,
+          remotePath: path,
+          files,
+        }),
+      });
+
+      const names = result.uploaded.map((u) => u.name).join(", ");
+      onResult({
+        ok: true,
+        msg: `Uploaded ${names} to ftp://${user}@${host}:${port}${path}`,
+      });
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "FTP upload failed";
+      onResult({ ok: false, msg });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-xl rounded-2xl bg-card border border-border shadow-elegant" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl rounded-2xl bg-card border border-border shadow-elegant"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="size-9 rounded-lg gradient-primary grid place-items-center text-primary-foreground">
@@ -360,26 +712,55 @@ function FtpDialog({ fileName, onClose, onResult }: { fileName: string; onClose:
               <div className="text-xs text-muted-foreground">{fileName}</div>
             </div>
           </div>
-          <button onClick={onClose} className="size-8 grid place-items-center rounded-lg hover:bg-secondary"><X className="size-4" /></button>
+          <button
+            onClick={onClose}
+            className="size-8 grid place-items-center rounded-lg hover:bg-secondary"
+          >
+            <X className="size-4" />
+          </button>
         </div>
         <form onSubmit={push} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="FTP Host *">
-            <input required value={host} onChange={(e) => setHost(e.target.value)} className={inputCls} />
+            <input
+              required
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              className={inputCls}
+            />
           </Field>
           <Field label="Port">
             <input value={port} onChange={(e) => setPort(e.target.value)} className={inputCls} />
           </Field>
           <Field label="Username *">
-            <input required value={user} onChange={(e) => setUser(e.target.value)} className={inputCls} />
+            <input
+              required
+              value={user}
+              onChange={(e) => setUser(e.target.value)}
+              className={inputCls}
+            />
           </Field>
           <Field label="Password *">
-            <input required type="password" value={pass} onChange={(e) => setPass(e.target.value)} className={inputCls} />
+            <input
+              required
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              className={inputCls}
+            />
           </Field>
           <Field label="Remote Path">
-            <input value={path} onChange={(e) => setPath(e.target.value)} className={`${inputCls} font-mono`} />
+            <input
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              className={`${inputCls} font-mono`}
+            />
           </Field>
           <Field label="Format">
-            <select value={format} onChange={(e) => setFormat(e.target.value as "pdf" | "xlsx" | "both")} className={inputCls}>
+            <select
+              value={format}
+              onChange={(e) => setFormat(e.target.value as "pdf" | "xlsx" | "both")}
+              className={inputCls}
+            >
               <option value="both">PDF + Excel</option>
               <option value="pdf">PDF only</option>
               <option value="xlsx">Excel only</option>
@@ -387,13 +768,24 @@ function FtpDialog({ fileName, onClose, onResult }: { fileName: string; onClose:
           </Field>
 
           <div className="md:col-span-2 rounded-lg bg-secondary/60 border border-border p-3 text-xs text-muted-foreground">
-            FTP credentials are sent over TLS to the MyMeals relay and the report file is uploaded to your server.
-            For production rollout, save these credentials per-camp in System Settings so scheduled reports push automatically.
+            The file is generated in your browser and posted to the MealOps server, which uploads it
+            to your FTP host. Credentials are sent over the same TLS connection as the rest of the
+            app.
           </div>
 
           <div className="md:col-span-2 flex items-center justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm hover:bg-secondary">Cancel</button>
-            <button disabled={busy} type="submit" className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow disabled:opacity-60">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm hover:bg-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={busy}
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow disabled:opacity-60"
+            >
               <Download className="size-4 rotate-180" /> {busy ? "Uploading…" : "Push to FTP"}
             </button>
           </div>

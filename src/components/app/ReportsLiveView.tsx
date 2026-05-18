@@ -272,7 +272,10 @@ function ScansView({ rows }: { rows: Extract<ReportData, { kind: "scans" }>["row
         <KpiTile label="Duplicates" value={num(counts.duplicates)} icon={ShieldAlert} tone="danger" />
       </div>
 
-      <DataCard headers={["Time", "Labour ID", "Employee", "Camp", "Meal", "Status"]} rowCount={rows.length}>
+      <DataCard
+        headers={["Time", "Labour ID", "Employee", "Camp", "Device", "Meal", "Status", "Reason"]}
+        rowCount={rows.length}
+      >
         {rows.map((s) => (
           <tr key={s.id} className="border-t border-border hover:bg-secondary/30">
             <td className="px-4 py-2.5 whitespace-nowrap">
@@ -282,8 +285,14 @@ function ScansView({ rows }: { rows: Extract<ReportData, { kind: "scans" }>["row
             <td className="px-4 py-2.5 tabular-nums text-xs font-mono">{s.labourId}</td>
             <td className="px-4 py-2.5 text-[13px]">{s.name}</td>
             <td className="px-4 py-2.5 text-xs font-medium">{s.camp}</td>
+            <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground whitespace-nowrap">
+              {s.device ?? "—"}
+            </td>
             <td className="px-4 py-2.5 text-xs">{s.meal}</td>
             <td className="px-4 py-2.5"><Badge status={s.status} /></td>
+            <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[260px]">
+              {s.reason ?? "—"}
+            </td>
           </tr>
         ))}
       </DataCard>

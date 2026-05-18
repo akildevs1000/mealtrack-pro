@@ -14,7 +14,10 @@ import overviewRouter from "./routes/overview.js";
 import auditRouter from "./routes/audit.js";
 import scannerRouter from "./routes/scanner.js";
 import reportsRouter from "./routes/reports.js";
+import schedulesRouter from "./routes/schedules.js";
+import ftpConfigRouter from "./routes/ftp-config.js";
 import { errorHandler, notFound } from "./middleware/error.js";
+import { startScheduler } from "./scheduler/worker.js";
 
 const app = express();
 const PORT = Number(process.env.PORT || 5044);
@@ -37,10 +40,15 @@ app.use("/api/overview", overviewRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/scanner", scannerRouter);
 app.use("/api/reports", reportsRouter);
+app.use("/api/schedules", schedulesRouter);
+app.use("/api/ftp-config", ftpConfigRouter);
 
 app.use(notFound);
 app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
+  // Boot the in-process cron only after the HTTP server is up so any startup
+  // crashes still surface a useful "listening on…" line first.
+  startScheduler();
 });

@@ -3,3 +3,6 @@ dist/
 .env
 .env.local
 *.log
+
+# Synced from frontend by scripts/sync-ssr.ts (predev/prebuild). Do not edit.
+src/ssr/

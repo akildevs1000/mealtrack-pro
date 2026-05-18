@@ -4,26 +4,23 @@ import type {
   ReportWastageRow,
   ReportScanRow,
   ReportEmployeeRow,
-} from "@/lib/hooks";
+  ReportType,
+  MealFilter,
+  ReportFilters,
+  ReportData,
+} from "./report-preview-types";
 
-export type ReportType = "consumption" | "employee" | "scans" | "camp" | "wastage";
-export type MealFilter = "All" | "Breakfast" | "Lunch" | "Dinner";
-
-export type ReportFilters = {
-  from: string;
-  to: string;
-  camp: string;
-  meal: MealFilter;
-  status: string;
-  query: string;
+export type {
+  ReportConsumptionRow,
+  ReportCampRow,
+  ReportWastageRow,
+  ReportScanRow,
+  ReportEmployeeRow,
+  ReportType,
+  MealFilter,
+  ReportFilters,
+  ReportData,
 };
-
-export type ReportData =
-  | { kind: "consumption"; rows: ReportConsumptionRow[] }
-  | { kind: "camp"; rows: ReportCampRow[] }
-  | { kind: "wastage"; rows: ReportWastageRow[] }
-  | { kind: "scans"; rows: ReportScanRow[] }
-  | { kind: "employee"; rows: ReportEmployeeRow[] };
 
 type Props = {
   type: ReportType;
@@ -817,13 +814,15 @@ function ScansTable({ rows }: { rows: ReportScanRow[] }) {
     <table>
       <thead>
         <tr>
-          <th style={{ width: 100 }}>Date</th>
-          <th style={{ width: 90 }}>Time</th>
-          <th style={{ width: 100 }}>Labour ID</th>
+          <th style={{ width: 84 }}>Date</th>
+          <th style={{ width: 70 }}>Time</th>
+          <th style={{ width: 92 }}>Labour ID</th>
           <th>Employee</th>
           <th>Camp</th>
+          <th>Device</th>
           <th>Meal</th>
           <th>Status</th>
+          <th>Reason</th>
         </tr>
       </thead>
       <tbody>
@@ -854,12 +853,14 @@ function ScansTable({ rows }: { rows: ReportScanRow[] }) {
               <td><strong>{s.labourId}</strong></td>
               <td>{s.name}</td>
               <td>{s.camp}</td>
+              <td style={{ fontSize: 10, color: "#475569" }}>{s.device ?? "—"}</td>
               <td><span className={`pill-tag ${tag}`}>{s.meal}</span></td>
               <td><span className={`status ${statusClass}`}>{s.status}</span></td>
+              <td style={{ fontSize: 10, color: "#475569" }}>{s.reason ?? "—"}</td>
             </tr>
           );
         })}
-        {rows.length === 0 && <EmptyRow span={7} />}
+        {rows.length === 0 && <EmptyRow span={9} />}
       </tbody>
     </table>
   );
