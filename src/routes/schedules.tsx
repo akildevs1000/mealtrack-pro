@@ -148,7 +148,9 @@ function SchedulesPage() {
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <ShieldCheck className="size-10 mx-auto text-muted-foreground" />
         <h2 className="mt-4 font-display text-lg font-semibold">Restricted</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Your role does not have access to automation.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your role does not have access to automation.
+        </p>
       </div>
     );
   }
@@ -249,9 +251,9 @@ function SchedulesPage() {
             Background scheduler is active
           </div>
           <div className="text-muted-foreground mt-1">
-            The MealOps server checks for due schedules every minute and pushes FTP-delivered
-            reports automatically. Email delivery is not wired yet — those runs will fail until the
-            SMTP integration is in place.
+            The MealOps server checks for due schedules every minute and delivers reports
+            automatically — both FTP upload and SMTP email are live. Email runs require Mail
+            settings to be configured; FTP runs require FTP settings.
           </div>
         </div>
       </div>
@@ -397,8 +399,7 @@ function ScheduleCard({
   const emails = s.recipientEmails ?? [];
   const emailMissingRecipients = s.destination === "email" && emails.length === 0;
   const mailMissing = s.destination === "email" && !mailConfig;
-  const hasError =
-    issues.some((i) => i.level === "error") || ftpMissing || emailMissingRecipients;
+  const hasError = issues.some((i) => i.level === "error") || ftpMissing || emailMissingRecipients;
 
   return (
     <div
@@ -737,7 +738,10 @@ function EmailRecipients({
     const v = raw.trim().replace(/,$/, "").trim();
     if (!v) return;
     if (!EMAIL_RE.test(v)) return; // ignore invalid; input border could flag it
-    if (emails.includes(v)) { setDraft(""); return; }
+    if (emails.includes(v)) {
+      setDraft("");
+      return;
+    }
     onChange([...emails, v]);
     setDraft("");
   }
@@ -1003,7 +1007,9 @@ function MailDialog({
             </div>
             <div>
               <div className="font-semibold">SMTP / mail settings</div>
-              <div className="text-xs text-muted-foreground">Used by schedules with email delivery</div>
+              <div className="text-xs text-muted-foreground">
+                Used by schedules with email delivery
+              </div>
             </div>
           </div>
           <button
@@ -1015,7 +1021,12 @@ function MailDialog({
         </div>
         <form onSubmit={submit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           <FtpField label="SMTP Host *">
-            <input required value={host} onChange={(e) => setHost(e.target.value)} className={inputCls} />
+            <input
+              required
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              className={inputCls}
+            />
           </FtpField>
           <FtpField label="Port">
             <input
@@ -1031,9 +1042,20 @@ function MailDialog({
             />
           </FtpField>
           <FtpField label="Username *">
-            <input required value={username} onChange={(e) => setUsername(e.target.value)} className={inputCls} />
+            <input
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className={inputCls}
+            />
           </FtpField>
-          <FtpField label={initial?.hasPassword ? "Password / app password (leave blank to keep)" : "Password / app password *"}>
+          <FtpField
+            label={
+              initial?.hasPassword
+                ? "Password / app password (leave blank to keep)"
+                : "Password / app password *"
+            }
+          >
             <input
               required={!initial?.hasPassword}
               type="password"
@@ -1044,7 +1066,11 @@ function MailDialog({
             />
           </FtpField>
           <FtpField label="From name">
-            <input value={fromName} onChange={(e) => setFromName(e.target.value)} className={inputCls} />
+            <input
+              value={fromName}
+              onChange={(e) => setFromName(e.target.value)}
+              className={inputCls}
+            />
           </FtpField>
           <FtpField label="From email *">
             <input

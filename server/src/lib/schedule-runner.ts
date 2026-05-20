@@ -31,32 +31,43 @@ function reportLabel(t: ReportType): string {
   return REPORT_LABELS[t] ?? t;
 }
 
+// Schedule times are Dubai wall-clock (the app reasons in Asia/Dubai — see
+// lib/time.ts), but the server may run in any timezone (UTC in production).
+// Dubai is a constant UTC+4 with no DST, so we do the calendar math in a
+// "Dubai-shifted" Date — one whose UTC fields equal the Dubai wall clock — then
+// shift back to a real UTC instant. This makes the result independent of the
+// host timezone, so e.g. "11:45" always fires at 11:45 Dubai, not 11:45 server.
+const DUBAI_OFFSET_MS = 4 * 60 * 60 * 1000;
+
 export function computeNextRunAt(
   s: { frequency: "daily" | "weekly" | "monthly"; time: string; weekday: number | null; dayOfMonth: number | null },
   from: Date = new Date(),
 ): Date | null {
   const [h, m] = s.time.split(":").map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  const cand = new Date(from);
-  cand.setSeconds(0, 0);
-  cand.setHours(h, m, 0, 0);
+
+  // Shift into "Dubai space": a Date whose UTC getters read the Dubai clock.
+  const nowDubai = new Date(from.getTime() + DUBAI_OFFSET_MS);
+  const cand = new Date(nowDubai.getTime());
+  cand.setUTCSeconds(0, 0);
+  cand.setUTCHours(h, m, 0, 0);
 
   if (s.frequency === "daily") {
-    if (cand <= from) cand.setDate(cand.getDate() + 1);
-    return cand;
-  }
-  if (s.frequency === "weekly") {
+    if (cand <= nowDubai) cand.setUTCDate(cand.getUTCDate() + 1);
+  } else if (s.frequency === "weekly") {
     const target = s.weekday ?? 1;
-    const delta = (target - cand.getDay() + 7) % 7;
-    cand.setDate(cand.getDate() + delta);
-    if (cand <= from) cand.setDate(cand.getDate() + 7);
-    return cand;
+    const delta = (target - cand.getUTCDay() + 7) % 7;
+    cand.setUTCDate(cand.getUTCDate() + delta);
+    if (cand <= nowDubai) cand.setUTCDate(cand.getUTCDate() + 7);
+  } else {
+    // monthly
+    const day = Math.min(28, s.dayOfMonth ?? 1);
+    cand.setUTCDate(day);
+    if (cand <= nowDubai) cand.setUTCMonth(cand.getUTCMonth() + 1);
   }
-  // monthly
-  const day = Math.min(28, s.dayOfMonth ?? 1);
-  cand.setDate(day);
-  if (cand <= from) cand.setMonth(cand.getMonth() + 1);
-  return cand;
+
+  // Shift back from Dubai space to the real UTC instant.
+  return new Date(cand.getTime() - DUBAI_OFFSET_MS);
 }
 
 function sanitiseRemoteName(name: string): string {

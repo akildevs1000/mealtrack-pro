@@ -3,7 +3,11 @@ import { Readable } from "node:stream";
 import { Client as FtpClient } from "basic-ftp";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth } from "../middleware/auth.js";
-import { fetchTypedReportData, type ReportType } from "../lib/report-data.js";
+import {
+  fetchTypedReportData,
+  cmsEmployeeToReportRow,
+  type ReportType,
+} from "../lib/report-data.js";
 import { buildStyledPdfBuffer } from "../lib/report-pdf-styled.js";
 
 const router = Router();
@@ -47,15 +51,21 @@ function scanCampWhere(codes: string[] | null, code?: string) {
   return {};
 }
 function uiStatus(s: string) {
-  return s === "AlreadyServed" ? "Already Served"
-    : s === "NotEligible" ? "Not Eligible"
-      : s === "WrongCamp" ? "Wrong Camp"
+  return s === "AlreadyServed"
+    ? "Already Served"
+    : s === "NotEligible"
+      ? "Not Eligible"
+      : s === "WrongCamp"
+        ? "Wrong Camp"
         : s;
 }
 function dbStatus(s: string) {
-  return s === "Already Served" ? "AlreadyServed"
-    : s === "Not Eligible" ? "NotEligible"
-      : s === "Wrong Camp" ? "WrongCamp"
+  return s === "Already Served"
+    ? "AlreadyServed"
+    : s === "Not Eligible"
+      ? "NotEligible"
+      : s === "Wrong Camp"
+        ? "WrongCamp"
         : s;
 }
 
@@ -80,7 +90,8 @@ router.get("/consumption", async (req, res, next) => {
 
     const days = dayCount(from, to);
     const rows = camps.map((c) => {
-      const get = (m: string) => groups.find((g) => g.campCode === c.code && g.meal === m)?._count._all ?? 0;
+      const get = (m: string) =>
+        groups.find((g) => g.campCode === c.code && g.meal === m)?._count._all ?? 0;
       const breakfast = get("Breakfast");
       const lunch = get("Lunch");
       const dinner = get("Dinner");
@@ -91,12 +102,23 @@ router.get("/consumption", async (req, res, next) => {
         name: c.name,
         site: c.site,
         employees: c.employees,
-        breakfast, lunch, dinner, served, estimated,
+        breakfast,
+        lunch,
+        dinner,
+        served,
+        estimated,
         variance: served - estimated,
       };
     });
-    res.json({ from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), days, rows });
-  } catch (e) { next(e); }
+    res.json({
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      days,
+      rows,
+    });
+  } catch (e) {
+    next(e);
+  }
 });
 
 // ---------------- /reports/scans ----------------
@@ -129,17 +151,21 @@ router.get("/scans", async (req, res, next) => {
       orderBy: { time: "desc" },
       take: limit,
     });
-    res.json(rows.map((s) => ({
-      id: s.id,
-      time: s.time.toISOString().slice(11, 19),
-      date: s.time.toISOString().slice(0, 10),
-      name: s.name,
-      labourId: s.labourId,
-      camp: s.campCode,
-      meal: s.meal,
-      status: uiStatus(s.status),
-    })));
-  } catch (e) { next(e); }
+    res.json(
+      rows.map((s) => ({
+        id: s.id,
+        time: s.time.toISOString().slice(11, 19),
+        date: s.time.toISOString().slice(0, 10),
+        name: s.name,
+        labourId: s.labourId,
+        camp: s.campCode,
+        meal: s.meal,
+        status: uiStatus(s.status),
+      })),
+    );
+  } catch (e) {
+    next(e);
+  }
 });
 
 // ---------------- /reports/camps ----------------
@@ -154,7 +180,10 @@ router.get("/camps", async (req, res, next) => {
       prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } }),
       prisma.scan.groupBy({
         by: ["campCode", "status"],
-        where: { time: { gte: from, lte: to }, ...scanCampWhere(codes, req.query.campCode as string) },
+        where: {
+          time: { gte: from, lte: to },
+          ...scanCampWhere(codes, req.query.campCode as string),
+        },
         _count: { _all: true },
       }),
       prisma.device.findMany({
@@ -164,8 +193,11 @@ router.get("/camps", async (req, res, next) => {
 
     const days = dayCount(from, to);
     const rows = camps.map((c) => {
-      const served = scanGroups.find((g) => g.campCode === c.code && g.status === "Eligible")?._count._all ?? 0;
-      const duplicates = scanGroups.find((g) => g.campCode === c.code && g.status === "AlreadyServed")?._count._all ?? 0;
+      const served =
+        scanGroups.find((g) => g.campCode === c.code && g.status === "Eligible")?._count._all ?? 0;
+      const duplicates =
+        scanGroups.find((g) => g.campCode === c.code && g.status === "AlreadyServed")?._count
+          ._all ?? 0;
       const estimated = Math.round(c.employees * days * 0.85);
       const dev = devices.filter((d) => d.campCode === c.code);
       return {
@@ -183,8 +215,15 @@ router.get("/camps", async (req, res, next) => {
         devicesTotal: dev.length,
       };
     });
-    res.json({ from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), days, rows });
-  } catch (e) { next(e); }
+    res.json({
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      days,
+      rows,
+    });
+  } catch (e) {
+    next(e);
+  }
 });
 
 // ---------------- /reports/wastage ----------------
@@ -225,65 +264,51 @@ router.get("/wastage", async (req, res, next) => {
         status,
       };
     });
-    res.json({ from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), days, rows });
-  } catch (e) { next(e); }
+    res.json({
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      days,
+      rows,
+    });
+  } catch (e) {
+    next(e);
+  }
 });
 
 // ---------------- /reports/employees ----------------
-// Synthesized roster aligned to Camp.code (separate from the CMS roster which
-// uses a different camp-coding scheme). Deterministic per (camp, slot).
-
-const NAMES = [
-  "Mohammed Rafiq", "Suresh Kumar", "Anwar Hussain", "Ramesh Babu", "Bilal Ahmed",
-  "Vinod Sharma", "Iqbal Khan", "Tariq Mahmood", "Sanjay Patel", "Imran Sheikh",
-  "Ravi Verma", "Karim Aslam", "Naveen Kumar", "Faisal Iqbal", "Pradeep Singh",
-  "Mohammed Asif", "Wasim Akram", "Hari Krishnan", "Vimal Raj", "Younis Ahmed",
-];
-const COMPANIES = ["Al Futtaim Construction", "Arabtec", "ALEC", "Khansaheb"];
-const DESIGNATIONS = ["Mason", "Carpenter", "Steel Fixer", "Electrician", "Plumber", "Helper"];
-const STATUSES = ["Active", "Active", "Active", "Active", "Active", "Active", "Leave", "Vacation", "Inactive"];
-
-function hash(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
+// Real CMS labour roster (CmsEmployee). Camp-scoped via campFilter. Note the
+// CMS roster uses its own camp-coding scheme ("CAMP 19") which does not join to
+// the dashboard Camp.code scheme ("AD-01"), so filtering by a dashboard camp
+// code returns no rows — same behaviour as the Employees page.
 
 router.get("/employees", async (req, res, next) => {
   try {
-    const { where: campWhere } = campFilter(req, req.query.campCode as string);
+    const { codes } = campFilter(req, req.query.campCode as string);
     const statusFilter = req.query.status as string | undefined;
     const q = (req.query.q as string | undefined)?.toLowerCase().trim();
     const limit = Math.min(Number(req.query.limit) || 300, 1000);
 
-    const camps = await prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } });
+    const where: any = {};
+    if (codes) where.campCode = { in: codes };
 
-    const rows: any[] = [];
-    for (const c of camps) {
-      const per = Math.min(50, Math.max(8, Math.floor(c.employees / 30)));
-      for (let i = 0; i < per; i++) {
-        const h = hash(`${c.code}:${i}`);
-        const nameBase = NAMES[h % NAMES.length];
-        const name = i >= NAMES.length ? `${nameBase} ${Math.floor(i / NAMES.length) + 1}` : nameBase;
-        const status = STATUSES[(h >> 3) % STATUSES.length];
-        if (statusFilter && statusFilter !== "all" && status !== statusFilter) continue;
-        const labourId = `LB-${(20000 + (h % 79999)).toString().padStart(5, "0")}`;
-        if (q && !name.toLowerCase().includes(q) && !labourId.toLowerCase().includes(q)) continue;
-        rows.push({
-          labourId,
-          name,
-          camp: c.code,
-          company: COMPANIES[(h >> 5) % COMPANIES.length],
-          designation: DESIGNATIONS[(h >> 7) % DESIGNATIONS.length],
-          status,
-          breakfast: (h % 7) !== 0,
-          lunch: true,
-          dinner: (h % 5) !== 0,
-        });
-      }
+    const employees = await prisma.cmsEmployee.findMany({
+      where,
+      orderBy: { laborCode: "asc" },
+    });
+
+    const rows: ReturnType<typeof cmsEmployeeToReportRow>[] = [];
+    for (const e of employees) {
+      const row = cmsEmployeeToReportRow(e);
+      if (statusFilter && statusFilter !== "all" && row.status !== statusFilter) continue;
+      if (q && !row.name.toLowerCase().includes(q) && !row.labourId.toLowerCase().includes(q))
+        continue;
+      rows.push(row);
+      if (rows.length >= limit) break;
     }
-    res.json(rows.slice(0, limit));
-  } catch (e) { next(e); }
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
 });
 
 // ---------------- /reports/push-ftp ----------------
@@ -396,13 +421,13 @@ router.get("/render-pdf", async (req, res, next) => {
     const from = parseFrom(req.query.from);
     const to = parseTo(req.query.to);
     const scope = campScopeOf(req);
-    const campParam = typeof req.query.camp === "string" && req.query.camp !== "all"
-      ? req.query.camp
-      : undefined;
+    const campParam =
+      typeof req.query.camp === "string" && req.query.camp !== "all" ? req.query.camp : undefined;
     // Effective camp restriction: intersect manager scope with explicit filter.
     let campCodes: string[] | null = null;
     if (campParam) {
-      if (scope && !scope.includes(campParam)) campCodes = []; // no overlap → empty result
+      if (scope && !scope.includes(campParam))
+        campCodes = []; // no overlap → empty result
       else campCodes = [campParam];
     } else if (scope) {
       campCodes = scope;
@@ -412,23 +437,28 @@ router.get("/render-pdf", async (req, res, next) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const q = typeof req.query.q === "string" ? req.query.q.trim() : undefined;
 
-    const data = await fetchTypedReportData(type, { from, to }, {
-      campCodes,
-      meal,
-      status,
-      q: q || undefined,
-    });
+    const data = await fetchTypedReportData(
+      type,
+      { from, to },
+      {
+        campCodes,
+        meal,
+        status,
+        q: q || undefined,
+      },
+    );
 
     const fromIso = from.toISOString().slice(0, 10);
     const toIso = to.toISOString().slice(0, 10);
-    const scopeLabel = campParam ?? (scope
-      ? (scope.length === 1 ? scope[0]! : `${scope.length} camps`)
-      : "All Camps");
+    const scopeLabel =
+      campParam ??
+      (scope ? (scope.length === 1 ? scope[0]! : `${scope.length} camps`) : "All Camps");
 
     const buffer = await buildStyledPdfBuffer({
       type,
       filters: {
-        from: fromIso, to: toIso,
+        from: fromIso,
+        to: toIso,
         camp: campParam ?? "all",
         meal: (meal as "All" | "Breakfast" | "Lunch" | "Dinner" | undefined) ?? "All",
         status: status ?? "all",
@@ -443,7 +473,9 @@ router.get("/render-pdf", async (req, res, next) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Length", String(buffer.length));
     res.end(buffer);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 export default router;
