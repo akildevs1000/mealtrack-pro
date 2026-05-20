@@ -1,12 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  Plus, Search, Pencil, Trash2, Power, PowerOff, Building2, Mail, Phone,
-  KeyRound, Shield, X, AlertTriangle, CheckCircle2, Clock, Smartphone,
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Power,
+  PowerOff,
+  Building2,
+  Mail,
+  Phone,
+  KeyRound,
+  Shield,
+  X,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Smartphone,
 } from "lucide-react";
 import {
-  useCamps, useManagers, useCreateManager, useUpdateManager,
-  useDeleteManager, useToggleManagerStatus, type Manager as CampManager,
+  useCamps,
+  useManagers,
+  useCreateManager,
+  useUpdateManager,
+  useDeleteManager,
+  useToggleManagerStatus,
+  type Manager as CampManager,
 } from "@/lib/hooks";
 
 export const Route = createFileRoute("/managers")({
@@ -34,16 +53,33 @@ type FormState = {
 
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (n: number) => {
-  const d = new Date(); d.setDate(d.getDate() + n);
+  const d = new Date();
+  d.setDate(d.getDate() + n);
   return d.toISOString().slice(0, 10);
 };
-const initials = (s: string) => s.split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+const initials = (s: string) =>
+  s
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
 const daysUntil = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
 
 const emptyForm: FormState = {
-  name: "", username: "", password: "", pin: "", email: "", phone: "", emiratesId: "",
-  camp: "", role: "Camp Manager", shift: "Full Day",
-  joinDate: today(), expiryDate: addDays(365), status: "Active",
+  name: "",
+  username: "",
+  password: "",
+  pin: "",
+  email: "",
+  phone: "",
+  emiratesId: "",
+  camp: "",
+  role: "Camp Manager",
+  shift: "Full Day",
+  joinDate: today(),
+  expiryDate: addDays(365),
+  status: "Active",
   permissions: { breakfast: true, lunch: true, dinner: true, reports: true },
 };
 
@@ -83,17 +119,30 @@ function Managers() {
     // On create: pin "" sends no PIN. On edit: empty pin means "don't touch".
     const pin = form.pin ? form.pin : id ? undefined : null;
     const payload = {
-      name: form.name, username: form.username, password: form.password, pin,
-      email: form.email, phone: form.phone, emiratesId: form.emiratesId,
-      campCode: form.camp, role: form.role, shift: form.shift,
-      joinDate: form.joinDate, expiryDate: form.expiryDate, status: form.status,
+      name: form.name,
+      username: form.username,
+      password: form.password,
+      pin,
+      email: form.email,
+      phone: form.phone,
+      emiratesId: form.emiratesId,
+      campCode: form.camp,
+      role: form.role,
+      shift: form.shift,
+      joinDate: form.joinDate,
+      expiryDate: form.expiryDate,
+      status: form.status,
       permissions: form.permissions,
     };
     if (id) await updateMgr.mutateAsync({ id, ...payload });
     else await createMgr.mutateAsync(payload);
-    setEditing(null); setCreating(false);
+    setEditing(null);
+    setCreating(false);
   }
-  async function remove(id: string) { await deleteMgr.mutateAsync(id); setConfirmDelete(null); }
+  async function remove(id: string) {
+    await deleteMgr.mutateAsync(id);
+    setConfirmDelete(null);
+  }
   async function toggleStatus(id: string) {
     const m = list.find((x) => x.id === id);
     if (!m) return;
@@ -105,30 +154,55 @@ function Managers() {
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Camp Managers</h1>
-          <p className="text-sm text-muted-foreground mt-1">Add, edit and manage canteen managers — assign each to a camp and control access.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Add, edit and manage canteen managers — assign each to a camp and control access.
+          </p>
         </div>
-        <button onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow hover:opacity-95">
+        <button
+          onClick={() => setCreating(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow hover:opacity-95"
+        >
           <Plus className="size-4" /> Add New Manager
         </button>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={<Shield className="size-4" />} label="Total Managers" value={list.length} tone="primary" />
-        <Kpi icon={<CheckCircle2 className="size-4" />} label="Active" value={active} tone="success" />
+        <Kpi
+          icon={<Shield className="size-4" />}
+          label="Total Managers"
+          value={list.length}
+          tone="primary"
+        />
+        <Kpi
+          icon={<CheckCircle2 className="size-4" />}
+          label="Active"
+          value={active}
+          tone="success"
+        />
         <Kpi icon={<Clock className="size-4" />} label="Suspended" value={suspended} tone="amber" />
-        <Kpi icon={<AlertTriangle className="size-4" />} label="Expired" value={expired} tone="destructive" />
+        <Kpi
+          icon={<AlertTriangle className="size-4" />}
+          label="Expired"
+          value={expired}
+          tone="destructive"
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)}
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name, username, camp, email…"
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30" />
+            className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
+          />
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as never)}
-          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as never)}
+          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
+        >
           <option value="all">All statuses</option>
           <option value="Active">Active</option>
           <option value="Suspended">Suspended</option>
@@ -159,10 +233,14 @@ function Managers() {
                   <tr key={m.id} className="border-t border-border hover:bg-secondary/30">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold text-xs">{m.avatar}</div>
+                        <div className="size-9 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold text-xs">
+                          {m.avatar}
+                        </div>
                         <div className="min-w-0">
                           <div className="font-medium truncate">{m.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">{m.emiratesId}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {m.emiratesId}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -177,8 +255,14 @@ function Managers() {
                       <div className="text-muted-foreground">{m.shift}</div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1"><Mail className="size-3" />{m.email}</div>
-                      <div className="flex items-center gap-1"><Phone className="size-3" />{m.phone}</div>
+                      <div className="flex items-center gap-1">
+                        <Mail className="size-3" />
+                        {m.email}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Phone className="size-3" />
+                        {m.phone}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {m.hasPin ? (
@@ -193,26 +277,51 @@ function Managers() {
                     </td>
                     <td className="px-4 py-3 text-xs">
                       <div className="tabular-nums">{m.expiryDate}</div>
-                      <div className={d < 0 ? "text-destructive" : d <= 30 ? "text-amber-500" : "text-muted-foreground"}>
+                      <div
+                        className={
+                          d < 0
+                            ? "text-destructive"
+                            : d <= 30
+                              ? "text-amber-500"
+                              : "text-muted-foreground"
+                        }
+                      >
                         {d < 0 ? `${Math.abs(d)}d ago` : `in ${d}d`}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${statusTone(m.status)}`}>{m.status}</span>
+                      <span
+                        className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${statusTone(m.status)}`}
+                      >
+                        {m.status}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => toggleStatus(m.id)} disabled={m.status === "Expired"}
+                        <button
+                          onClick={() => toggleStatus(m.id)}
+                          disabled={m.status === "Expired"}
                           title={m.status === "Active" ? "Set Inactive" : "Set Active"}
-                          className={`size-8 grid place-items-center rounded-lg disabled:opacity-30 disabled:cursor-not-allowed ${m.status === "Active" ? "hover:bg-amber-500/10 text-amber-500" : "hover:bg-success/10 text-success"}`}>
-                          {m.status === "Active" ? <PowerOff className="size-4" /> : <Power className="size-4" />}
+                          className={`size-8 grid place-items-center rounded-lg disabled:opacity-30 disabled:cursor-not-allowed ${m.status === "Active" ? "hover:bg-amber-500/10 text-amber-500" : "hover:bg-success/10 text-success"}`}
+                        >
+                          {m.status === "Active" ? (
+                            <PowerOff className="size-4" />
+                          ) : (
+                            <Power className="size-4" />
+                          )}
                         </button>
-                        <button onClick={() => setEditing(m)} title="Edit"
-                          className="size-8 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground">
+                        <button
+                          onClick={() => setEditing(m)}
+                          title="Edit"
+                          className="size-8 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
+                        >
                           <Pencil className="size-4" />
                         </button>
-                        <button onClick={() => setConfirmDelete(m)} title="Delete"
-                          className="size-8 grid place-items-center rounded-lg hover:bg-destructive/10 text-destructive">
+                        <button
+                          onClick={() => setConfirmDelete(m)}
+                          title="Delete"
+                          className="size-8 grid place-items-center rounded-lg hover:bg-destructive/10 text-destructive"
+                        >
                           <Trash2 className="size-4" />
                         </button>
                       </div>
@@ -221,7 +330,11 @@ function Managers() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">No managers match.</td></tr>
+                <tr>
+                  <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                    No managers match.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -233,18 +346,35 @@ function Managers() {
           manager={editing}
           camps={camps}
           existingUsernames={list.map((m) => m.username)}
-          onClose={() => { setCreating(false); setEditing(null); }}
+          onClose={() => {
+            setCreating(false);
+            setEditing(null);
+          }}
           onSave={save}
         />
       )}
       {confirmDelete && (
-        <ConfirmDialog manager={confirmDelete} onCancel={() => setConfirmDelete(null)} onConfirm={() => remove(confirmDelete.id)} />
+        <ConfirmDialog
+          manager={confirmDelete}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => remove(confirmDelete.id)}
+        />
       )}
     </div>
   );
 }
 
-function Kpi({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: "primary" | "success" | "amber" | "destructive" }) {
+function Kpi({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  tone: "primary" | "success" | "amber" | "destructive";
+}) {
   const map = {
     primary: "from-primary/15 text-primary",
     success: "from-success/15 text-success",
@@ -253,63 +383,136 @@ function Kpi({ icon, label, value, tone }: { icon: React.ReactNode; label: strin
   } as const;
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className={`size-9 rounded-lg bg-gradient-to-br ${map[tone]} to-transparent grid place-items-center mb-2`}>{icon}</div>
+      <div
+        className={`size-9 rounded-lg bg-gradient-to-br ${map[tone]} to-transparent grid place-items-center mb-2`}
+      >
+        {icon}
+      </div>
       <div className="text-2xl font-display font-bold tabular-nums">{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
 }
 
-const inputCls = "w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30";
+const inputCls =
+  "w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30";
 
-function ManagerDialog({ manager, camps, existingUsernames, onClose, onSave }: {
+function ManagerDialog({
+  manager,
+  camps,
+  existingUsernames,
+  onClose,
+  onSave,
+}: {
   manager: CampManager | null;
   camps: { id: string; code: string; name: string }[];
   existingUsernames: string[];
   onClose: () => void;
-  onSave: (form: FormState, id?: string) => void;
+  onSave: (form: FormState, id?: string) => void | Promise<void>;
 }) {
-  const [form, setForm] = useState<FormState>(manager ? {
-    name: manager.name, username: manager.username, password: "", pin: "",
-    email: manager.email, phone: manager.phone, emiratesId: manager.emiratesId,
-    camp: manager.camp, role: manager.role, shift: manager.shift,
-    joinDate: manager.joinDate, expiryDate: manager.expiryDate, status: manager.status,
-    permissions: { ...manager.permissions },
-  } : emptyForm);
+  const [form, setForm] = useState<FormState>(
+    manager
+      ? {
+          name: manager.name,
+          username: manager.username,
+          password: "",
+          pin: "",
+          email: manager.email,
+          phone: manager.phone,
+          emiratesId: manager.emiratesId,
+          camp: manager.camp,
+          role: manager.role,
+          shift: manager.shift,
+          joinDate: manager.joinDate,
+          expiryDate: manager.expiryDate,
+          status: manager.status,
+          permissions: { ...manager.permissions },
+        }
+      : emptyForm,
+  );
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     if (!form.name || !form.username || !form.camp) {
-      setError("Name, username and camp are required."); return;
+      setError("Name, username and camp are required.");
+      return;
     }
     if (!manager && !form.password) {
-      setError("Password is required when creating a new manager."); return;
+      setError("Password is required when creating a new manager.");
+      return;
     }
     if (form.pin && !/^\d{4}$/.test(form.pin)) {
-      setError("Mobile PIN must be exactly 4 digits."); return;
+      setError("Mobile PIN must be exactly 4 digits.");
+      return;
     }
-    const dupe = existingUsernames.some((u) => u.toLowerCase() === form.username.toLowerCase() && u !== manager?.username);
-    if (dupe) { setError("This username is already taken."); return; }
-    onSave(form, manager?.id);
+    const dupe = existingUsernames.some(
+      (u) => u.toLowerCase() === form.username.toLowerCase() && u !== manager?.username,
+    );
+    if (dupe) {
+      setError("This username is already taken.");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      // onSave closes the dialog on success; on failure it throws here so we
+      // surface the reason instead of leaving a stuck, dimmed overlay.
+      await onSave(form, manager?.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save. Please try again.");
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-2xl bg-card border border-border shadow-elegant my-8" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl bg-card border border-border shadow-elegant my-8"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-lg gradient-primary grid place-items-center text-primary-foreground"><KeyRound className="size-4" /></div>
+            <div className="size-9 rounded-lg gradient-primary grid place-items-center text-primary-foreground">
+              <KeyRound className="size-4" />
+            </div>
             <div>
               <div className="font-semibold">{manager ? "Edit Manager" : "Add New Manager"}</div>
-              <div className="text-xs text-muted-foreground">{manager ? `Updating @${manager.username}` : "Create a new camp manager account"}</div>
+              <div className="text-xs text-muted-foreground">
+                {manager ? `Updating @${manager.username}` : "Create a new camp manager account"}
+              </div>
             </div>
           </div>
-          <button onClick={onClose} className="size-8 grid place-items-center rounded-lg hover:bg-secondary"><X className="size-4" /></button>
+          <button
+            onClick={onClose}
+            className="size-8 grid place-items-center rounded-lg hover:bg-secondary"
+          >
+            <X className="size-4" />
+          </button>
         </div>
         <form onSubmit={submit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Full Name *"><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Ahmed Al Mansouri" /></Field>
-          <Field label="Username *"><input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase() })} className={`${inputCls} font-mono`} placeholder="ahmed.mansouri" /></Field>
+          <Field label="Full Name *">
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className={inputCls}
+              placeholder="Ahmed Al Mansouri"
+            />
+          </Field>
+          <Field label="Username *">
+            <input
+              required
+              value={form.username}
+              onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase() })}
+              className={`${inputCls} font-mono`}
+              placeholder="ahmed.mansouri"
+            />
+          </Field>
           <Field label={manager ? "Password (leave blank to keep existing)" : "Password *"}>
             <input
               required={!manager}
@@ -320,12 +523,15 @@ function ManagerDialog({ manager, camps, existingUsernames, onClose, onSave }: {
               placeholder={manager ? "Unchanged" : ""}
             />
           </Field>
-          <Field label={
-            <span className="inline-flex items-center gap-1.5">
-              <Smartphone className="size-3.5" />
-              Mobile PIN {manager ? "(blank to keep existing)" : "(4 digits, for Android scanner)"}
-            </span>
-          }>
+          <Field
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <Smartphone className="size-3.5" />
+                Mobile PIN{" "}
+                {manager ? "(blank to keep existing)" : "(4 digits, for Android scanner)"}
+              </span>
+            }
+          >
             <input
               type="password"
               inputMode="numeric"
@@ -337,43 +543,114 @@ function ManagerDialog({ manager, camps, existingUsernames, onClose, onSave }: {
               placeholder={manager ? "Unchanged" : "4 digits"}
             />
           </Field>
-          <Field label="Emirates ID"><input value={form.emiratesId} onChange={(e) => setForm({ ...form, emiratesId: e.target.value })} className={`${inputCls} font-mono`} placeholder="784-XXXX-XXXXXXX-X" /></Field>
-          <Field label="Email"><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} /></Field>
-          <Field label="Phone"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} placeholder="+971 50 000 0000" /></Field>
+          <Field label="Emirates ID">
+            <input
+              value={form.emiratesId}
+              onChange={(e) => setForm({ ...form, emiratesId: e.target.value })}
+              className={`${inputCls} font-mono`}
+              placeholder="784-XXXX-XXXXXXX-X"
+            />
+          </Field>
+          <Field label="Email">
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Phone">
+            <input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              className={inputCls}
+              placeholder="+971 50 000 0000"
+            />
+          </Field>
 
           <Field label="Assigned Camp *">
-            <select required value={form.camp} onChange={(e) => setForm({ ...form, camp: e.target.value })} className={inputCls}>
+            <select
+              required
+              value={form.camp}
+              onChange={(e) => setForm({ ...form, camp: e.target.value })}
+              className={inputCls}
+            >
               <option value="">— Select camp —</option>
-              {camps.map((c) => <option key={c.id} value={c.code}>{c.code} — {c.name}</option>)}
+              {camps.map((c) => (
+                <option key={c.id} value={c.code}>
+                  {c.code} — {c.name}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Role">
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as CampManager["role"] })} className={inputCls}>
-              <option>Camp Manager</option><option>Senior Manager</option><option>Supervisor</option>
+            <select
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value as CampManager["role"] })}
+              className={inputCls}
+            >
+              <option>Camp Manager</option>
+              <option>Senior Manager</option>
+              <option>Supervisor</option>
             </select>
           </Field>
           <Field label="Shift">
-            <select value={form.shift} onChange={(e) => setForm({ ...form, shift: e.target.value as CampManager["shift"] })} className={inputCls}>
-              <option>Morning</option><option>Evening</option><option>Full Day</option>
+            <select
+              value={form.shift}
+              onChange={(e) => setForm({ ...form, shift: e.target.value as CampManager["shift"] })}
+              className={inputCls}
+            >
+              <option>Morning</option>
+              <option>Evening</option>
+              <option>Full Day</option>
             </select>
           </Field>
           <Field label="Status">
-            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as CampManager["status"] })} className={inputCls}>
-              <option>Active</option><option>Suspended</option><option>Expired</option>
+            <select
+              value={form.status}
+              onChange={(e) =>
+                setForm({ ...form, status: e.target.value as CampManager["status"] })
+              }
+              className={inputCls}
+            >
+              <option>Active</option>
+              <option>Suspended</option>
+              <option>Expired</option>
             </select>
           </Field>
-          <Field label="Join Date"><input type="date" value={form.joinDate} onChange={(e) => setForm({ ...form, joinDate: e.target.value })} className={inputCls} /></Field>
-          <Field label="Access Expiry"><input type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className={inputCls} /></Field>
+          <Field label="Join Date">
+            <input
+              type="date"
+              value={form.joinDate}
+              onChange={(e) => setForm({ ...form, joinDate: e.target.value })}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Access Expiry">
+            <input
+              type="date"
+              value={form.expiryDate}
+              onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
+              className={inputCls}
+            />
+          </Field>
 
           <div className="md:col-span-2">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Permissions</div>
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Permissions
+            </div>
             <div className="flex flex-wrap gap-2">
-              {(["breakfast","lunch","dinner","reports"] as const).map((p) => {
+              {(["breakfast", "lunch", "dinner", "reports"] as const).map((p) => {
                 const on = form.permissions[p];
                 return (
-                  <button type="button" key={p}
-                    onClick={() => setForm({ ...form, permissions: { ...form.permissions, [p]: !on } })}
-                    className={`text-xs px-3 py-1.5 rounded-full border capitalize transition ${on ? "bg-primary/10 text-primary border-primary/30" : "bg-secondary text-muted-foreground border-border"}`}>
+                  <button
+                    type="button"
+                    key={p}
+                    onClick={() =>
+                      setForm({ ...form, permissions: { ...form.permissions, [p]: !on } })
+                    }
+                    className={`text-xs px-3 py-1.5 rounded-full border capitalize transition ${on ? "bg-primary/10 text-primary border-primary/30" : "bg-secondary text-muted-foreground border-border"}`}
+                  >
                     {p}
                   </button>
                 );
@@ -381,12 +658,27 @@ function ManagerDialog({ manager, camps, existingUsernames, onClose, onSave }: {
             </div>
           </div>
 
-          {error && <div className="md:col-span-2 rounded-lg bg-destructive/10 text-destructive text-sm px-3 py-2">{error}</div>}
+          {error && (
+            <div className="md:col-span-2 rounded-lg bg-destructive/10 text-destructive text-sm px-3 py-2">
+              {error}
+            </div>
+          )}
 
           <div className="md:col-span-2 flex items-center justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm hover:bg-secondary">Cancel</button>
-            <button type="submit" className="rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow">
-              {manager ? "Save Changes" : "Create Manager"}
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2 rounded-lg text-sm hover:bg-secondary disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {submitting ? "Saving…" : manager ? "Save Changes" : "Create Manager"}
             </button>
           </div>
         </form>
@@ -404,22 +696,47 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
   );
 }
 
-function ConfirmDialog({ manager, onCancel, onConfirm }: { manager: CampManager; onCancel: () => void; onConfirm: () => void }) {
+function ConfirmDialog({
+  manager,
+  onCancel,
+  onConfirm,
+}: {
+  manager: CampManager;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={onCancel}>
-      <div className="w-full max-w-md rounded-2xl bg-card border border-border shadow-elegant p-6" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl bg-card border border-border shadow-elegant p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start gap-3">
-          <div className="size-10 rounded-full bg-destructive/10 text-destructive grid place-items-center"><AlertTriangle className="size-5" /></div>
+          <div className="size-10 rounded-full bg-destructive/10 text-destructive grid place-items-center">
+            <AlertTriangle className="size-5" />
+          </div>
           <div>
             <div className="font-semibold">Delete manager?</div>
             <div className="text-sm text-muted-foreground mt-1">
-              This will permanently remove <span className="font-medium text-foreground">{manager.name}</span> (@{manager.username}) and revoke their access to {manager.camp}.
+              This will permanently remove{" "}
+              <span className="font-medium text-foreground">{manager.name}</span> (@
+              {manager.username}) and revoke their access to {manager.camp}.
             </div>
           </div>
         </div>
         <div className="mt-5 flex items-center justify-end gap-2">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-secondary">Cancel</button>
-          <button onClick={onConfirm} className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-95">Delete Manager</button>
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-secondary">
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-95"
+          >
+            Delete Manager
+          </button>
         </div>
       </div>
     </div>
