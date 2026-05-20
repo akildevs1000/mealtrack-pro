@@ -2,62 +2,97 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## What this is
+
+"MealOps / MyMeals" — a meal-distribution / QR-scan verification dashboard for labour camps. It is a **full-stack app**:
+
+- **Frontend** (`src/`) — TanStack Start (SSR React 19) on Vite 7, shadcn/ui (new-york) + Tailwind v4.
+- **Backend** (`server/`) — Express + Prisma + PostgreSQL REST API on `:5044`.
+
+The frontend talks to the backend over HTTP — there is **no more mock data driving the UI** (see _Data layer_). The old `src/lib/mock-data.ts` / `src/lib/cms-employees.ts` are legacy; only `defaultSchedule` (a form default) is still imported, in `routes/camps.tsx`.
+
 ## Commands
 
-Package manager is **bun** (see `bun.lock`, `bunfig.toml`). Scripts:
+Use **npm / npx / tsx** — do NOT invoke `bun` in this project, even though `bun.lock` / `bunfig.toml` exist. (`package-lock.json` is the source of truth; deploys run `npm ci`.) `bunfig.toml`'s 24h supply-chain guard only applies to `bun`, so it does not affect the npm-based deploy.
 
-- `bun run dev` — Vite dev server.
-- `bun run build` — production build (Cloudflare worker target).
-- `bun run build:dev` — build with dev mode (source-map friendly).
-- `bun run preview` — preview the built worker.
-- `bun run lint` — ESLint over the repo.
-- `bun run format` — Prettier write.
+**Frontend** (repo root):
 
-There is no test runner configured.
+- `npm run dev` — Vite dev server (`:8080`).
+- `npm run build` — production SSR build → `dist/server` + `dist/client`.
+- `npm run lint` — ESLint. `npm run format` — Prettier write.
 
-`bunfig.toml` enforces a 24-hour supply-chain guard (`minimumReleaseAge`). When adding a dep, do not bypass it via `minimumReleaseAgeExcludes` without explicit confirmation.
+**Backend** (`cd server`):
+
+- `npm run dev` — API with `tsx watch` (`:5044`).
+- `npm run build` — `tsc` → `dist/index.js` (a `prebuild` runs `sync-ssr`, which copies `src/components/app/ReportPreview.tsx` + types into `server/src/ssr/`).
+- `npm run seed` — seed camps/employees/devices/managers/users/permissions/scans.
+- `npx prisma migrate dev --name X` (create migration) · `npx prisma migrate deploy` (apply) · `npx prisma generate`.
+
+There is no unit-test runner. `server/scripts/test-manager-flow.ts` and `test-device-flow.ts` are end-to-end API smoke tests — run with `npx tsx scripts/<file>.ts` against a running server.
 
 ## Architecture
 
-This is a **TanStack Start** (SSR React) app targeting **Cloudflare Workers**, built on Vite 7 and React 19, with shadcn/ui (style: new-york) on Tailwind v4. The product is "MealOps" — a meal-distribution / QR-scan verification dashboard for labour camps. **All data is currently mocked** in `src/lib/` — there is no backend integration.
+### Frontend ↔ backend wiring
+
+- `src/lib/api.ts` — fetch wrapper. Bearer token in `localStorage` (`mealops.token.v1`); base URL from `VITE_API_BASE` (default `http://localhost:5044/api`). A 401 clears the token.
+- `src/lib/hooks.ts` — React Query hooks for every resource (`useCamps`, `useEmployees`, `useScans`, `useOverview`, `useReportConsumption`, `useSchedules`, `useMailConfig`, …). **Add data access here**, not ad-hoc `fetch`.
 
 ### Build/runtime wiring (non-obvious)
 
 - `vite.config.ts` uses `@lovable.dev/vite-tanstack-config`, which **already bundles** `tanstackStart`, `viteReact`, `tailwindcss`, `tsConfigPaths`, the Cloudflare plugin, the `@` alias, React/TanStack dedupe, and dev/host config. **Do not re-add these plugins manually** — duplicates will break the app. Extend via `defineConfig({ vite: { ... } })` only.
-- The Cloudflare worker entry is `src/server.ts` (not the default TanStack one). `vite.config.ts` redirects via `tanstackStart.server.entry = "server"`; `wrangler.jsonc` also points `main` at `src/server.ts`. Both are required — `wrangler.jsonc` alone is insufficient because `@cloudflare/vite-plugin` builds from the Vite config.
-- `src/server.ts` wraps the TanStack handler to recover from a specific h3 failure mode: h3 swallows in-handler throws into a JSON 500 `{"unhandled":true,"message":"HTTPError"}` that `try/catch` cannot observe. The wrapper inspects the response body, detects this shape, pulls the real error from `src/lib/error-capture.ts` (which listens on `error` / `unhandledrejection` globally with a 5s TTL), and returns the branded HTML from `src/lib/error-page.ts`.
+- The SSR server entry is `src/server.ts` (not the default TanStack one); `vite.config.ts` redirects via `tanstackStart.server.entry = "server"`. The build emits `dist/server/server.js`. **In production this is served by `web-server.mjs` (a thin Node listener) under PM2 — not Cloudflare Workers.** `wrangler.jsonc` exists but is not the production runtime (see _Deployment_).
+- `src/server.ts` wraps the TanStack handler to recover from a specific h3 failure mode: h3 swallows in-handler throws into a JSON 500 `{"unhandled":true,"message":"HTTPError"}` that `try/catch` cannot observe. The wrapper inspects the response body, detects this shape, pulls the real error from `src/lib/error-capture.ts` (global `error`/`unhandledrejection` listener, 5s TTL), and returns the branded HTML from `src/lib/error-page.ts`.
 - `src/start.ts` registers a `requestMiddleware` that converts any non-HTTP throw inside loaders/server functions into the same branded 500 page. Preserve `statusCode`-bearing errors (TanStack redirects/notFound) — don't catch those.
-- `server-only` (the Next.js package) is **banned** by ESLint (`no-restricted-imports`). For server-only modules use the `*.server.ts` suffix or `@tanstack/react-start/server-only`.
+- `server-only` (the Next.js package) is **banned** by ESLint. For server-only frontend modules use the `*.server.ts` suffix or `@tanstack/react-start/server-only`.
 
 ### Routing
 
-File-based routing under `src/routes/` (TanStack Router). `src/routeTree.gen.ts` is **generated** — never edit it. The plugin auto-regenerates it from filenames; just add/rename a file under `src/routes/` and let the dev server pick it up. `src/router.tsx` wires a `QueryClient` into the router context so loaders can use React Query.
+File-based routing under `src/routes/` (TanStack Router). `src/routeTree.gen.ts` is **generated** — never edit it; add/rename a file under `src/routes/` and let the dev server regenerate it. `src/router.tsx` wires a `QueryClient` into the router context. Routes are flat; chrome lives in `__root.tsx` → `AppLayout`. `/` redirects to `/overview`.
 
-Routes are flat (no nested layouts); the chrome lives in `__root.tsx` → `AppLayout`. `/` redirects to `/overview`.
+### Auth, RBAC, and camp scoping
 
-### Session, RBAC, and camp scoping
+Auth is **real JWT**, backed by the server:
 
-`src/lib/session.tsx` is the linchpin for access control. It's a `localStorage`-backed (`mealops.session.v1`) React context exposing:
-
-- **Four roles** — `admin`, `operator`, `user`, `manager` — with a per-role `TabKey → {view, edit, delete}` permission matrix (`DEFAULT_PERMS`). Permissions are user-editable on the `/users` route and persist to localStorage.
-- **`useSession().can(tab, action?)`** — gate UI on permissions. `AppLayout` already filters the sidebar via `can(key, "view")`; route components should additionally guard edit/delete actions.
-- **`useCampScope()`** — returns `string[] | null`. `null` means "all camps"; an array means restrict to those `campCode`s. **Every list/report/chart that surfaces camp-bound data must respect this scope.** Pattern (see `routes/overview.tsx`, `routes/employees.tsx`): `const scope = useCampScope(); const visible = scope ? data.filter(d => scope.includes(d.campCode)) : data;`. Managers are scoped to their `assignedCampCode`; admin/operator/user see everything.
-- A header dropdown lets you hot-swap the active user — used to demo RBAC without auth.
+- `src/lib/session.tsx` (`SessionProvider` / `useSession`) loads the current user from `GET /api/auth/me`, and exposes `login(username, password)`, `logout()`, `refresh()`, `currentUser`, `can(tab, action?)`, and `campScope`. `src/components/app/Login.tsx` is the login screen.
+- **Four roles** — `admin`, `operator`, `user`, `manager`. The permission matrix lives in the DB (`RolePermission` table, backfilled by `ensureDefaultPermissions` on server boot) and is admin-editable on `/users`. `can(tab, action?)` gates the UI (e.g. `AppLayout` hides sidebar tabs).
+- **`campScope` / `useCampScope()`** returns `string[] | null` (`null` = all camps; managers are scoped to their `assignedCampCode`). **The server is the source of truth** — `campScopeOf()` in `server/src/middleware/auth.ts` filters every scoped endpoint, so client gating is UX only, never a security boundary.
 
 ### Data layer
 
-There is no API. Two mock-data modules:
+All data is **real**, served by the Prisma/PostgreSQL backend. Reports (`/api/reports/*`, `/api/overview`) are computed from real `Scan` / `Camp` / `CmsEmployee` / `Device` rows. The audit, drilldown, and forecast pages read live `/api/reports/*` data; the employee report reads the real `CmsEmployee` roster.
 
-- `src/lib/mock-data.ts` — camps, KPIs, hourly/weekly trends, recent scans. Use this for dashboard/overview-style data.
-- `src/lib/cms-employees.ts` — employee roster plus `buildMealLog(emp, from, to)` / `summarize(records)`. The mock log uses a seeded RNG keyed on `laborId` so an employee's history is **deterministic across renders** — don't replace with `Math.random()` if you need stable output.
+**Two camp-coding schemes that do NOT join:** `Camp.code` is `AD-01` / `DXB-04`; `CmsEmployee.campCode` is `CAMP 19`. There is no mapping between them. Consequence: a manager's `assignedCampCode` (an `AD-01`-style code) never matches `CmsEmployee.campCode`, so **managers currently see an empty employee roster** (and the Employee report is keyed to the CMS scheme). Don't invent a mapping — it's a pending product decision.
 
-Note the two domains use different camp identifiers: `mock-data.camps[].code` looks like `AD-01` / `DXB-04`, while `cms-employees[].campCode` looks like `CAMP 19`. They are intentionally separate seed data and don't join.
+## Backend (`server/`)
 
-### UI conventions
+Express + Prisma (PostgreSQL). Entry `server/src/index.ts` mounts routers under `/api/*` and starts the scheduler.
+
+- **Routes** (`server/src/routes/`): `auth`, `camps`, `employees`, `devices`, `managers`, `users`, `scans`, `overview`, `audit`, `scanner`, `reports`, `schedules`, `ftp-config`, `mail-config`. All hit Prisma; auth via `requireAuth` / `requireRole` (`server/src/middleware/auth.ts`).
+- **Scanner** (`/api/scanner/*`): the Android scanner flow — device-gate by MAC, manager PIN login (separate scanner JWT), and `/scan` (eligibility + meal-window + duplicate checks → upserts `MealRecord`, records `Scan`).
+- **Scheduler** (`server/src/scheduler/worker.ts`): in-process cron, ticks every 60s, runs due `Schedule` rows via `server/src/lib/schedule-runner.ts`. **Schedule times are Asia/Dubai** — `computeNextRunAt` anchors to Dubai regardless of host timezone (see _Gotchas_).
+- **Delivery**: email via `server/src/lib/mailer.ts` (nodemailer, transport built per-send from the `MailConfig` DB row); FTP via `basic-ftp` (creds from the `FtpConfig` DB row). Both config singletons are managed at `/api/mail-config` and `/api/ftp-config`.
+- **Reports**: `server/src/lib/report-data.ts` does the real aggregation; styled PDFs render via Puppeteer + `server/src/ssr/ReportPreview.tsx` (`report-pdf-styled.ts`); XLSX via `report-files.ts`. `time.ts` centralises all Asia/Dubai conversions.
+- **Env**: `server/.env` (`DATABASE_URL`, `JWT_SECRET`, `PORT`, `CORS_ORIGIN`) — **gitignored**.
+
+## Deployment
+
+Production runs on a Node droplet (`139.59.69.241`) under **PM2** (`ecosystem.config.cjs`): `mealops-api` (`server/dist/index.js`) and `mealops-web` (`web-server.mjs` serving the Vite SSR build). Node 22 via nvm. `dist/` is gitignored — **the server builds from the git checkout.**
+
+Deploy with the committed script (run on the server): `bash /var/www/mealtrack-pro/deploy.sh` — it does `git pull` → `npm ci` (root + server) → `npx prisma migrate deploy` → `npm run build` (both) → `pm2 restart all` → health-check. `set -euo pipefail`, so it stops on the first error.
+
+- **New npm package** → committed `package-lock.json` must be in sync (`npm ci` fails otherwise); `npm ci` then installs it automatically. `@prisma/client`'s postinstall regenerates the client during `npm ci`.
+- **New migration** → `prisma migrate deploy` applies all pending migrations forward-only (never resets). Review the generated SQL before pushing; never hand-edit the live DB schema (causes drift).
+- **Env safety** → `server/.env` is gitignored and FTP/SMTP creds live in the DB, so `git pull`/deploy **never overwrite secrets**. The only tracked env file is `.env.production` (`VITE_API_BASE`, a public URL).
+
+## Gotchas
+
+- **Scheduler timezone**: schedule `HH:MM` is Dubai wall-clock. `computeNextRunAt` does the calendar math in a "Dubai-shifted" `Date` (constant UTC+4) so it's host-timezone-independent. If you see runs firing N hours off, it's a TZ regression here.
+- **Prisma client staleness**: after any `schema.prisma` change, run `npx prisma generate` and restart. Config routes/libs use `const p = prisma as any`, so a missing model on a stale client surfaces as a **runtime 500, not a compile error** (and `prisma migrate status` will still say "up to date"). On Windows, `prisma generate` throws `EPERM` while the dev server holds the engine DLL — stop the server first.
+
+## UI conventions
 
 - shadcn/ui components in `src/components/ui/` (style "new-york", base "slate"). Add new ones with the shadcn CLI rather than hand-writing.
 - App-specific components in `src/components/app/`.
-- Path alias: `@/*` → `src/*`.
-- Class merging: use `cn()` from `@/lib/utils`.
-- Theme: dark mode is toggled by adding `.dark` to `<html>` (see `AppLayout`); CSS variables drive colors — prefer tokens like `bg-background`, `text-foreground`, `bg-sidebar-accent` over raw colors.
+- Path alias: `@/*` → `src/*`. Class merging: `cn()` from `@/lib/utils`.
+- Theme: dark mode toggles `.dark` on `<html>` (see `AppLayout`); CSS variables drive colors — prefer tokens like `bg-background`, `text-foreground`, `bg-sidebar-accent` over raw colors.
 - Prettier: 100-col, double quotes, semis, trailing commas — match this when editing.
