@@ -263,6 +263,22 @@ model FtpConfig {
   updatedAt  DateTime @updatedAt
 }
 
+// Singleton SMTP config used by scheduled email delivery. Same singleton
+// pattern as FtpConfig; password stored plaintext (encryption-at-rest TODO).
+model MailConfig {
+  id        String   @id @default("default")
+  host      String
+  port      Int      @default(587)
+  username  String
+  password  String
+  // true for implicit TLS (port 465); false uses STARTTLS (port 587).
+  secure    Boolean  @default(false)
+  fromName  String   @default("MealOps")
+  fromEmail String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum ScheduleFrequency {
   daily
   weekly
@@ -307,8 +323,11 @@ model Schedule {
   // 1..28 (monthly only)
   dayOfMonth    Int?
   destination   ScheduleDestination @default(email)
-  // Stored as a flat array of User IDs; ignored when destination = ftp.
+  // Legacy: app-user IDs. Kept for back-compat; the UI now writes
+  // recipientEmails directly so arbitrary addresses can be added.
   recipientIds  String[]            @default([])
+  // Email addresses the report is sent to when destination = email.
+  recipientEmails String[]          @default([])
   // Used by the cron worker to avoid re-firing within the same minute and to
   // skip schedules whose next slot is in the future.
   nextRunAt     DateTime?

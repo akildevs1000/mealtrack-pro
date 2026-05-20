@@ -12,12 +12,24 @@ import {
 } from "./report-data.js";
 import { buildXlsxBuffer } from "./report-files.js";
 import { buildStyledPdfBuffer } from "./report-pdf-styled.js";
+import { sendReportEmail } from "./mailer.js";
 
 export type RunOutcome = {
   ok: boolean;
   detail: string;
   uploaded?: { name: string; bytes: number }[];
 };
+
+const REPORT_LABELS: Record<ReportType, string> = {
+  consumption: "Daily Meal Consumption",
+  employee: "Employee Master",
+  scans: "Scan Activity Log",
+  camp: "Camp Performance",
+  wastage: "Wastage & Variance",
+};
+function reportLabel(t: ReportType): string {
+  return REPORT_LABELS[t] ?? t;
+}
 
 export function computeNextRunAt(
   s: { frequency: "daily" | "weekly" | "monthly"; time: string; weekday: number | null; dayOfMonth: number | null },
@@ -131,8 +143,37 @@ export async function runSchedule(scheduleId: string): Promise<RunOutcome> {
         };
       }
     } else {
-      // Email delivery is intentionally not wired yet (phase 2).
-      outcome = { ok: false, detail: "Email delivery is not yet implemented" };
+      // Email delivery. Recipients are stored as plain addresses on the
+      // schedule; fall back to resolving legacy recipientIds → User.email
+      // for schedules created before recipientEmails existed.
+      let recipients: string[] = Array.isArray(s.recipientEmails) ? [...s.recipientEmails] : [];
+      if (recipients.length === 0 && Array.isArray(s.recipientIds) && s.recipientIds.length > 0) {
+        const users = await p.user.findMany({
+          where: { id: { in: s.recipientIds } },
+          select: { email: true },
+        });
+        recipients = users.map((u: { email: string }) => u.email).filter(Boolean);
+      }
+
+      if (recipients.length === 0) {
+        outcome = { ok: false, detail: "No recipient email addresses configured" };
+      } else {
+        const files = await buildFiles(s.reportType, s.format, s.frequency);
+        const window = windowForFrequency(s.frequency);
+        const subject = `${reportLabel(s.reportType)} — ${window.from.toISOString().slice(0, 10)} to ${window.to.toISOString().slice(0, 10)}`;
+        const text =
+          `Automated ${reportLabel(s.reportType)} report from MealOps.\n\n` +
+          `Schedule: ${s.name}\n` +
+          `Period: ${window.from.toISOString().slice(0, 10)} → ${window.to.toISOString().slice(0, 10)}\n\n` +
+          `${files.length} file(s) attached.`;
+        const sent = await sendReportEmail({
+          to: recipients,
+          subject,
+          text,
+          attachments: files.map((f) => ({ filename: f.name, content: f.buffer })),
+        });
+        outcome = { ok: sent.ok, detail: sent.detail };
+      }
     }
   } catch (e: unknown) {
     outcome = { ok: false, detail: e instanceof Error ? e.message : "Run failed" };

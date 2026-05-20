@@ -29,6 +29,7 @@ const baseSchema = z.object({
   dayOfMonth: z.number().int().min(1).max(28).nullable().optional(),
   destination,
   recipientIds: z.array(z.string()).default([]),
+  recipientEmails: z.array(z.string().email()).default([]),
 });
 
 function deriveNextRunAt(s: z.infer<typeof baseSchema>) {

@@ -495,6 +495,7 @@ export type Schedule = {
   dayOfMonth: number | null;
   destination: ScheduleDestination;
   recipientIds: string[];
+  recipientEmails: string[];
   nextRunAt: string | null;
   lastRunAt: string | null;
   lastRunStatus: ScheduleRunStatus | null;
@@ -587,5 +588,47 @@ export function useDeleteFtpConfig() {
   return useMutation({
     mutationFn: () => api<{ ok: boolean }>("/ftp-config", { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ftp-config"] }),
+  });
+}
+
+export type MailConfigView = {
+  host: string;
+  port: number;
+  username: string;
+  hasPassword: boolean;
+  secure: boolean;
+  fromName: string;
+  fromEmail: string;
+  updatedAt: string;
+} | null;
+
+export type MailConfigInput = {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  secure: boolean;
+  fromName: string;
+  fromEmail: string;
+};
+
+export function useMailConfig() {
+  return useQuery({ queryKey: ["mail-config"], queryFn: () => api<MailConfigView>("/mail-config") });
+}
+
+export function useSaveMailConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MailConfigInput) =>
+      api<MailConfigView>("/mail-config", { method: "PUT", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mail-config"] }),
+  });
+}
+
+export function useDeleteMailConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ ok: boolean }>("/mail-config", { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mail-config"] }),
   });
 }

@@ -11,6 +11,9 @@ import {
   useFtpConfig,
   useSaveFtpConfig,
   useDeleteFtpConfig,
+  useMailConfig,
+  useSaveMailConfig,
+  useDeleteMailConfig,
   type Schedule,
   type ScheduleInput,
   type ScheduleFormat,
@@ -19,6 +22,8 @@ import {
   type ScheduleReportType,
   type FtpConfigView,
   type FtpConfigInput,
+  type MailConfigView,
+  type MailConfigInput,
 } from "@/lib/hooks";
 import {
   CalendarClock,
@@ -124,14 +129,18 @@ function SchedulesPage() {
 
   const { data: schedules = [], isLoading } = useSchedules();
   const { data: ftpConfig = null } = useFtpConfig();
+  const { data: mailConfig = null } = useMailConfig();
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
   const deleteSchedule = useDeleteSchedule();
   const runSchedule = useRunSchedule();
   const saveFtpConfig = useSaveFtpConfig();
   const deleteFtpConfig = useDeleteFtpConfig();
+  const saveMailConfig = useSaveMailConfig();
+  const deleteMailConfig = useDeleteMailConfig();
 
   const [ftpOpen, setFtpOpen] = useState(false);
+  const [mailOpen, setMailOpen] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null);
 
   if (!canView) {
@@ -155,7 +164,8 @@ function SchedulesPage() {
       weekday: null,
       dayOfMonth: null,
       destination: "email",
-      recipientIds: adminRecipients.map((u) => u.id),
+      recipientIds: [],
+      recipientEmails: adminRecipients.map((u) => u.email).filter(Boolean),
     };
     createSchedule.mutate(body, {
       onError: (e) =>
@@ -207,6 +217,13 @@ function SchedulesPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setMailOpen(true)}
+            className="h-9 px-4 rounded-lg bg-secondary hover:bg-secondary/80 text-xs font-semibold inline-flex items-center gap-2"
+          >
+            <Mail className="size-3.5" /> Mail settings
+            {mailConfig && <span className="ml-0.5 size-1.5 rounded-full bg-emerald-500" />}
+          </button>
+          <button
             onClick={() => setFtpOpen(true)}
             className="h-9 px-4 rounded-lg bg-secondary hover:bg-secondary/80 text-xs font-semibold inline-flex items-center gap-2"
           >
@@ -253,11 +270,13 @@ function SchedulesPage() {
               schedule={s}
               adminRecipients={adminRecipients}
               ftpConfig={ftpConfig}
+              mailConfig={mailConfig}
               issues={validateSchedule(s, schedules)}
               onChange={(p) => patch(s.id, p)}
               onRemove={() => remove(s.id)}
               onSendNow={() => sendNow(s)}
               onOpenFtpSettings={() => setFtpOpen(true)}
+              onOpenMailSettings={() => setMailOpen(true)}
               readOnly={!canEdit}
               canDelete={canDelete}
               running={runSchedule.isPending && runSchedule.variables === s.id}
@@ -296,6 +315,31 @@ function SchedulesPage() {
         />
       )}
 
+      {mailOpen && (
+        <MailDialog
+          initial={mailConfig}
+          onClose={() => setMailOpen(false)}
+          onSave={async (body) => {
+            try {
+              await saveMailConfig.mutateAsync(body);
+              setToast({ ok: true, msg: "Mail settings saved." });
+              setMailOpen(false);
+            } catch (e) {
+              setToast({ ok: false, msg: e instanceof Error ? e.message : "Save failed" });
+            }
+          }}
+          onDelete={async () => {
+            try {
+              await deleteMailConfig.mutateAsync();
+              setToast({ ok: true, msg: "Mail settings cleared." });
+              setMailOpen(false);
+            } catch (e) {
+              setToast({ ok: false, msg: e instanceof Error ? e.message : "Delete failed" });
+            }
+          }}
+        />
+      )}
+
       {toast && (
         <div
           className={`fixed bottom-6 right-6 z-50 max-w-md rounded-xl border p-4 shadow-elegant flex items-start gap-3 ${
@@ -323,11 +367,13 @@ function ScheduleCard({
   schedule: s,
   adminRecipients,
   ftpConfig,
+  mailConfig,
   issues,
   onChange,
   onRemove,
   onSendNow,
   onOpenFtpSettings,
+  onOpenMailSettings,
   readOnly,
   canDelete,
   running,
@@ -335,21 +381,24 @@ function ScheduleCard({
   schedule: Schedule;
   adminRecipients: { id: string; name: string; email: string; role: string }[];
   ftpConfig: FtpConfigView;
+  mailConfig: MailConfigView;
   issues: Issue[];
   onChange: (patch: Partial<ScheduleInput>) => void;
   onRemove: () => void;
   onSendNow: () => void;
   onOpenFtpSettings: () => void;
+  onOpenMailSettings: () => void;
   readOnly: boolean;
   canDelete: boolean;
   running: boolean;
 }) {
   const next = s.nextRunAt ? new Date(s.nextRunAt) : null;
   const ftpMissing = s.destination === "ftp" && !ftpConfig;
-  const hasError = issues.some((i) => i.level === "error") || ftpMissing;
-  const recipientChips = s.recipientIds
-    .map((id) => adminRecipients.find((u) => u.id === id))
-    .filter(Boolean) as { id: string; name: string; email: string }[];
+  const emails = s.recipientEmails ?? [];
+  const emailMissingRecipients = s.destination === "email" && emails.length === 0;
+  const mailMissing = s.destination === "email" && !mailConfig;
+  const hasError =
+    issues.some((i) => i.level === "error") || ftpMissing || emailMissingRecipients;
 
   return (
     <div
@@ -532,43 +581,22 @@ function ScheduleCard({
       </Field>
 
       {s.destination === "email" ? (
-        <Field label={`Recipients (${recipientChips.length})`} full>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {recipientChips.length === 0 && (
-              <span className="text-[11px] text-muted-foreground">No recipients</span>
-            )}
-            {recipientChips.map((r) => (
-              <button
-                key={r.id}
-                disabled={readOnly}
-                onClick={() => onChange({ recipientIds: s.recipientIds.filter((x) => x !== r.id) })}
-                className="inline-flex items-center gap-1 h-6 pl-2 pr-1.5 rounded-md bg-primary/10 text-primary text-[11px] font-semibold border border-primary/20"
-              >
-                <Mail className="size-3" /> {r.name}
-                {!readOnly && <span className="opacity-60 hover:opacity-100 ml-0.5">×</span>}
-              </button>
-            ))}
-          </div>
-          {!readOnly && (
-            <select
-              value=""
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v && !s.recipientIds.includes(v))
-                  onChange({ recipientIds: [...s.recipientIds, v] });
-              }}
-              className="h-8 px-2 rounded-md bg-secondary/60 border border-border text-xs outline-none"
-            >
-              <option value="">+ Add recipient…</option>
-              {adminRecipients
-                .filter((u) => !s.recipientIds.includes(u.id))
-                .map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} · {u.email}
-                  </option>
-                ))}
-            </select>
+        <Field label={`Recipients (${emails.length})`} full>
+          {mailMissing && (
+            <div className="mb-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
+              No SMTP server configured.{" "}
+              <button onClick={onOpenMailSettings} className="font-semibold underline">
+                Configure mail settings
+              </button>{" "}
+              before this can send.
+            </div>
           )}
+          <EmailRecipients
+            emails={emails}
+            suggestions={adminRecipients.map((u) => u.email).filter(Boolean)}
+            readOnly={readOnly}
+            onChange={(next) => onChange({ recipientEmails: next })}
+          />
         </Field>
       ) : (
         <Field label="FTP destination" full>
@@ -685,6 +713,96 @@ function humanCadence(s: Schedule) {
   if (s.frequency === "daily") return `Daily at ${s.time}`;
   if (s.frequency === "weekly") return `Weekly on ${WEEKDAYS[s.weekday ?? 1]} at ${s.time}`;
   return `Monthly on day ${s.dayOfMonth ?? 1} at ${s.time}`;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Editable email-chip list: pick from a datalist of app-user emails or type any
+// address. Enter / comma / blur commits the typed value.
+function EmailRecipients({
+  emails,
+  suggestions,
+  readOnly,
+  onChange,
+}: {
+  emails: string[];
+  suggestions: string[];
+  readOnly: boolean;
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const listId = useMemo(() => `emails_${Math.random().toString(36).slice(2)}`, []);
+
+  function commit(raw: string) {
+    const v = raw.trim().replace(/,$/, "").trim();
+    if (!v) return;
+    if (!EMAIL_RE.test(v)) return; // ignore invalid; input border could flag it
+    if (emails.includes(v)) { setDraft(""); return; }
+    onChange([...emails, v]);
+    setDraft("");
+  }
+
+  const remaining = suggestions.filter((e) => !emails.includes(e));
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {emails.length === 0 && (
+          <span className="text-[11px] text-muted-foreground">No recipients</span>
+        )}
+        {emails.map((e) => (
+          <span
+            key={e}
+            className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md bg-primary/10 text-primary text-[11px] font-semibold border border-primary/20"
+          >
+            <Mail className="size-3" /> {e}
+            {!readOnly && (
+              <button
+                onClick={() => onChange(emails.filter((x) => x !== e))}
+                className="opacity-60 hover:opacity-100 ml-0.5 px-0.5"
+                title="Remove"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+      </div>
+      {!readOnly && (
+        <div className="flex items-center gap-2">
+          <input
+            list={listId}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                commit(draft);
+              }
+            }}
+            onBlur={() => commit(draft)}
+            placeholder="name@example.com — type or pick, then Enter"
+            className={`h-8 px-2 rounded-md bg-secondary/60 border text-xs outline-none flex-1 ${
+              draft && !EMAIL_RE.test(draft.trim()) ? "border-rose-500/50" : "border-border"
+            }`}
+          />
+          <datalist id={listId}>
+            {remaining.map((e) => (
+              <option key={e} value={e} />
+            ))}
+          </datalist>
+          <button
+            type="button"
+            onClick={() => commit(draft)}
+            disabled={!draft || !EMAIL_RE.test(draft.trim())}
+            className="h-8 px-3 rounded-md bg-secondary border border-border text-xs font-semibold disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function FtpDialog({
@@ -830,5 +948,161 @@ function FtpField({ label, children }: { label: string; children: React.ReactNod
       <span className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</span>
       {children}
     </label>
+  );
+}
+
+function MailDialog({
+  initial,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  initial: MailConfigView;
+  onClose: () => void;
+  onSave: (c: MailConfigInput) => void;
+  onDelete: () => void;
+}) {
+  const [host, setHost] = useState(initial?.host ?? "smtp.gmail.com");
+  const [port, setPort] = useState(String(initial?.port ?? 465));
+  const [username, setUsername] = useState(initial?.username ?? "");
+  // Password is never returned from the server; only re-send when typed.
+  const [pass, setPass] = useState("");
+  const [secure, setSecure] = useState(initial?.secure ?? true);
+  const [fromName, setFromName] = useState(initial?.fromName ?? "MealOps");
+  const [fromEmail, setFromEmail] = useState(initial?.fromEmail ?? "");
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    onSave({
+      host: host.trim(),
+      port: Number(port) || 587,
+      username: username.trim(),
+      password: pass,
+      secure,
+      fromName: fromName.trim() || "MealOps",
+      fromEmail: fromEmail.trim(),
+    });
+  }
+
+  const inputCls =
+    "w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl rounded-2xl bg-card border border-border shadow-elegant"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-lg gradient-primary grid place-items-center text-primary-foreground">
+              <Mail className="size-4" />
+            </div>
+            <div>
+              <div className="font-semibold">SMTP / mail settings</div>
+              <div className="text-xs text-muted-foreground">Used by schedules with email delivery</div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="size-8 grid place-items-center rounded-lg hover:bg-secondary"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <form onSubmit={submit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FtpField label="SMTP Host *">
+            <input required value={host} onChange={(e) => setHost(e.target.value)} className={inputCls} />
+          </FtpField>
+          <FtpField label="Port">
+            <input
+              value={port}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPort(v);
+                // Smart default: 465 = implicit TLS, 587 = STARTTLS.
+                if (v === "465") setSecure(true);
+                else if (v === "587") setSecure(false);
+              }}
+              className={inputCls}
+            />
+          </FtpField>
+          <FtpField label="Username *">
+            <input required value={username} onChange={(e) => setUsername(e.target.value)} className={inputCls} />
+          </FtpField>
+          <FtpField label={initial?.hasPassword ? "Password / app password (leave blank to keep)" : "Password / app password *"}>
+            <input
+              required={!initial?.hasPassword}
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              className={inputCls}
+              placeholder={initial?.hasPassword ? "••••••••" : ""}
+            />
+          </FtpField>
+          <FtpField label="From name">
+            <input value={fromName} onChange={(e) => setFromName(e.target.value)} className={inputCls} />
+          </FtpField>
+          <FtpField label="From email *">
+            <input
+              required
+              type="email"
+              value={fromEmail}
+              onChange={(e) => setFromEmail(e.target.value)}
+              className={inputCls}
+              placeholder="reports@yourdomain.com"
+            />
+          </FtpField>
+
+          <label className="md:col-span-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={secure}
+              onChange={(e) => setSecure(e.target.checked)}
+              className="size-4 rounded border-border"
+            />
+            Use implicit TLS (SSL) — on for port 465, off for STARTTLS port 587.
+          </label>
+
+          <div className="md:col-span-2 rounded-lg bg-secondary/60 border border-border p-3 text-xs text-muted-foreground">
+            Gmail: enable 2-step verification and use a 16-character App Password as the password
+            (your normal account password will not work). Credentials are stored on the MealOps
+            server and used by the background scheduler.
+          </div>
+
+          <div className="md:col-span-2 flex items-center justify-between gap-2 pt-1">
+            <div>
+              {initial && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 inline-flex items-center gap-1.5"
+                >
+                  <Trash2 className="size-3.5" /> Clear settings
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg text-sm hover:bg-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow"
+              >
+                <CheckCircle2 className="size-4" /> Save settings
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

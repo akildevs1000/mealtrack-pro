@@ -16,6 +16,7 @@ import scannerRouter from "./routes/scanner.js";
 import reportsRouter from "./routes/reports.js";
 import schedulesRouter from "./routes/schedules.js";
 import ftpConfigRouter from "./routes/ftp-config.js";
+import mailConfigRouter from "./routes/mail-config.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 import { startScheduler } from "./scheduler/worker.js";
 import { ensureDefaultPermissions } from "./lib/ensure-permissions.js";
@@ -43,6 +44,7 @@ app.use("/api/scanner", scannerRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/schedules", schedulesRouter);
 app.use("/api/ftp-config", ftpConfigRouter);
+app.use("/api/mail-config", mailConfigRouter);
 
 app.use(notFound);
 app.use(errorHandler);
