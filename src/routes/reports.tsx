@@ -761,7 +761,7 @@ function FtpDialog({
           </Field>
 
           <div className="md:col-span-2 rounded-lg bg-secondary/60 border border-border p-3 text-xs text-muted-foreground">
-            The file is generated in your browser and posted to the MealOps server, which uploads it
+            The file is generated in your browser and posted to the MyMeal server, which uploads it
             to your FTP host. Credentials are sent over the same TLS connection as the rest of the
             app.
           </div>
