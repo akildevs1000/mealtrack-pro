@@ -173,7 +173,7 @@ export async function runSchedule(scheduleId: string): Promise<RunOutcome> {
         const window = windowForFrequency(s.frequency);
         const subject = `${reportLabel(s.reportType)} — ${window.from.toISOString().slice(0, 10)} to ${window.to.toISOString().slice(0, 10)}`;
         const text =
-          `Automated ${reportLabel(s.reportType)} report from MealOps.\n\n` +
+          `Automated ${reportLabel(s.reportType)} report from MyMeal.\n\n` +
           `Schedule: ${s.name}\n` +
           `Period: ${window.from.toISOString().slice(0, 10)} → ${window.to.toISOString().slice(0, 10)}\n\n` +
           `${files.length} file(s) attached.`;

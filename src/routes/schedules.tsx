@@ -251,7 +251,7 @@ function SchedulesPage() {
             Background scheduler is active
           </div>
           <div className="text-muted-foreground mt-1">
-            The MealOps server checks for due schedules every minute and delivers reports
+            The MyMeal server checks for due schedules every minute and delivers reports
             automatically — both FTP upload and SMTP email are live. Email runs require Mail
             settings to be configured; FTP runs require FTP settings.
           </div>
@@ -908,7 +908,7 @@ function FtpDialog({
           </FtpField>
 
           <div className="md:col-span-2 rounded-lg bg-secondary/60 border border-border p-3 text-xs text-muted-foreground">
-            Credentials are stored on the MealOps server and used by the background scheduler. Any
+            Credentials are stored on the MyMeal server and used by the background scheduler. Any
             FTP-delivery schedule will use these settings on its next run.
           </div>
 
@@ -972,7 +972,7 @@ function MailDialog({
   // Password is never returned from the server; only re-send when typed.
   const [pass, setPass] = useState("");
   const [secure, setSecure] = useState(initial?.secure ?? true);
-  const [fromName, setFromName] = useState(initial?.fromName ?? "MealOps");
+  const [fromName, setFromName] = useState(initial?.fromName ?? "MyMeal");
   const [fromEmail, setFromEmail] = useState(initial?.fromEmail ?? "");
 
   function submit(e: React.FormEvent) {
@@ -983,7 +983,7 @@ function MailDialog({
       username: username.trim(),
       password: pass,
       secure,
-      fromName: fromName.trim() || "MealOps",
+      fromName: fromName.trim() || "MyMeal",
       fromEmail: fromEmail.trim(),
     });
   }
@@ -1095,7 +1095,7 @@ function MailDialog({
 
           <div className="md:col-span-2 rounded-lg bg-secondary/60 border border-border p-3 text-xs text-muted-foreground">
             Gmail: enable 2-step verification and use a 16-character App Password as the password
-            (your normal account password will not work). Credentials are stored on the MealOps
+            (your normal account password will not work). Credentials are stored on the MyMeal
             server and used by the background scheduler.
           </div>
 

@@ -17,6 +17,7 @@ import reportsRouter from "./routes/reports.js";
 import schedulesRouter from "./routes/schedules.js";
 import ftpConfigRouter from "./routes/ftp-config.js";
 import mailConfigRouter from "./routes/mail-config.js";
+import setupRouter from "./routes/setup.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 import { startScheduler } from "./scheduler/worker.js";
 import { ensureDefaultPermissions } from "./lib/ensure-permissions.js";
@@ -45,6 +46,13 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/schedules", schedulesRouter);
 app.use("/api/ftp-config", ftpConfigRouter);
 app.use("/api/mail-config", mailConfigRouter);
+
+// Desktop-only first-run provisioning. Mounted exclusively when the Electron
+// launcher sets MEALOPS_DESKTOP=1, so the web deployment never exposes it.
+if (process.env.MEALOPS_DESKTOP === "1") {
+  app.use("/api/setup", setupRouter);
+  console.log("[server] desktop mode: /api/setup mounted");
+}
 
 app.use(notFound);
 app.use(errorHandler);

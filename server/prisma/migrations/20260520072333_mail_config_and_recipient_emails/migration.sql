@@ -9,7 +9,7 @@ CREATE TABLE "MailConfig" (
     "username" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "secure" BOOLEAN NOT NULL DEFAULT false,
-    "fromName" TEXT NOT NULL DEFAULT 'MealOps',
+    "fromName" TEXT NOT NULL DEFAULT 'MyMeal',
     "fromEmail" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

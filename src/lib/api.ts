@@ -3,11 +3,35 @@
  * Adds the bearer token from localStorage and unwraps JSON.
  */
 
-const TOKEN_KEY = "mealops.token.v1";
+const TOKEN_KEY = "mymeals.token.v1";
 
-export const API_BASE =
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE) ||
-  "http://localhost:5044/api";
+/**
+ * Resolve the API base URL.
+ *
+ * Order of precedence:
+ *   1. Runtime override — used by the desktop (Electron) build, where the API
+ *      port is user-configurable and therefore unknown at build time:
+ *        - client: `window.__MEALOPS_API_BASE__` (injected into the HTML <head>
+ *          by web-server.mjs before any app script runs)
+ *        - SSR/Node: `process.env.MEALOPS_API_BASE`
+ *   2. Build-time `VITE_API_BASE` (the web deployment sets this in .env.production).
+ *   3. Localhost default.
+ *
+ * When neither runtime source is present this collapses to the original
+ * behaviour, so the existing web app is unaffected.
+ */
+function resolveApiBase(): string {
+  if (typeof window !== "undefined") {
+    const fromWindow = (window as { __MEALOPS_API_BASE__?: string }).__MEALOPS_API_BASE__;
+    if (typeof fromWindow === "string" && fromWindow) return fromWindow;
+  } else if (typeof process !== "undefined" && process.env?.MEALOPS_API_BASE) {
+    return process.env.MEALOPS_API_BASE;
+  }
+  const baked = typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE;
+  return baked || "http://localhost:5044/api";
+}
+
+export const API_BASE = resolveApiBase();
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

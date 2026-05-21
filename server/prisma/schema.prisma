@@ -273,7 +273,7 @@ model MailConfig {
   password  String
   // true for implicit TLS (port 465); false uses STARTTLS (port 587).
   secure    Boolean  @default(false)
-  fromName  String   @default("MealOps")
+  fromName  String   @default("MyMeal")
   fromEmail String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

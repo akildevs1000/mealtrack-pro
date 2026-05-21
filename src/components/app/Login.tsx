@@ -65,7 +65,7 @@ export function Login() {
                 <div className="absolute inset-0 rounded-full bg-primary/20 blur-3xl" />
                 <img
                   src="/login-logo.png"
-                  alt="MealOps — premium dark serving cloche and bowl illustration"
+                  alt="MyMeal — premium dark serving cloche and bowl illustration"
                   className="relative w-full h-auto object-contain drop-shadow-[0_20px_20px_rgba(0,0,0,0.5)]"
                 />
               </div>

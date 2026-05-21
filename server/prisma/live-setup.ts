@@ -50,7 +50,7 @@ async function main() {
       serial: DEVICE_SERIAL,
       model: "Zebra TC22",
       androidVersion: "Android 13",
-      appVersion: "MealOps 4.2.1",
+      appVersion: "MyMeal 4.2.1",
       ipAddress: "",
       assignedTo: "",
       registeredOn: new Date(),

@@ -61,13 +61,13 @@ const cmsEmployees = [
 ];
 
 const devices = [
-  { name: "Scanner-AD01-A", campCode: "AD-01", battery: 86, online: true, macAddress: "A4:5E:60:11:8C:21", serial: "ZBR-AD01A-7781", model: "Zebra TC22", androidVersion: "Android 13", appVersion: "MealOps 4.2.1", ipAddress: "10.42.10.21", assignedTo: "Ahmed Al Mansouri", registeredOn: "2024-02-14" },
-  { name: "Scanner-AD01-B", campCode: "AD-01", battery: 42, online: true, macAddress: "A4:5E:60:11:8C:22", serial: "ZBR-AD01B-7782", model: "Zebra TC22", androidVersion: "Android 13", appVersion: "MealOps 4.2.1", ipAddress: "10.42.10.22", assignedTo: "Ahmed Al Mansouri", registeredOn: "2024-02-14" },
-  { name: "Scanner-DXB04", campCode: "DXB-04", battery: 71, online: true, macAddress: "B8:27:EB:44:19:7C", serial: "HON-DXB04-3320", model: "Honeywell EDA52", androidVersion: "Android 12", appVersion: "MealOps 4.2.0", ipAddress: "10.44.20.11", assignedTo: "Rajesh Pillai", registeredOn: "2023-11-02" },
-  { name: "Scanner-SHJ02-A", campCode: "SHJ-02", battery: 58, online: true, macAddress: "DC:A6:32:8E:55:01", serial: "ZBR-SHJ02A-9120", model: "Zebra MC2200", androidVersion: "Android 11", appVersion: "MealOps 4.1.8", ipAddress: "10.46.30.31", assignedTo: "Khalid Al Suwaidi", registeredOn: "2023-09-21" },
-  { name: "Scanner-AUH09-A", campCode: "AUH-09", battery: 12, online: false, macAddress: "F0:18:98:21:AC:55", serial: "SAM-AUH09A-1145", model: "Samsung XCover 6 Pro", androidVersion: "Android 13", appVersion: "MealOps 4.2.1", ipAddress: "10.48.40.12", assignedTo: "Imran Sheikh", registeredOn: "2022-12-08" },
-  { name: "Scanner-RAK01", campCode: "RAK-01", battery: 94, online: true, macAddress: "3C:5A:B4:77:09:E2", serial: "HON-RAK01-5560", model: "Honeywell CT30 XP", androidVersion: "Android 13", appVersion: "MealOps 4.2.1", ipAddress: "10.50.50.10", assignedTo: "Fatima Al Hosani", registeredOn: "2024-04-03" },
-  { name: "Scanner-AJM03", campCode: "AJM-03", battery: 67, online: true, macAddress: "00:1A:7D:DA:71:13", serial: "ZBR-AJM03-2244", model: "Zebra TC52", androidVersion: "Android 12", appVersion: "MealOps 4.2.0", ipAddress: "10.52.60.18", assignedTo: "Bilal Ahmed", registeredOn: "2023-06-19" },
+  { name: "Scanner-AD01-A", campCode: "AD-01", battery: 86, online: true, macAddress: "A4:5E:60:11:8C:21", serial: "ZBR-AD01A-7781", model: "Zebra TC22", androidVersion: "Android 13", appVersion: "MyMeal 4.2.1", ipAddress: "10.42.10.21", assignedTo: "Ahmed Al Mansouri", registeredOn: "2024-02-14" },
+  { name: "Scanner-AD01-B", campCode: "AD-01", battery: 42, online: true, macAddress: "A4:5E:60:11:8C:22", serial: "ZBR-AD01B-7782", model: "Zebra TC22", androidVersion: "Android 13", appVersion: "MyMeal 4.2.1", ipAddress: "10.42.10.22", assignedTo: "Ahmed Al Mansouri", registeredOn: "2024-02-14" },
+  { name: "Scanner-DXB04", campCode: "DXB-04", battery: 71, online: true, macAddress: "B8:27:EB:44:19:7C", serial: "HON-DXB04-3320", model: "Honeywell EDA52", androidVersion: "Android 12", appVersion: "MyMeal 4.2.0", ipAddress: "10.44.20.11", assignedTo: "Rajesh Pillai", registeredOn: "2023-11-02" },
+  { name: "Scanner-SHJ02-A", campCode: "SHJ-02", battery: 58, online: true, macAddress: "DC:A6:32:8E:55:01", serial: "ZBR-SHJ02A-9120", model: "Zebra MC2200", androidVersion: "Android 11", appVersion: "MyMeal 4.1.8", ipAddress: "10.46.30.31", assignedTo: "Khalid Al Suwaidi", registeredOn: "2023-09-21" },
+  { name: "Scanner-AUH09-A", campCode: "AUH-09", battery: 12, online: false, macAddress: "F0:18:98:21:AC:55", serial: "SAM-AUH09A-1145", model: "Samsung XCover 6 Pro", androidVersion: "Android 13", appVersion: "MyMeal 4.2.1", ipAddress: "10.48.40.12", assignedTo: "Imran Sheikh", registeredOn: "2022-12-08" },
+  { name: "Scanner-RAK01", campCode: "RAK-01", battery: 94, online: true, macAddress: "3C:5A:B4:77:09:E2", serial: "HON-RAK01-5560", model: "Honeywell CT30 XP", androidVersion: "Android 13", appVersion: "MyMeal 4.2.1", ipAddress: "10.50.50.10", assignedTo: "Fatima Al Hosani", registeredOn: "2024-04-03" },
+  { name: "Scanner-AJM03", campCode: "AJM-03", battery: 67, online: true, macAddress: "00:1A:7D:DA:71:13", serial: "ZBR-AJM03-2244", model: "Zebra TC52", androidVersion: "Android 12", appVersion: "MyMeal 4.2.0", ipAddress: "10.52.60.18", assignedTo: "Bilal Ahmed", registeredOn: "2023-06-19" },
 ];
 
 const addDays = (n: number) => {
@@ -78,12 +78,12 @@ const addDays = (n: number) => {
 
 // `pin` is a demo Android-scanner PIN (4 digits) — admin should overwrite via the UI.
 const managers = [
-  { name: "Ahmed Al Mansouri", username: "ahmed.mansouri", password: "Ad@2025!Reem", pin: "1111", email: "ahmed.m@mealops.ae", phone: "+971 50 442 8821", emiratesId: "784-1988-2237811-3", campCode: "AD-01", role: "CampManager", shift: "FullDay", joinDate: new Date("2023-03-12"), expiryDate: addDays(184), status: "Active", avatar: "AM", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
-  { name: "Rajesh Pillai", username: "rajesh.pillai", password: "Mar!na#0420", pin: "2222", email: "rajesh.p@mealops.ae", phone: "+971 55 119 7733", emiratesId: "784-1985-9912334-1", campCode: "DXB-04", role: "SeniorManager", shift: "Morning", joinDate: new Date("2022-08-04"), expiryDate: addDays(42), status: "Active", avatar: "RP", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
-  { name: "Khalid Al Suwaidi", username: "khalid.suwaidi", password: "ShJ$Indus#02", pin: "3333", email: "khalid.s@mealops.ae", phone: "+971 52 880 4471", emiratesId: "784-1990-5567129-7", campCode: "SHJ-02", role: "CampManager", shift: "FullDay", joinDate: new Date("2024-01-22"), expiryDate: addDays(310), status: "Active", avatar: "KS", permBreakfast: true, permLunch: true, permDinner: true, permReports: false },
-  { name: "Imran Sheikh", username: "imran.sheikh", password: "Mus@ffah*09", pin: null,   email: "imran.s@mealops.ae", phone: "+971 56 339 0098", emiratesId: "784-1982-1133447-9", campCode: "AUH-09", role: "Supervisor", shift: "Evening", joinDate: new Date("2021-11-18"), expiryDate: addDays(-8), status: "Expired", avatar: "IS", permBreakfast: false, permLunch: true, permDinner: true, permReports: false },
-  { name: "Fatima Al Hosani", username: "fatima.hosani", password: "Hamr@2026$RAK", pin: "4444", email: "fatima.h@mealops.ae", phone: "+971 50 778 1290", emiratesId: "784-1992-7782311-2", campCode: "RAK-01", role: "CampManager", shift: "Morning", joinDate: new Date("2023-09-30"), expiryDate: addDays(96), status: "Active", avatar: "FH", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
-  { name: "Bilal Ahmed", username: "bilal.ahmed", password: "Ajm@n!Cent03", pin: "5555", email: "bilal.a@mealops.ae", phone: "+971 54 220 9981", emiratesId: "784-1987-4456789-5", campCode: "AJM-03", role: "CampManager", shift: "FullDay", joinDate: new Date("2022-05-14"), expiryDate: addDays(15), status: "Suspended", avatar: "BA", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
+  { name: "Ahmed Al Mansouri", username: "ahmed.mansouri", password: "Ad@2025!Reem", pin: "1111", email: "ahmed.m@mymeals.ae", phone: "+971 50 442 8821", emiratesId: "784-1988-2237811-3", campCode: "AD-01", role: "CampManager", shift: "FullDay", joinDate: new Date("2023-03-12"), expiryDate: addDays(184), status: "Active", avatar: "AM", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
+  { name: "Rajesh Pillai", username: "rajesh.pillai", password: "Mar!na#0420", pin: "2222", email: "rajesh.p@mymeals.ae", phone: "+971 55 119 7733", emiratesId: "784-1985-9912334-1", campCode: "DXB-04", role: "SeniorManager", shift: "Morning", joinDate: new Date("2022-08-04"), expiryDate: addDays(42), status: "Active", avatar: "RP", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
+  { name: "Khalid Al Suwaidi", username: "khalid.suwaidi", password: "ShJ$Indus#02", pin: "3333", email: "khalid.s@mymeals.ae", phone: "+971 52 880 4471", emiratesId: "784-1990-5567129-7", campCode: "SHJ-02", role: "CampManager", shift: "FullDay", joinDate: new Date("2024-01-22"), expiryDate: addDays(310), status: "Active", avatar: "KS", permBreakfast: true, permLunch: true, permDinner: true, permReports: false },
+  { name: "Imran Sheikh", username: "imran.sheikh", password: "Mus@ffah*09", pin: null,   email: "imran.s@mymeals.ae", phone: "+971 56 339 0098", emiratesId: "784-1982-1133447-9", campCode: "AUH-09", role: "Supervisor", shift: "Evening", joinDate: new Date("2021-11-18"), expiryDate: addDays(-8), status: "Expired", avatar: "IS", permBreakfast: false, permLunch: true, permDinner: true, permReports: false },
+  { name: "Fatima Al Hosani", username: "fatima.hosani", password: "Hamr@2026$RAK", pin: "4444", email: "fatima.h@mymeals.ae", phone: "+971 50 778 1290", emiratesId: "784-1992-7782311-2", campCode: "RAK-01", role: "CampManager", shift: "Morning", joinDate: new Date("2023-09-30"), expiryDate: addDays(96), status: "Active", avatar: "FH", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
+  { name: "Bilal Ahmed", username: "bilal.ahmed", password: "Ajm@n!Cent03", pin: "5555", email: "bilal.a@mymeals.ae", phone: "+971 54 220 9981", emiratesId: "784-1987-4456789-5", campCode: "AJM-03", role: "CampManager", shift: "FullDay", joinDate: new Date("2022-05-14"), expiryDate: addDays(15), status: "Suspended", avatar: "BA", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
 ];
 
 const TABS = ["overview", "scanner", "camps", "employees", "managers", "forecast", "devices", "reports", "automation", "users"];
@@ -201,11 +201,11 @@ async function main() {
   // App users (for auth)
   const defaultHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
   const appUsers = [
-    { username: "admin",    name: "Head Office Admin",        email: "admin@mealops.io",  role: "admin"    as Role, assignedCampCode: null },
-    { username: "sara.op",  name: "Sara Operator",            email: "sara@mealops.io",   role: "operator" as Role, assignedCampCode: null },
-    { username: "viewer",   name: "Read-only User",           email: "viewer@mealops.io", role: "user"     as Role, assignedCampCode: null },
-    { username: "khalid.ad01", name: "Khalid (AD-01 Manager)", email: "khalid@mealops.io", role: "manager" as Role, assignedCampCode: "AD-01" },
-    { username: "omar.dxb04",  name: "Omar (DXB-04 Manager)",  email: "omar@mealops.io",   role: "manager" as Role, assignedCampCode: "DXB-04" },
+    { username: "admin",    name: "Head Office Admin",        email: "admin@mymeals.io",  role: "admin"    as Role, assignedCampCode: null },
+    { username: "sara.op",  name: "Sara Operator",            email: "sara@mymeals.io",   role: "operator" as Role, assignedCampCode: null },
+    { username: "viewer",   name: "Read-only User",           email: "viewer@mymeals.io", role: "user"     as Role, assignedCampCode: null },
+    { username: "khalid.ad01", name: "Khalid (AD-01 Manager)", email: "khalid@mymeals.io", role: "manager" as Role, assignedCampCode: "AD-01" },
+    { username: "omar.dxb04",  name: "Omar (DXB-04 Manager)",  email: "omar@mymeals.io",   role: "manager" as Role, assignedCampCode: "DXB-04" },
   ];
   for (const u of appUsers) {
     await prisma.user.upsert({

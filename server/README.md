@@ -1,6 +1,6 @@
 # MealTrack Pro — Backend
 
-Express + Prisma + PostgreSQL API for the MealOps dashboard.
+Express + Prisma + PostgreSQL API for the MyMeal dashboard.
 
 ## Quickstart
 

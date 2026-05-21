@@ -20,7 +20,7 @@ const upsertSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
   secure: z.boolean().default(false),
-  fromName: z.string().default("MealOps"),
+  fromName: z.string().default("MyMeal"),
   fromEmail: z.string().email(),
 });
 

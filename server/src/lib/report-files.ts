@@ -38,7 +38,7 @@ export function buildPdfBuffer(d: ReportData): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.fontSize(16).fillColor("#111").text(`MealOps — ${d.title}`);
+    doc.fontSize(16).fillColor("#111").text(`MyMeal — ${d.title}`);
     doc.moveDown(0.2);
     doc.fontSize(10).fillColor("#666").text(d.subtitle);
     doc.moveDown(0.6);

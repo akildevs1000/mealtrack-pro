@@ -167,7 +167,7 @@ function PageFooter({ type, pageNum, totalPages }: { type: ReportType; pageNum: 
   return (
     <footer className="footer">
       <div className="legend">{REPORT_META[type].legend}</div>
-      <div>Powered by <strong style={{ color: "#0f172a" }}>MealOps</strong></div>
+      <div>Powered by <strong style={{ color: "#0f172a" }}>MyMeal</strong></div>
       <div>Page {pageNum} of {totalPages}</div>
     </footer>
   );
