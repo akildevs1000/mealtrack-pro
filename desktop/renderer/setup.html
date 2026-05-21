@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MyMeal Setup</title>
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="logo">🍽️</div>
+        <div>
+          <h1 id="title">Welcome to MyMeal</h1>
+          <p id="subtitle">How would you like to connect your database?</p>
+        </div>
+      </header>
+
+      <!-- Step 1: choose New vs Existing -->
+      <main id="choose" class="card choose">
+        <button class="choice" id="choice-new" type="button">
+          <div class="choice-icon">✨</div>
+          <div class="choice-text">
+            <h3>Set up a new database</h3>
+            <p>Create a fresh database and your administrator account. Best for first-time use.</p>
+          </div>
+        </button>
+        <button class="choice" id="choice-existing" type="button">
+          <div class="choice-icon">🗄️</div>
+          <div class="choice-text">
+            <h3>Connect to an existing database</h3>
+            <p>Use a database that's already set up. New updates are applied automatically.</p>
+          </div>
+        </button>
+      </main>
+
+      <!-- Step 2: connection form -->
+      <main id="form-screen" class="card" hidden>
+        <button class="back" id="back-btn" type="button">← Back</button>
+
+        <section class="group">
+          <h2>Database connection</h2>
+          <div class="row">
+            <label class="col grow">
+              <span>Host / IP</span>
+              <input id="db-host" type="text" placeholder="127.0.0.1" autocomplete="off" />
+            </label>
+            <label class="col port">
+              <span>Port</span>
+              <input id="db-port" type="number" placeholder="5432" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="col grow">
+              <span>Username</span>
+              <input id="db-user" type="text" placeholder="postgres" autocomplete="off" />
+            </label>
+            <label class="col grow">
+              <span>Password</span>
+              <input id="db-password" type="password" autocomplete="off" />
+            </label>
+          </div>
+          <label class="col">
+            <span id="db-name-label">Database name</span>
+            <input id="db-name" type="text" placeholder="mymeals" autocomplete="off" />
+            <small id="db-name-hint">Created automatically.</small>
+          </label>
+
+          <div class="test-row">
+            <button id="test-btn" class="btn ghost" type="button">Test connection</button>
+            <span id="test-result" class="result"></span>
+          </div>
+        </section>
+
+        <section class="group" id="admin-group">
+          <h2>Administrator account</h2>
+          <p class="hint">Used for your first sign-in. You can add more users later inside the app.</p>
+          <div class="row">
+            <label class="col grow">
+              <span>Admin username</span>
+              <input id="admin-user" type="text" placeholder="admin" autocomplete="off" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="col grow">
+              <span>Password</span>
+              <input id="admin-password" type="password" autocomplete="off" />
+            </label>
+            <label class="col grow">
+              <span>Confirm password</span>
+              <input id="admin-password2" type="password" autocomplete="off" />
+            </label>
+          </div>
+        </section>
+
+        <section class="group">
+          <details id="advanced">
+            <summary>Advanced — network &amp; ports</summary>
+            <label class="col">
+              <span>Server address (for other devices)</span>
+              <input id="server-address" type="text" autocomplete="off" />
+              <small id="server-address-hint"
+                >Leave blank to detect automatically. This is the address other
+                devices/scanners use to open MyMeal.</small
+              >
+            </label>
+            <p class="hint">Change the ports only if they're already in use on this PC.</p>
+            <div class="row">
+              <label class="col grow">
+                <span>API port</span>
+                <input id="api-port" type="number" placeholder="5044" />
+              </label>
+              <label class="col grow">
+                <span>App (web) port</span>
+                <input id="web-port" type="number" placeholder="8044" />
+              </label>
+            </div>
+          </details>
+        </section>
+
+        <div id="form-error" class="form-error" hidden></div>
+
+        <div class="actions">
+          <button id="save-btn" class="btn primary" type="button">Save &amp; Launch</button>
+        </div>
+      </main>
+    </div>
+
+    <div id="overlay" class="overlay" hidden>
+      <div class="overlay-card">
+        <div class="spinner"></div>
+        <h3 id="overlay-title">Setting things up…</h3>
+        <pre id="progress-log" class="progress-log"></pre>
+      </div>
+    </div>
+
+    <script src="setup.js"></script>
+  </body>
+</html>

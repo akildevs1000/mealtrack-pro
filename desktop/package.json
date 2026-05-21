@@ -1,0 +1,63 @@
+{
+  "name": "mymeals-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MyMeal Windows desktop shell (wraps the existing full-stack app)",
+  "author": "Akil Group",
+  "main": "main/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "prepare:runtime": "node scripts/prepare-runtime.cjs",
+    "dist": "node scripts/prepare-runtime.cjs && electron-builder --win nsis portable",
+    "dist:dir": "node scripts/prepare-runtime.cjs && electron-builder --win --dir"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.akilgroup.mymeals",
+    "productName": "MyMeal",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**",
+      "renderer/**",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "../dist", "to": "runtime/dist" },
+      { "from": "../web-server.mjs", "to": "runtime/web-server.mjs" },
+      { "from": "../package.json", "to": "runtime/package.json" },
+      { "from": "../node_modules", "to": "runtime/node_modules" },
+      { "from": "../server/dist", "to": "runtime/server/dist" },
+      { "from": "../server/prisma", "to": "runtime/server/prisma" },
+      { "from": "../server/package.json", "to": "runtime/server/package.json" },
+      { "from": "../server/node_modules", "to": "runtime/server/node_modules" }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MyMeal",
+      "artifactName": "MyMeal-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "MyMeal-${version}-portable.exe"
+    }
+  }
+}
