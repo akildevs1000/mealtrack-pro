@@ -178,10 +178,13 @@
   .shadow-elegant { box-shadow: var(--shadow-elegant); }
   .shadow-card { box-shadow: var(--shadow-card); }
   .shadow-glow { box-shadow: var(--shadow-glow); }
+  /* Frosted background only — borders are intentionally left to the consumer
+     (e.g. the header uses `border-b` for a single bottom line). Including a
+     full box border here previously drew a stray vertical line on the header's
+     left edge, doubling up against the sidebar border. */
   .glass {
     background: color-mix(in oklab, var(--card) 70%, transparent);
     backdrop-filter: blur(12px);
-    border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
   }
 }
 

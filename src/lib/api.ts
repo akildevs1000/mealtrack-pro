@@ -15,16 +15,21 @@ const TOKEN_KEY = "mymeals.token.v1";
  *          by web-server.mjs before any app script runs)
  *        - SSR/Node: `process.env.MEALOPS_API_BASE`
  *   2. Build-time `VITE_API_BASE` (the web deployment sets this in .env.production).
- *   3. Localhost default.
- *
- * When neither runtime source is present this collapses to the original
- * behaviour, so the existing web app is unaffected.
+ *   3. Default:
+ *        - client: relative `/api` — the Vite dev server proxies it to the
+ *          backend, so the page works from any host (localhost, LAN IP, …) with
+ *          no CORS. In the web prod build step 2 always wins, so this is the
+ *          dev-only path.
+ *        - SSR/Node: absolute localhost URL (Node's fetch needs an absolute URL).
  */
 function resolveApiBase(): string {
   if (typeof window !== "undefined") {
     const fromWindow = (window as { __MEALOPS_API_BASE__?: string }).__MEALOPS_API_BASE__;
     if (typeof fromWindow === "string" && fromWindow) return fromWindow;
-  } else if (typeof process !== "undefined" && process.env?.MEALOPS_API_BASE) {
+    const baked = (import.meta as any).env?.VITE_API_BASE;
+    return baked || "/api";
+  }
+  if (typeof process !== "undefined" && process.env?.MEALOPS_API_BASE) {
     return process.env.MEALOPS_API_BASE;
   }
   const baked = typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE;

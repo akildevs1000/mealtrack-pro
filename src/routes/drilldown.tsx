@@ -401,7 +401,7 @@ function DrilldownPage() {
                 axisLine={false}
                 tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
               />
-              <Tooltip contentStyle={tooltipStyle} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--secondary)", opacity: 0.6 }} />
               <Bar dataKey="estimated" fill="var(--muted)" radius={[6, 6, 0, 0]} />
               <Bar dataKey="served" radius={[6, 6, 0, 0]}>
                 {perCamp.map((r) => (

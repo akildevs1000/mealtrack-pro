@@ -263,7 +263,7 @@ function Overview() {
                 <CartesianGrid stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--secondary)", opacity: 0.6 }} />
                 <Bar dataKey="estimated" fill="var(--muted)" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="served" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
               </BarChart>

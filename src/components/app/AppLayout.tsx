@@ -106,17 +106,17 @@ function Shell() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 glass border-b border-border">
           <div className="h-16 px-4 md:px-8 flex items-center gap-4">
-            <div className="md:hidden size-9 rounded-lg gradient-primary grid place-items-center">
+            <div className="md:hidden size-9 rounded-lg gradient-primary grid place-items-center shrink-0">
               <UtensilsCrossed className="size-4 text-primary-foreground" />
             </div>
-            <div className="relative flex-1 max-w-md">
+            <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <input
                 placeholder="Search employees, camps, devices…"
-                className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
+                className="w-full h-9 pl-9 pr-3 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
               />
             </div>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-1">
               <button
                 onClick={() => setDark((d) => !d)}
                 className="size-9 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground"
@@ -124,33 +124,33 @@ function Shell() {
               >
                 {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
               </button>
-              <button className="size-9 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground relative">
+              <button className="relative size-9 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground">
                 <Bell className="size-4" />
                 <span className="absolute top-2 right-2 size-1.5 rounded-full bg-destructive" />
               </button>
               <button className="size-9 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground">
                 <Settings className="size-4" />
               </button>
-              <div className="ml-2 flex items-center gap-2 pl-3 border-l border-border">
-                <div className="size-8 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold text-xs">
-                  {initials}
+            </div>
+            <div className="flex items-center gap-3 pl-3 ml-1 border-l border-border">
+              <div className="hidden sm:block text-right leading-tight">
+                <div className="text-sm font-medium">{session.currentUser.name}</div>
+                <div className="text-xs text-muted-foreground capitalize">
+                  {session.currentUser.role}
+                  {session.currentUser.assignedCampCode ? ` · ${session.currentUser.assignedCampCode}` : ""}
                 </div>
-                <div className="hidden sm:block">
-                  <div className="text-sm font-medium leading-tight">{session.currentUser.name}</div>
-                  <div className="text-xs text-muted-foreground capitalize">
-                    {session.currentUser.role}
-                    {session.currentUser.assignedCampCode ? ` · ${session.currentUser.assignedCampCode}` : ""}
-                  </div>
-                </div>
-                <button
-                  onClick={session.logout}
-                  className="ml-1 size-9 grid place-items-center rounded-lg hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
-                  title="Sign out"
-                  aria-label="Sign out"
-                >
-                  <LogOut className="size-4" />
-                </button>
               </div>
+              <div className="size-9 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold text-xs shrink-0">
+                {initials}
+              </div>
+              <button
+                onClick={session.logout}
+                className="size-9 grid place-items-center rounded-lg hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                title="Sign out"
+                aria-label="Sign out"
+              >
+                <LogOut className="size-4" />
+              </button>
             </div>
           </div>
         </header>

@@ -17,4 +17,15 @@ export default defineConfig({
   tanstackStart: {
     server: { preset: "node-server" },
   },
+  // Dev-only: proxy the API through the same origin the page is served from, so
+  // the app can be opened from any LAN device (http://<pc-ip>:8044) and call a
+  // relative "/api" with no CORS. The frontend's default base is "/api" (see
+  // src/lib/api.ts); this forwards it to the backend on :5044.
+  vite: {
+    server: {
+      proxy: {
+        "/api": { target: "http://localhost:5044", changeOrigin: true },
+      },
+    },
+  },
 });
