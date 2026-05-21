@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-"MealOps / MyMeals" — a meal-distribution / QR-scan verification dashboard for labour camps. It is a **full-stack app**:
+"MyMeal / MyMeals" — a meal-distribution / QR-scan verification dashboard for labour camps. It is a **full-stack app**:
 
 - **Frontend** (`src/`) — TanStack Start (SSR React 19) on Vite 7, shadcn/ui (new-york) + Tailwind v4.
 - **Backend** (`server/`) — Express + Prisma + PostgreSQL REST API on `:5044`.
@@ -34,7 +34,7 @@ There is no unit-test runner. `server/scripts/test-manager-flow.ts` and `test-de
 
 ### Frontend ↔ backend wiring
 
-- `src/lib/api.ts` — fetch wrapper. Bearer token in `localStorage` (`mealops.token.v1`); base URL from `VITE_API_BASE` (default `http://localhost:5044/api`). A 401 clears the token.
+- `src/lib/api.ts` — fetch wrapper. Bearer token in `localStorage` (`mymeals.token.v1`); base URL from `VITE_API_BASE` (default `http://localhost:5044/api`). A 401 clears the token.
 - `src/lib/hooks.ts` — React Query hooks for every resource (`useCamps`, `useEmployees`, `useScans`, `useOverview`, `useReportConsumption`, `useSchedules`, `useMailConfig`, …). **Add data access here**, not ad-hoc `fetch`.
 
 ### Build/runtime wiring (non-obvious)
@@ -76,13 +76,24 @@ Express + Prisma (PostgreSQL). Entry `server/src/index.ts` mounts routers under 
 
 ## Deployment
 
-Production runs on a Node droplet (`139.59.69.241`) under **PM2** (`ecosystem.config.cjs`): `mealops-api` (`server/dist/index.js`) and `mealops-web` (`web-server.mjs` serving the Vite SSR build). Node 22 via nvm. `dist/` is gitignored — **the server builds from the git checkout.**
+Production runs on a Node droplet (`139.59.69.241`) under **PM2** (`ecosystem.config.cjs`): `mymeals-api` (`server/dist/index.js`) and `mymeals-web` (`web-server.mjs` serving the Vite SSR build). Node 22 via nvm. `dist/` is gitignored — **the server builds from the git checkout.**
 
 Deploy with the committed script (run on the server): `bash /var/www/mealtrack-pro/deploy.sh` — it does `git pull` → `npm ci` (root + server) → `npx prisma migrate deploy` → `npm run build` (both) → `pm2 restart all` → health-check. `set -euo pipefail`, so it stops on the first error.
 
 - **New npm package** → committed `package-lock.json` must be in sync (`npm ci` fails otherwise); `npm ci` then installs it automatically. `@prisma/client`'s postinstall regenerates the client during `npm ci`.
 - **New migration** → `prisma migrate deploy` applies all pending migrations forward-only (never resets). Review the generated SQL before pushing; never hand-edit the live DB schema (causes drift).
 - **Env safety** → `server/.env` is gitignored and FTP/SMTP creds live in the DB, so `git pull`/deploy **never overwrite secrets**. The only tracked env file is `.env.production` (`VITE_API_BASE`, a public URL).
+
+## Desktop app (Windows)
+
+`desktop/` is an **Electron** shell that runs the **same** frontend + backend locally — it's purely additive; the web deployment is unaffected. Its own `package.json` (Electron + electron-builder + `pg`) is **separate from the root** — never add Electron to the root deps (it'd bloat `npm ci` on the server). See `desktop/README.md`.
+
+- **How it runs** (`desktop/main/`): the main process spawns the built API (`server/dist/index.js`) and the SSR web server (`web-server.mjs`) as child processes using Electron's own binary in Node mode (`ELECTRON_RUN_AS_NODE=1`), so no separate Node is shipped. `paths.cjs` resolves the runtime root (repo root in dev; `resources/runtime` when packaged). `servers.cjs` orchestrates: ensure/create DB → `prisma migrate deploy` → start API → health-check → bootstrap admin → start web. `logger.cjs` tees everything to `%APPDATA%/mymeals-desktop/desktop.log`.
+- **Config** lives in `%APPDATA%/mymeals-desktop/config.json` (DB connection, `apiPort`, `webPort`, generated `jwtSecret`) — written on first run, never bundled. Delete it to force first-run setup.
+- **Setup flow** (`desktop/renderer/`): first launch shows Welcome → **New** (create DB + migrate + create admin) or **Existing** (require DB + apply pending migrations only). **Settings → Database & Ports…** (`Ctrl+S`) reopens it to reconfigure; **View Logs…** (`Ctrl+L`) opens the log viewer; **Network Address…** shows the LAN URL.
+- **Network access**: the web server binds `0.0.0.0` and reverse-proxies `/api/*` to `127.0.0.1:apiPort`, so any LAN device opens `http://<pc-ip>:webPort` through one port (no CORS, backend stays internal). The browser client uses a relative `/api` base; SSR still uses the absolute `MEALOPS_API_BASE`.
+- **Shared-code hooks (all no-ops without the desktop env vars)** — `src/lib/api.ts` prefers a runtime API base (`window.__MEALOPS_API_BASE__` client / `process.env.MEALOPS_API_BASE` SSR) over build-time `VITE_API_BASE`; `web-server.mjs` injects that client base + proxies `/api` only when `MEALOPS_API_PROXY`/`MEALOPS_API_BASE` are set; `server/src/routes/setup.ts` (the `/api/setup` bootstrap router) is mounted only when `MEALOPS_DESKTOP=1`.
+- **Build**: `cd desktop && npm run dist` → `scripts/prepare-runtime.cjs` rebuilds both apps, then electron-builder emits `desktop/release/MyMeal-Setup-${version}.exe` (NSIS) + `MyMeal-${version}-portable.exe`. The runtime (incl. `server/node_modules` with the Prisma Windows engines) ships via `extraResources` **outside asar**, so native binaries load; `server/.env` is **not** bundled. Styled-PDF reports need Chromium bundled separately (opt-in steps in the README); XLSX/pdfkit work without it.
 
 ## Gotchas
 

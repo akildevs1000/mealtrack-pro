@@ -10,7 +10,7 @@ const NODE_BIN = process.env.MEALOPS_NODE_BIN || process.execPath;
 module.exports = {
   apps: [
     {
-      name: "mealops-api",
+      name: "mymeals-api",
       cwd: "./server",
       script: "dist/index.js",
       interpreter: NODE_BIN,
@@ -21,7 +21,7 @@ module.exports = {
       restart_delay: 2000,
     },
     {
-      name: "mealops-web",
+      name: "mymeals-web",
       cwd: "./",
       // web-server.mjs is our thin Node listener around the TanStack Start SSR build at
       // dist/server/server.js. Vite emits dist/client/ (static) + dist/server/server.js

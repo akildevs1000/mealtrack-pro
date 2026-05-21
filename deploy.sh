@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# MealOps production deploy.
+# MyMeal production deploy.
 #
 # Run on the LIVE server (Ubuntu droplet), from anywhere:
 #   bash /var/www/mealtrack-pro/deploy.sh
@@ -40,7 +40,7 @@ npx prisma migrate deploy
 npm run build
 cd ..
 
-echo "==> Restarting PM2 (mealops-api + mealops-web)"
+echo "==> Restarting PM2 (mymeals-api + mymeals-web)"
 export PM2_HOME=/var/www/mealtrack-pro/.pm2
 pm2 restart all
 pm2 save || true
@@ -50,7 +50,7 @@ sleep 2
 if curl -fsS http://localhost:5044/api/health >/dev/null; then
   echo "    API healthy ✓"
 else
-  echo "    WARNING: API health check failed — inspect with: PM2_HOME=$PM2_HOME pm2 logs mealops-api"
+  echo "    WARNING: API health check failed — inspect with: PM2_HOME=$PM2_HOME pm2 logs mymeals-api"
 fi
 
 echo "==> Done. Now running $(git rev-parse --short HEAD)"

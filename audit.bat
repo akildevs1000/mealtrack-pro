@@ -1,12 +1,19 @@
 @echo off
 REM ============================================================
-REM  MealOps manual audit
+REM  MyMeal FUNCTIONAL audit  -  "does it actually work?"
+REM
+REM  Checks:
+REM    - TypeScript typecheck (frontend + backend)   <- catches real code errors
+REM    - API smoke tests (manager + device flows)    <- if the backend is running
 REM
 REM  Usage:
-REM    audit.bat          lint + typecheck (frontend + backend) + API smoke tests
+REM    audit.bat          typecheck + smoke tests
 REM    audit.bat full     also runs the production builds (slower)
 REM
-REM  To audit a DIFFERENT server (e.g. live), set env vars first:
+REM  Formatting/style is intentionally NOT checked here. Run `npm run format`
+REM  separately if you want that.
+REM
+REM  Audit a DIFFERENT server (e.g. live) by setting env vars first:
 REM    set API_BASE=http://139.59.69.241:5044/api
 REM    set ADMIN_USER=admin
 REM    set ADMIN_PASS=your-admin-password
@@ -20,12 +27,8 @@ set "AUDIT_API=%API_BASE%"
 if "%AUDIT_API%"=="" set "AUDIT_API=http://localhost:5044/api"
 
 echo ============================================================
-echo  MealOps audit   (API: %AUDIT_API%)
+echo  MyMeal functional audit   (API: %AUDIT_API%)
 echo ============================================================
-
-echo.
-echo --- Frontend lint ---
-call npm run lint || set "FAIL=1"
 
 echo.
 echo --- Frontend typecheck ---
@@ -53,7 +56,7 @@ echo --- Backend health check ---
 curl -fs -m 5 "%AUDIT_API%/health" >NUL 2>&1
 if errorlevel 1 (
   echo  Backend NOT reachable at %AUDIT_API% - skipping API smoke tests.
-  echo  Start it first:   cd server ^&^& npm run dev
+  echo  Start it first with dev.bat, then re-run audit.bat.
 ) else (
   echo  Backend healthy - running smoke tests...
   pushd server
