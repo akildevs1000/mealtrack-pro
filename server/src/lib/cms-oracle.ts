@@ -102,6 +102,15 @@ function coerceDate(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// Oracle DATE columns arrive as JS Dates in the host's local timezone (e.g.
+// Dubai-midnight = 20:00Z the previous day). These are calendar dates, so pin
+// them to UTC midnight of the local calendar day — otherwise every date
+// renders one day early once sliced to YYYY-MM-DD.
+function dateOnly(d: Date | null): Date | null {
+  if (!d) return null;
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+}
+
 function normEligibility(v: unknown): "Y" | "N" {
   const s = str(v).toUpperCase();
   return s === "Y" || s === "YES" || s === "1" || s === "TRUE" ? "Y" : "N";
@@ -180,13 +189,13 @@ export async function fetchCmsEmployees(): Promise<FetchResult> {
         laborCode,
         name: str(r.EMP_NAME),
         designation: str(r.DESIGNATION),
-        doj,
+        doj: dateOnly(doj)!,
         campCode: str(r.CAMP_CODE),
         campName: str(r.CAMP_NAME),
         mealsEligibility: normEligibility(r.MEALS_ELIGIBILITY),
         status: normStatus(r.EMP_STATUS),
-        effectiveDate: coerceDate(r.EFFECTIVE_DATE),
-        lastUpdated: coerceDate(r.LAST_UPDATED),
+        effectiveDate: dateOnly(coerceDate(r.EFFECTIVE_DATE)),
+        lastUpdated: dateOnly(coerceDate(r.LAST_UPDATED)),
       });
     }
 
