@@ -632,3 +632,44 @@ export function useDeleteMailConfig() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mail-config"] }),
   });
 }
+
+export type CmsSyncSummary = {
+  ok: boolean;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  fetched: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  stale: number;
+  error?: string;
+};
+
+export type CmsSyncStatus = {
+  configured: boolean;
+  enabled: boolean;
+  intervalMin: number;
+  running: boolean;
+  lastRun: CmsSyncSummary | null;
+};
+
+export function useCmsSyncStatus() {
+  return useQuery({
+    queryKey: ["cms-sync"],
+    queryFn: () => api<CmsSyncStatus>("/cms-sync"),
+    // Poll fast while a sync is in flight so the card updates live.
+    refetchInterval: (q) => (q.state.data?.running ? 3_000 : 60_000),
+  });
+}
+
+export function useRunCmsSync() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<CmsSyncSummary>("/cms-sync/run", { method: "POST" }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["cms-sync"] });
+      qc.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
+}

@@ -9,6 +9,7 @@ import {
 import * as XLSX from "xlsx";
 import { QRCodeSVG } from "qrcode.react";
 import { useCampScope, useSession } from "@/lib/session";
+import { CmsSyncCard } from "@/components/app/CmsSyncCard";
 import {
   useEmployees, useEmployeeMeals, useImportEmployees,
   type CmsEmployee, type MealRecord, type EmployeeImportRow,
@@ -141,6 +142,8 @@ function EmployeesPage() {
           onClose={() => setImportState(null)}
         />
       )}
+
+      <CmsSyncCard />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[240px] max-w-md">
