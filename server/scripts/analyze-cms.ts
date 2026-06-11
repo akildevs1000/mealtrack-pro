@@ -8,18 +8,23 @@
 // sync. Requires the ORACLE_CMS_* env vars in server/.env.
 
 import "dotenv/config";
-import { fetchCmsEmployees, isOracleConfigured } from "../src/lib/cms-oracle.js";
+import { connectionAttrs, fetchCmsEmployees, isOracleConfigured } from "../src/lib/cms-oracle.js";
 
 const env = process.env;
 const TABLE = env.ORACLE_CMS_TABLE || "CMS_EMPLOYEE_MASTER";
 
-function connectString(): string {
-  if (env.ORACLE_CMS_CONNECT_STRING) return env.ORACLE_CMS_CONNECT_STRING;
-  const host = env.ORACLE_CMS_HOST as string;
-  const port = Number(env.ORACLE_CMS_PORT || 1521);
-  if (env.ORACLE_CMS_SERVICE) return `${host}:${port}/${env.ORACLE_CMS_SERVICE}`;
-  const sid = env.ORACLE_CMS_SID || "hrms";
-  return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=${host})(PORT=${port}))(CONNECT_DATA=(SID=${sid})))`;
+// The customer's inter-subnet firewall intermittently stalls data fetches, so
+// every step retries a few times instead of giving up (or hanging) once.
+async function withRetry<T>(label: string, fn: () => Promise<T>, tries = 3): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      const msg = String(e?.message ?? e).split("\n")[0];
+      if (i >= tries) throw e;
+      console.log(`   (attempt ${i}/${tries} failed: ${msg} — retrying…)`);
+    }
+  }
 }
 
 function dist(values: (string | null | undefined)[]): Record<string, number> {
@@ -42,27 +47,23 @@ async function main() {
   oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
 
   console.log("→ connecting to Oracle…");
-  const conn = await oracledb.getConnection({
-    user: env.ORACLE_CMS_USER,
-    password: env.ORACLE_CMS_PASSWORD,
-    connectString: connectString(),
-  });
+  const conn = await oracledb.getConnection(connectionAttrs());
   // Any single round-trip that exceeds this errors out instead of hanging the
   // script forever (NJS-123 / DPI-1067 style timeout error).
-  conn.callTimeout = 60_000;
+  conn.callTimeout = Number(env.ORACLE_CMS_CALL_TIMEOUT_MS || 30_000);
   console.log("✓ connected\n");
 
   try {
     // 1. Row count
     console.log("→ counting rows…");
-    const cnt = await conn.execute(`SELECT COUNT(*) AS C FROM ${TABLE}`);
+    const cnt = await withRetry("count", () => conn.execute(`SELECT COUNT(*) AS C FROM ${TABLE}`));
     const total = (cnt.rows?.[0] as any)?.C;
     console.log(`=== 1. TOTAL ROWS in ${TABLE}: ${total} ===\n`);
 
     // 2. Actual columns — metadata only (WHERE 1=0 transfers zero rows, so a
     // wide table / LOB columns / slow scan can't stall us here).
     console.log("→ reading column metadata…");
-    const meta = await conn.execute(`SELECT * FROM ${TABLE} WHERE 1 = 0`);
+    const meta = await withRetry("meta", () => conn.execute(`SELECT * FROM ${TABLE} WHERE 1 = 0`));
     const colMeta: { name: string; dbTypeName?: string }[] = (meta.metaData ?? []).map(
       (m: any) => ({ name: m.name, dbTypeName: m.dbTypeName }),
     );
@@ -75,20 +76,26 @@ async function main() {
     const safeCols = colMeta.filter((c) => !LOBBY.test(c.dbTypeName ?? "")).map((c) => `"${c.name}"`);
     const skippedCols = colMeta.length - safeCols.length;
     console.log(`→ fetching 2 sample rows (${safeCols.length} cols${skippedCols ? `, ${skippedCols} LOB-type cols skipped` : ""})…`);
-    let sample: any;
     const sel = `SELECT ${safeCols.join(", ")} FROM ${TABLE}`;
-    try {
-      sample = await conn.execute(`${sel} FETCH FIRST 2 ROWS ONLY`);
-    } catch {
-      sample = await conn.execute(`SELECT * FROM (${sel}) WHERE ROWNUM <= 2`);
-    }
+    const sample: any = await withRetry("sample", async () => {
+      try {
+        return await conn.execute(`${sel} FETCH FIRST 2 ROWS ONLY`);
+      } catch (e: any) {
+        // Only fall back to ROWNUM for syntax errors (pre-12c Oracle); real
+        // network stalls should bubble to the retry wrapper.
+        if (/ORA-00933|ORA-00907/.test(String(e?.message))) {
+          return await conn.execute(`SELECT * FROM (${sel}) WHERE ROWNUM <= 2`);
+        }
+        throw e;
+      }
+    });
     console.log("=== 3. FIRST 2 RAW ROWS (as stored in Oracle) ===");
     for (const r of (sample.rows ?? []).slice(0, 2)) console.log(JSON.stringify(r), "\n");
 
     // 4. Our mapped query — does our column mapping work?
     console.log("=== 4. MAPPED FETCH (our sync's view of the data) ===");
     try {
-      const { rows, skipped } = await fetchCmsEmployees();
+      const { rows, skipped } = await withRetry("mapped fetch", () => fetchCmsEmployees());
       console.log(`✓ mapped query OK — ${rows.length} usable rows, ${skipped.length} skipped\n`);
 
       if (skipped.length) {

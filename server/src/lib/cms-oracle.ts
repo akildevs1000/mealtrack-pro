@@ -36,20 +36,34 @@ export function isOracleConfigured(): boolean {
 }
 
 /**
- * Build an Oracle Easy-Connect / descriptor connect string.
- * The access doc gives an SID ("hrms"), so we default to an SID descriptor.
- * Set ORACLE_CMS_SERVICE instead to connect by service name.
+ * Build an Oracle connect descriptor.
+ * The access doc gives an SID ("hrms"); set ORACLE_CMS_SERVICE to connect by
+ * service name instead. Always a full descriptor so we can pin a small SDU:
+ * the customer's inter-subnet firewall intermittently blackholes large
+ * packets (COUNT(*) replies arrive, row-data fetches stall), and a small
+ * session data unit keeps SQL*Net packets under the failing size.
  */
 function connectString(): string {
   if (env.ORACLE_CMS_CONNECT_STRING) return env.ORACLE_CMS_CONNECT_STRING;
 
   const host = env.ORACLE_CMS_HOST as string;
   const port = Number(env.ORACLE_CMS_PORT || 1521);
+  const sdu = Number(env.ORACLE_CMS_SDU || 1400);
   const service = env.ORACLE_CMS_SERVICE;
-  if (service) return `${host}:${port}/${service}`;
+  const connectData = service ? `(SERVICE_NAME=${service})` : `(SID=${env.ORACLE_CMS_SID || "hrms"})`;
+  return `(DESCRIPTION=(SDU=${sdu})(ADDRESS=(PROTOCOL=TCP)(HOST=${host})(PORT=${port}))(CONNECT_DATA=${connectData}))`;
+}
 
-  const sid = env.ORACLE_CMS_SID || "hrms";
-  return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=${host})(PORT=${port}))(CONNECT_DATA=(SID=${sid})))`;
+/** Shared connection attributes for every Oracle connection we open. */
+export function connectionAttrs() {
+  return {
+    user: env.ORACLE_CMS_USER,
+    password: env.ORACLE_CMS_PASSWORD,
+    connectString: connectString(),
+    // Strict firewalls drop TCP out-of-band/urgent packets, which manifests
+    // as random hangs; OOB is only used to interrupt running calls, safe off.
+    disableOOB: true,
+  };
 }
 
 const TABLE = env.ORACLE_CMS_TABLE || "CMS_EMPLOYEE_MASTER";
@@ -150,11 +164,7 @@ export async function fetchCmsEmployees(): Promise<FetchResult> {
 
   let conn: any;
   try {
-    conn = await oracledb.getConnection({
-      user: env.ORACLE_CMS_USER,
-      password: env.ORACLE_CMS_PASSWORD,
-      connectString: connectString(),
-    });
+    conn = await oracledb.getConnection(connectionAttrs());
     // Fail with a timeout error instead of hanging forever if the network or
     // DB stalls mid-fetch. Override via ORACLE_CMS_CALL_TIMEOUT_MS.
     conn.callTimeout = Number(env.ORACLE_CMS_CALL_TIMEOUT_MS || 120_000);
