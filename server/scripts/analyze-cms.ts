@@ -71,9 +71,16 @@ async function main() {
     console.log(colMeta.map((c) => `${c.name}${c.dbTypeName ? `(${c.dbTypeName})` : ""}`).join(", "), "\n");
 
     // 3. Sample rows — select only non-LOB columns explicitly; LONG/CLOB/BLOB
-    // columns are a classic cause of fetch hangs over strict firewalls.
+    // columns are a classic cause of fetch hangs over strict firewalls. Also
+    // skip columns listed in ORACLE_CMS_EXCLUDE_COLS (e.g. a view column so
+    // expensive it can't return one row — Innovo's LAST_UPDATED).
     const LOBBY = /LONG|CLOB|BLOB|BFILE|RAW|XMLTYPE/i;
-    const safeCols = colMeta.filter((c) => !LOBBY.test(c.dbTypeName ?? "")).map((c) => `"${c.name}"`);
+    const excluded = new Set(
+      (env.ORACLE_CMS_EXCLUDE_COLS || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
+    );
+    const safeCols = colMeta
+      .filter((c) => !LOBBY.test(c.dbTypeName ?? "") && !excluded.has(c.name.toUpperCase()))
+      .map((c) => `"${c.name}"`);
     const skippedCols = colMeta.length - safeCols.length;
     console.log(`→ fetching 2 sample rows (${safeCols.length} cols${skippedCols ? `, ${skippedCols} LOB-type cols skipped` : ""})…`);
     const sel = `SELECT ${safeCols.join(", ")} FROM ${TABLE}`;
