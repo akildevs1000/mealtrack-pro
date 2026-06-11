@@ -17,9 +17,11 @@ import reportsRouter from "./routes/reports.js";
 import schedulesRouter from "./routes/schedules.js";
 import ftpConfigRouter from "./routes/ftp-config.js";
 import mailConfigRouter from "./routes/mail-config.js";
+import cmsSyncRouter from "./routes/cms-sync.js";
 import setupRouter from "./routes/setup.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 import { startScheduler } from "./scheduler/worker.js";
+import { startCmsSync } from "./scheduler/cms-sync-worker.js";
 import { ensureDefaultPermissions } from "./lib/ensure-permissions.js";
 
 const app = express();
@@ -46,6 +48,7 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/schedules", schedulesRouter);
 app.use("/api/ftp-config", ftpConfigRouter);
 app.use("/api/mail-config", mailConfigRouter);
+app.use("/api/cms-sync", cmsSyncRouter);
 
 // Desktop-only first-run provisioning. Mounted exclusively when the Electron
 // launcher sets MEALOPS_DESKTOP=1, so the web deployment never exposes it.
@@ -69,4 +72,6 @@ app.listen(PORT, async () => {
   // Boot the in-process cron only after the HTTP server is up so any startup
   // crashes still surface a useful "listening on…" line first.
   startScheduler();
+  // CMS → Postgres roster sync (no-op unless Oracle is configured + enabled).
+  startCmsSync();
 });
