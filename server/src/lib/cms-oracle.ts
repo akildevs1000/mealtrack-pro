@@ -146,6 +146,9 @@ export async function fetchCmsEmployees(): Promise<FetchResult> {
       password: env.ORACLE_CMS_PASSWORD,
       connectString: connectString(),
     });
+    // Fail with a timeout error instead of hanging forever if the network or
+    // DB stalls mid-fetch. Override via ORACLE_CMS_CALL_TIMEOUT_MS.
+    conn.callTimeout = Number(env.ORACLE_CMS_CALL_TIMEOUT_MS || 120_000);
 
     const result = await conn.execute(buildQuery(), [], { maxRows: 0 });
     const raw: Record<string, unknown>[] = result.rows ?? [];

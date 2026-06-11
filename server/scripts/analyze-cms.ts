@@ -47,24 +47,41 @@ async function main() {
     password: env.ORACLE_CMS_PASSWORD,
     connectString: connectString(),
   });
+  // Any single round-trip that exceeds this errors out instead of hanging the
+  // script forever (NJS-123 / DPI-1067 style timeout error).
+  conn.callTimeout = 60_000;
   console.log("✓ connected\n");
 
   try {
     // 1. Row count
+    console.log("→ counting rows…");
     const cnt = await conn.execute(`SELECT COUNT(*) AS C FROM ${TABLE}`);
     const total = (cnt.rows?.[0] as any)?.C;
     console.log(`=== 1. TOTAL ROWS in ${TABLE}: ${total} ===\n`);
 
-    // 2. Actual columns — what the table REALLY looks like
+    // 2. Actual columns — metadata only (WHERE 1=0 transfers zero rows, so a
+    // wide table / LOB columns / slow scan can't stall us here).
+    console.log("→ reading column metadata…");
+    const meta = await conn.execute(`SELECT * FROM ${TABLE} WHERE 1 = 0`);
+    const colMeta: { name: string; dbTypeName?: string }[] = (meta.metaData ?? []).map(
+      (m: any) => ({ name: m.name, dbTypeName: m.dbTypeName }),
+    );
+    console.log(`=== 2. ACTUAL COLUMNS (${colMeta.length}) ===`);
+    console.log(colMeta.map((c) => `${c.name}${c.dbTypeName ? `(${c.dbTypeName})` : ""}`).join(", "), "\n");
+
+    // 3. Sample rows — select only non-LOB columns explicitly; LONG/CLOB/BLOB
+    // columns are a classic cause of fetch hangs over strict firewalls.
+    const LOBBY = /LONG|CLOB|BLOB|BFILE|RAW|XMLTYPE/i;
+    const safeCols = colMeta.filter((c) => !LOBBY.test(c.dbTypeName ?? "")).map((c) => `"${c.name}"`);
+    const skippedCols = colMeta.length - safeCols.length;
+    console.log(`→ fetching 2 sample rows (${safeCols.length} cols${skippedCols ? `, ${skippedCols} LOB-type cols skipped` : ""})…`);
     let sample: any;
+    const sel = `SELECT ${safeCols.join(", ")} FROM ${TABLE}`;
     try {
-      sample = await conn.execute(`SELECT * FROM ${TABLE} FETCH FIRST 5 ROWS ONLY`);
+      sample = await conn.execute(`${sel} FETCH FIRST 2 ROWS ONLY`);
     } catch {
-      sample = await conn.execute(`SELECT * FROM ${TABLE} WHERE ROWNUM <= 5`);
+      sample = await conn.execute(`SELECT * FROM (${sel}) WHERE ROWNUM <= 2`);
     }
-    const cols = (sample.metaData ?? []).map((m: any) => m.name);
-    console.log(`=== 2. ACTUAL COLUMNS (${cols.length}) ===`);
-    console.log(cols.join(", "), "\n");
     console.log("=== 3. FIRST 2 RAW ROWS (as stored in Oracle) ===");
     for (const r of (sample.rows ?? []).slice(0, 2)) console.log(JSON.stringify(r), "\n");
 
