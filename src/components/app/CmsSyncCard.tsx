@@ -55,7 +55,8 @@ export function CmsSyncCard() {
               {last.ok
                 ? `${last.fetched} fetched · ${last.created} new · ${last.updated} updated` +
                   (last.skipped ? ` · ${last.skipped} skipped` : "") +
-                  (last.stale ? ` · ${last.stale} stale` : "")
+                  (last.stale ? ` · ${last.stale} stale` : "") +
+                  (last.campsCreated ? ` · ${last.campsCreated} camps created` : "")
                 : (last.error ?? "failed")}
             </span>
           </>

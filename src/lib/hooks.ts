@@ -643,6 +643,7 @@ export type CmsSyncSummary = {
   updated: number;
   skipped: number;
   stale: number;
+  campsCreated?: number;
   error?: string;
 };
 

@@ -22,6 +22,7 @@ export interface SyncSummary {
   updated: number;
   skipped: number;
   stale: number; // present locally but absent from the CMS pull
+  campsCreated: number; // Camp records auto-created from new roster camp codes
   error?: string;
 }
 
@@ -48,6 +49,7 @@ export async function runCmsSync(): Promise<SyncSummary> {
   let fetched = 0;
   let skipped = 0;
   let stale = 0;
+  let campsCreated = 0;
   let error: string | undefined;
   let ok = false;
 
@@ -87,6 +89,31 @@ export async function runCmsSync(): Promise<SyncSummary> {
     }
 
     stale = existing.filter((e) => !seenIds.has(e.laborId)).length;
+
+    // Ensure a Camp record exists for every camp in the roster, so meal
+    // windows / scanner gating can be configured without hand-creating camps.
+    // New camps get the schema's default meal windows; existing camps only
+    // have their headcount refreshed — admin-tuned names, windows, and
+    // online state are never overwritten.
+    const byCamp = new Map<string, { name: string; count: number }>();
+    for (const r of rows) {
+      if (!r.campCode) continue;
+      const c = byCamp.get(r.campCode);
+      if (c) c.count++;
+      else byCamp.set(r.campCode, { name: r.campName || r.campCode, count: 1 });
+    }
+    const existingCamps = new Set(
+      (await prisma.camp.findMany({ select: { code: true } })).map((c) => c.code),
+    );
+    for (const [code, c] of byCamp) {
+      await prisma.camp.upsert({
+        where: { code },
+        create: { code, name: c.name, site: c.name, employees: c.count },
+        update: { employees: c.count },
+      });
+      if (!existingCamps.has(code)) campsCreated++;
+    }
+
     ok = true;
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
@@ -105,6 +132,7 @@ export async function runCmsSync(): Promise<SyncSummary> {
     updated,
     skipped,
     stale,
+    campsCreated,
     error,
   };
   return lastRun;
