@@ -245,24 +245,33 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
       return res.status(400).json({ status: "error", reason: "camp_missing" });
     }
 
+    // Resolve the employee up front so even denied results (outside meal
+    // window, etc.) can show the person's name + photo on the result card.
+    const employee = await prisma.cmsEmployee.findFirst({
+      where: { OR: [{ laborCode: code }, { laborId: Number.isFinite(Number(code)) ? Number(code) : -1 }] },
+    });
+
     const now = new Date();
     const hhmm = dubaiHHMM(now);
     const meal = forcedMeal ?? mealForTime(hhmm, camp);
     if (!meal) {
       const scan = await prisma.scan.create({
         data: {
-          name: code, labourId: code, campCode,
+          name: employee?.name ?? code,
+          labourId: employee?.laborCode ?? code,
+          campCode,
           meal: "Lunch",
           status: "Expired",
           managerId: req.scanner!.managerId,
         },
       });
-      return res.json({ status: "expired", reason: "outside_meal_window", scan: toScanApi(scan) });
+      return res.json({
+        status: "expired",
+        reason: "outside_meal_window",
+        ...(employee ? { employee: toEmployeeApi(employee, req) } : {}),
+        scan: toScanApi(scan),
+      });
     }
-
-    const employee = await prisma.cmsEmployee.findFirst({
-      where: { OR: [{ laborCode: code }, { laborId: Number.isFinite(Number(code)) ? Number(code) : -1 }] },
-    });
 
     if (!employee) {
       const scan = await prisma.scan.create({
