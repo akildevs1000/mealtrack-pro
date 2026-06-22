@@ -128,6 +128,80 @@ router.get("/me", requireScannerAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ---------- HOME DASHBOARD: STATS ----------
+// Today's counts for the logged-in manager's camp. Scoped by the scanner token
+// (campCode), so the :id the mobile client passes is ignored — the server is
+// the source of truth.
+router.get("/stats", requireScannerAuth, async (req, res, next) => {
+  try {
+    const campCode = req.scanner!.campCode;
+    const dayStart = dubaiStartOfToday(new Date());
+
+    const employees = await prisma.cmsEmployee.count({
+      where: { campCode, status: "Active", mealsEligibility: "Y" },
+    });
+
+    // Served today = distinct labourIds with an Eligible scan today in this camp.
+    const eligible = await prisma.scan.findMany({
+      where: { campCode, status: "Eligible", time: { gte: dayStart } },
+      select: { labourId: true },
+    });
+    const served_today = new Set(eligible.map((s) => s.labourId)).size;
+
+    const denied_today = await prisma.scan.count({
+      where: { campCode, status: "NotEligible", time: { gte: dayStart } },
+    });
+
+    const pending = Math.max(0, employees - served_today);
+
+    res.json({ employees, served_today, pending, denied_today });
+  } catch (e) { next(e); }
+});
+
+// ---------- HOME DASHBOARD: RECENT ACTIVITY ----------
+// Today's scans for the manager's camp, newest first, paginated. Shape matches
+// what the mobile HomeScreen renders (result / employee / meal_rule / reason).
+router.get("/logs", requireScannerAuth, async (req, res, next) => {
+  try {
+    const campCode = req.scanner!.campCode;
+    const dayStart = dubaiStartOfToday(new Date());
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+
+    const rows = await prisma.scan.findMany({
+      where: { campCode, time: { gte: dayStart } },
+      orderBy: { time: "desc" },
+      take: limit + 1,
+    });
+    const hasMore = rows.length > limit;
+    const data = rows.slice(0, limit).map(toLogApi);
+
+    res.json({ data, hasMore });
+  } catch (e) { next(e); }
+});
+
+// ---------- HOME DASHBOARD: MEAL RULES ----------
+// The manager's camp meal windows, in the {name,start_time,end_time} shape the
+// mobile client uses to highlight the active meal.
+router.get("/meal-rules", requireScannerAuth, async (req, res, next) => {
+  try {
+    const campCode = req.scanner!.campCode;
+    const camp = await prisma.camp.findUnique({
+      where: { code: campCode },
+      select: {
+        breakfastStart: true, breakfastEnd: true,
+        lunchStart: true, lunchEnd: true,
+        dinnerStart: true, dinnerEnd: true,
+      },
+    });
+    if (!camp) return res.json([]);
+    res.json([
+      { name: "Breakfast", start_time: camp.breakfastStart, end_time: camp.breakfastEnd },
+      { name: "Lunch", start_time: camp.lunchStart, end_time: camp.lunchEnd },
+      { name: "Dinner", start_time: camp.dinnerStart, end_time: camp.dinnerEnd },
+    ]);
+  } catch (e) { next(e); }
+});
+
 // ---------- DEVICE INFO BY MAC ----------
 // Public — the scanner calls this BEFORE login so the operator can confirm
 // they're binding the right device.
@@ -284,6 +358,27 @@ function toScanApi(s: any) {
     camp: s.campCode,
     meal: s.meal,
     status: s.status,
+  };
+}
+
+// Maps a Scan row to the log shape the mobile HomeScreen renders. The Scan
+// table only persists a coarse status (not the granular scan reason), so we
+// derive a reason code the app's reasonLabel() understands.
+function toLogApi(s: any) {
+  const allowed = s.status === "Eligible";
+  let reason: string | null = null;
+  if (!allowed) {
+    if (s.status === "AlreadyServed") reason = `already_${String(s.meal).toLowerCase()}`;
+    else if (s.status === "Expired") reason = "outside_meal_window";
+    else reason = "meal_ineligible";
+  }
+  return {
+    id: s.id,
+    result: allowed ? "allowed" : "denied",
+    reason,
+    employee: { name: s.name, employee_code: s.labourId, profile_picture: null },
+    meal_rule: { name: s.meal },
+    scanned_at: new Date(s.time).toISOString(),
   };
 }
 
