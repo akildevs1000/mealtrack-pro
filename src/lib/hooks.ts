@@ -197,6 +197,37 @@ export function useImportEmployees() {
   });
 }
 
+/** Fields the user may edit from the Employees page. `laborId` keys the row. */
+export type EmployeeUpdate = {
+  company: string;
+  laborId: number;
+  laborCode: string;
+  name: string;
+  designation: string;
+  doj: string; // YYYY-MM-DD
+  campCode: string;
+  campName: string;
+  mealsEligibility: "Y" | "N";
+  status: "Active" | "InActive" | "leave";
+  effectiveDate: string | null;
+};
+
+export function useUpdateEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (emp: EmployeeUpdate) =>
+      api<CmsEmployee>(`/employees/${emp.laborId}`, {
+        method: "PUT",
+        // The server stamps lastUpdated itself, but the schema requires it.
+        body: JSON.stringify({ ...emp, lastUpdated: new Date().toISOString().slice(0, 10) }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["employees"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
+    },
+  });
+}
+
 export function useEmployeeMeals(laborId: number | null, from: string, to: string) {
   return useQuery({
     queryKey: ["employee-meals", laborId, from, to],
@@ -643,6 +674,7 @@ export type CmsSyncSummary = {
   updated: number;
   skipped: number;
   stale: number;
+  staleDeactivated?: number;
   campsCreated?: number;
   error?: string;
 };

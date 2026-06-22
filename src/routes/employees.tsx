@@ -4,15 +4,15 @@ import {
   Search, Users, Building2, BadgeCheck, BadgeAlert, Briefcase, Calendar,
   IdCard, Coffee, UtensilsCrossed, Moon, Check, X,
   Upload, AlertTriangle, Loader2, Printer, User as UserIcon,
-  LayoutGrid, List, Eye,
+  LayoutGrid, List, Eye, Pencil, Save,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { QRCodeSVG } from "qrcode.react";
 import { useCampScope, useSession } from "@/lib/session";
 import { CmsSyncCard } from "@/components/app/CmsSyncCard";
 import {
-  useEmployees, useEmployeeMeals, useImportEmployees,
-  type CmsEmployee, type MealRecord, type EmployeeImportRow,
+  useEmployees, useEmployeeMeals, useImportEmployees, useUpdateEmployee,
+  type CmsEmployee, type MealRecord, type EmployeeImportRow, type EmployeeUpdate,
 } from "@/lib/hooks";
 
 export const Route = createFileRoute("/employees")({
@@ -37,6 +37,7 @@ function EmployeesPage() {
   const [campFilter, setCampFilter] = useState<string>("all");
   const [view, setView] = useState<"card" | "list">("list");
   const [selected, setSelected] = useState<CmsEmployee | null>(null);
+  const [editing, setEditing] = useState<CmsEmployee | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [importState, setImportState] = useState<
     | null
@@ -286,14 +287,26 @@ function EmployeesPage() {
                           <DurationCell doj={e.doj} effectiveDate={e.effectiveDate} />
                         </td>
                         <td className="px-4 py-2.5 text-right">
-                          <button
-                            onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
-                            className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-secondary/60 hover:bg-primary/10 hover:text-primary hover:border-primary/40 transition"
-                            title="View profile"
-                            aria-label="View profile"
-                          >
-                            <Eye className="size-4" />
-                          </button>
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
+                              className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-secondary/60 hover:bg-primary/10 hover:text-primary hover:border-primary/40 transition"
+                              title="View profile"
+                              aria-label="View profile"
+                            >
+                              <Eye className="size-4" />
+                            </button>
+                            {canImport && (
+                              <button
+                                onClick={(ev) => { ev.stopPropagation(); setEditing(e); }}
+                                className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-secondary/60 hover:bg-primary/10 hover:text-primary hover:border-primary/40 transition"
+                                title="Edit employee"
+                                aria-label="Edit employee"
+                              >
+                                <Pencil className="size-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -305,12 +318,164 @@ function EmployeesPage() {
         </div>
       )}
 
-      {selected && <ProfileDialog emp={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ProfileDialog
+          emp={selected}
+          canEdit={canImport}
+          onEdit={() => { setEditing(selected); setSelected(null); }}
+          onClose={() => setSelected(null)}
+        />
+      )}
+
+      {editing && <EditEmployeeDialog emp={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }
 
-function ProfileDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () => void }) {
+function EditEmployeeDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () => void }) {
+  const update = useUpdateEmployee();
+  const [form, setForm] = useState<EmployeeUpdate>({
+    company: emp.company,
+    laborId: emp.laborId,
+    laborCode: emp.laborCode,
+    name: emp.name,
+    designation: emp.designation,
+    doj: emp.doj.slice(0, 10),
+    campCode: emp.campCode,
+    campName: emp.campName,
+    mealsEligibility: emp.mealsEligibility,
+    status: emp.status,
+    effectiveDate: emp.effectiveDate ? emp.effectiveDate.slice(0, 10) : null,
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  function set<K extends keyof EmployeeUpdate>(key: K, value: EmployeeUpdate[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await update.mutateAsync(form);
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save employee");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur p-4 overflow-y-auto" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={onSubmit}
+        className="w-full max-w-2xl bg-card border border-border rounded-2xl shadow-elegant overflow-hidden my-4"
+      >
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-lg gradient-primary grid place-items-center text-primary-foreground">
+              <Pencil className="size-4" />
+            </div>
+            <div>
+              <div className="font-display font-semibold">Edit employee</div>
+              <div className="text-xs text-muted-foreground font-mono">{emp.laborCode} · #{emp.laborId}</div>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="size-8 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="p-6 grid sm:grid-cols-2 gap-4">
+          <Field label="Name">
+            <input value={form.name} onChange={(e) => set("name", e.target.value)} required className={inputCls} />
+          </Field>
+          <Field label="Designation">
+            <input value={form.designation} onChange={(e) => set("designation", e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Labour Code">
+            <input value={form.laborCode} onChange={(e) => set("laborCode", e.target.value)} required className={inputCls} />
+          </Field>
+          <Field label="Company">
+            <input value={form.company} onChange={(e) => set("company", e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Camp Code">
+            <input value={form.campCode} onChange={(e) => set("campCode", e.target.value)} required className={inputCls} />
+          </Field>
+          <Field label="Camp Name">
+            <input value={form.campName} onChange={(e) => set("campName", e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Date of Joining">
+            <input type="date" value={form.doj} onChange={(e) => set("doj", e.target.value)} required className={inputCls} />
+          </Field>
+          <Field label="Expiry Date">
+            <input
+              type="date"
+              value={form.effectiveDate ?? ""}
+              onChange={(e) => set("effectiveDate", e.target.value || null)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Status">
+            <select value={form.status} onChange={(e) => set("status", e.target.value as EmployeeUpdate["status"])} className={inputCls}>
+              <option value="Active">Active</option>
+              <option value="InActive">Inactive</option>
+              <option value="leave">On Leave</option>
+            </select>
+          </Field>
+          <Field label="Meals Eligibility">
+            <select value={form.mealsEligibility} onChange={(e) => set("mealsEligibility", e.target.value as "Y" | "N")} className={inputCls}>
+              <option value="Y">Yes</option>
+              <option value="N">No</option>
+            </select>
+          </Field>
+        </div>
+
+        {error && (
+          <div className="px-6 pb-2">
+            <div className="flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm">
+              <AlertTriangle className="size-4 text-destructive shrink-0 mt-0.5" />
+              <span className="text-destructive">{error}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="px-6 py-4 border-t border-border bg-secondary/30 flex items-center justify-end gap-2">
+          <button type="button" onClick={onClose} disabled={update.isPending} className="px-3 py-2 rounded-lg text-sm hover:bg-secondary disabled:opacity-50">Cancel</button>
+          <button
+            type="submit"
+            disabled={update.isPending}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow disabled:opacity-50"
+          >
+            {update.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Save changes
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+const inputCls =
+  "w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30";
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="mt-1">{children}</div>
+    </label>
+  );
+}
+
+function ProfileDialog({
+  emp, canEdit, onEdit, onClose,
+}: {
+  emp: CmsEmployee;
+  canEdit: boolean;
+  onEdit: () => void;
+  onClose: () => void;
+}) {
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur p-4 overflow-y-auto"
@@ -327,13 +492,13 @@ function ProfileDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () => void
         >
           <X className="size-4" />
         </button>
-        <Profile emp={emp} />
+        <Profile emp={emp} canEdit={canEdit} onEdit={onEdit} />
       </div>
     </div>
   );
 }
 
-function Profile({ emp }: { emp: CmsEmployee }) {
+function Profile({ emp, canEdit, onEdit }: { emp: CmsEmployee; canEdit: boolean; onEdit: () => void }) {
   const [from, setFrom] = useState(() => isoDaysAgo(13));
   const [to, setTo] = useState(() => isoDaysAgo(0));
   const [printing, setPrinting] = useState(false);
@@ -357,14 +522,26 @@ function Profile({ emp }: { emp: CmsEmployee }) {
             </div>
             <div className="text-sm text-muted-foreground mt-0.5">{emp.designation} · {emp.company}</div>
           </div>
-          <button
-            onClick={() => setPrinting(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/60 hover:bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground transition shrink-0"
-            title="Print access card"
-          >
-            <Printer className="size-3.5" />
-            Print card
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+              <button
+                onClick={onEdit}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/60 hover:bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground transition"
+                title="Edit employee"
+              >
+                <Pencil className="size-3.5" />
+                Edit
+              </button>
+            )}
+            <button
+              onClick={() => setPrinting(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/60 hover:bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground transition"
+              title="Print access card"
+            >
+              <Printer className="size-3.5" />
+              Print card
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
