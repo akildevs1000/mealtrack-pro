@@ -45,8 +45,12 @@ function campFilter(req: any, codeParam?: string): { where: any; codes: string[]
   if (scope) return { where: { code: { in: scope } }, codes: scope };
   return { where: undefined, codes: null };
 }
-function scanCampWhere(codes: string[] | null, code?: string) {
-  if (code && code !== "all") return { campCode: code };
+// Build the Scan campCode filter from the *resolved* scope codes only. Do NOT
+// trust the raw ?campCode= param here — campFilter() already validated it against
+// the caller's scope and folded it into `codes` ([] = requested an out-of-scope
+// camp → match nothing). Reading the raw param would let a scoped manager read
+// any camp's scans by flipping the query string (IDOR).
+function scanCampWhere(codes: string[] | null) {
   if (codes) return { campCode: { in: codes } };
   return {};
 }
@@ -83,7 +87,7 @@ router.get("/consumption", async (req, res, next) => {
       where: {
         time: { gte: from, lte: to },
         status: "Eligible",
-        ...scanCampWhere(codes, req.query.campCode as string),
+        ...scanCampWhere(codes),
       },
       _count: { _all: true },
     });
@@ -135,7 +139,7 @@ router.get("/scans", async (req, res, next) => {
 
     const where: any = {
       time: { gte: from, lte: to },
-      ...scanCampWhere(codes, req.query.campCode as string),
+      ...scanCampWhere(codes),
     };
     if (meal && meal !== "All") where.meal = meal;
     if (status && status !== "all") where.status = dbStatus(status);
@@ -182,7 +186,7 @@ router.get("/camps", async (req, res, next) => {
         by: ["campCode", "status"],
         where: {
           time: { gte: from, lte: to },
-          ...scanCampWhere(codes, req.query.campCode as string),
+          ...scanCampWhere(codes),
         },
         _count: { _all: true },
       }),
@@ -240,7 +244,7 @@ router.get("/wastage", async (req, res, next) => {
       where: {
         time: { gte: from, lte: to },
         status: "Eligible",
-        ...scanCampWhere(codes, req.query.campCode as string),
+        ...scanCampWhere(codes),
       },
       _count: { _all: true },
     });
