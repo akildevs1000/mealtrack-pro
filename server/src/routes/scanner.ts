@@ -148,8 +148,11 @@ router.get("/stats", requireScannerAuth, async (req, res, next) => {
     });
     const served_today = new Set(eligible.map((s) => s.labourId)).size;
 
+    // "Denied" = anything that isn't a successful serve. Matches the app's NO
+    // badge, which marks every non-Eligible scan (NotEligible + AlreadyServed +
+    // Expired) red — so the tile and the list agree.
     const denied_today = await prisma.scan.count({
-      where: { campCode, status: "NotEligible", time: { gte: dayStart } },
+      where: { campCode, status: { not: "Eligible" }, time: { gte: dayStart } },
     });
 
     const pending = Math.max(0, employees - served_today);
