@@ -106,7 +106,7 @@ function DevicesPage() {
           </p>
         </div>
         <button
-          onClick={() => { setOpen(true); setError(null); }}
+          onClick={() => { setForm(initialForm(visibleCamps[0]?.code ?? "")); setOpen(true); setError(null); }}
           className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold shadow-glow hover:opacity-95 transition"
         >
           <Plus className="size-4" /> Register Device
