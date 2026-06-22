@@ -4,7 +4,7 @@ import {
   Search, Users, Building2, BadgeCheck, BadgeAlert, Briefcase, Calendar,
   IdCard, Coffee, UtensilsCrossed, Moon, Check, X,
   Upload, AlertTriangle, Loader2, Printer, User as UserIcon,
-  LayoutGrid, List, Eye, Pencil, Save,
+  LayoutGrid, List, Eye, Pencil, Save, ImagePlus, Trash2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { QRCodeSVG } from "qrcode.react";
@@ -12,6 +12,7 @@ import { useCampScope, useSession } from "@/lib/session";
 import { CmsSyncCard } from "@/components/app/CmsSyncCard";
 import {
   useEmployees, useEmployeeMeals, useImportEmployees, useUpdateEmployee,
+  useSetEmployeePhoto, useDeleteEmployeePhoto, employeePhotoUrl,
   type CmsEmployee, type MealRecord, type EmployeeImportRow, type EmployeeUpdate,
 } from "@/lib/hooks";
 
@@ -201,9 +202,7 @@ function EmployeesPage() {
                   className="text-left rounded-2xl bg-card border border-border p-4 hover:border-primary/40 hover:shadow-elegant transition group"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="size-11 rounded-xl gradient-primary text-primary-foreground grid place-items-center text-sm font-semibold shadow-elegant shrink-0">
-                      {initials(e.name)}
-                    </div>
+                    <EmployeeAvatar emp={e} size="size-11" rounded="rounded-xl" text="text-sm" className="shadow-elegant" />
                     <StatusPill status={e.status} />
                   </div>
                   <div className="mt-3 min-w-0">
@@ -262,9 +261,7 @@ function EmployeesPage() {
                       >
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-3">
-                            <div className="size-9 rounded-full gradient-primary text-primary-foreground grid place-items-center text-xs font-semibold shrink-0">
-                              {initials(e.name)}
-                            </div>
+                            <EmployeeAvatar emp={e} size="size-9" text="text-xs" />
                             <div className="min-w-0">
                               <div className="font-medium truncate" title={e.name}>{e.name}</div>
                               <div className="text-xs text-muted-foreground tabular-nums">#{e.laborId}</div>
@@ -349,6 +346,44 @@ function EditEmployeeDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () =>
   });
   const [error, setError] = useState<string | null>(null);
 
+  // Photo is stored on disk keyed by the (stable) original laborCode, separate
+  // from the text fields above — uploads/removals take effect immediately.
+  const setPhoto = useSetEmployeePhoto();
+  const delPhoto = useDeleteEmployeePhoto();
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  // undefined = show the server photo; string = a just-uploaded preview;
+  // null = removed (show placeholder).
+  const [localPhoto, setLocalPhoto] = useState<string | null | undefined>(undefined);
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const [photoErr, setPhotoErr] = useState<string | null>(null);
+  const photoBusy = setPhoto.isPending || delPhoto.isPending;
+
+  async function onPickPhoto(file: File | null) {
+    if (!file) return;
+    setPhotoErr(null);
+    try {
+      const dataUrl = await fileToDownscaledDataUrl(file);
+      await setPhoto.mutateAsync({ laborCode: emp.laborCode, dataUrl });
+      setLocalPhoto(dataUrl);
+      setPhotoFailed(false);
+    } catch (err: unknown) {
+      setPhotoErr(err instanceof Error ? err.message : "Upload failed");
+    }
+  }
+
+  async function onRemovePhoto() {
+    setPhotoErr(null);
+    try {
+      await delPhoto.mutateAsync(emp.laborCode);
+      setLocalPhoto(null);
+    } catch (err: unknown) {
+      setPhotoErr(err instanceof Error ? err.message : "Remove failed");
+    }
+  }
+
+  const showPlaceholder = localPhoto === null || (localPhoto === undefined && photoFailed);
+  const hasPhoto = localPhoto != null || (localPhoto === undefined && !photoFailed);
+
   function set<K extends keyof EmployeeUpdate>(key: K, value: EmployeeUpdate[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -384,6 +419,61 @@ function EditEmployeeDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () =>
           <button type="button" onClick={onClose} className="size-8 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground">
             <X className="size-4" />
           </button>
+        </div>
+
+        <div className="px-6 pt-6">
+          <span className="text-xs font-medium text-muted-foreground">Profile photo</span>
+          <div className="mt-2 flex items-center gap-4">
+            <div className="size-20 rounded-2xl overflow-hidden border border-border bg-secondary grid place-items-center shrink-0">
+              {showPlaceholder ? (
+                <span className="text-lg font-semibold text-muted-foreground">{initials(emp.name)}</span>
+              ) : localPhoto ? (
+                <img src={localPhoto} alt={emp.name} className="size-full object-cover" />
+              ) : (
+                <img
+                  src={employeePhotoUrl(emp.laborCode)}
+                  alt={emp.name}
+                  onError={() => setPhotoFailed(true)}
+                  className="size-full object-cover"
+                />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  void onPickPhoto(e.target.files?.[0] ?? null);
+                  e.target.value = "";
+                }}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={photoBusy}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/60 hover:bg-secondary px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50"
+                >
+                  {photoBusy ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
+                  {hasPhoto ? "Replace" : "Upload"}
+                </button>
+                {hasPhoto && (
+                  <button
+                    type="button"
+                    onClick={onRemovePhoto}
+                    disabled={photoBusy}
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/60 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" /> Remove
+                  </button>
+                )}
+              </div>
+              <span className="text-[11px] text-muted-foreground">JPEG, PNG or WebP — auto-resized. Saved immediately.</span>
+              {photoErr && <span className="text-[11px] text-destructive">{photoErr}</span>}
+            </div>
+          </div>
         </div>
 
         <div className="p-6 grid sm:grid-cols-2 gap-4">
@@ -511,9 +601,7 @@ function Profile({ emp, canEdit, onEdit }: { emp: CmsEmployee; canEdit: boolean;
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="p-5 border-b border-border bg-gradient-to-br from-primary/5 to-transparent">
         <div className="flex items-start gap-4">
-          <div className="size-14 rounded-2xl gradient-primary text-primary-foreground grid place-items-center text-base font-semibold shadow-glow">
-            {initials(emp.name)}
-          </div>
+          <EmployeeAvatar emp={emp} size="size-14" rounded="rounded-2xl" text="text-base" className="shadow-glow" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="font-display text-lg font-bold">{emp.name}</h2>
@@ -685,7 +773,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
             boxSizing: "border-box",
           }}
         >
-          <UserIcon style={{ width: "60%", height: "60%", color: "#94a3b8" }} strokeWidth={1.25} />
+          <CardPhoto emp={employee} />
         </div>
       </div>
 
@@ -734,6 +822,23 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// Photo for the printable access card: the uploaded photo if present, else the
+// gray placeholder icon. Fills the circular frame from AccessCard.
+function CardPhoto({ emp }: { emp: CmsEmployee }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return <UserIcon style={{ width: "60%", height: "60%", color: "#94a3b8" }} strokeWidth={1.25} />;
+  }
+  return (
+    <img
+      src={employeePhotoUrl(emp.laborCode)}
+      alt={emp.name}
+      onError={() => setFailed(true)}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+    />
   );
 }
 
@@ -899,6 +1004,69 @@ function summarize(records: MealRecord[]) {
 
 function initials(name: string) {
   return name.split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+}
+
+/**
+ * Employee avatar: shows the uploaded profile photo, falling back to the
+ * gradient initials tile when there's none (the photo endpoint 404s) or it
+ * fails to load. `size`/`rounded`/`text` are Tailwind classes so callers can
+ * match each context (list row, card, profile header).
+ */
+function EmployeeAvatar({
+  emp, size, rounded = "rounded-full", text, className = "",
+}: {
+  emp: CmsEmployee;
+  size: string;
+  rounded?: string;
+  text: string;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const base = `${size} ${rounded} shrink-0 ${className}`;
+  if (failed) {
+    return (
+      <div className={`${base} gradient-primary text-primary-foreground grid place-items-center font-semibold ${text}`}>
+        {initials(emp.name)}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={employeePhotoUrl(emp.laborCode)}
+      alt={emp.name}
+      onError={() => setFailed(true)}
+      className={`${base} object-cover bg-secondary`}
+    />
+  );
+}
+
+/**
+ * Read an image File and return a downscaled JPEG data URL. Keeps uploads small
+ * (longest side ≤ max px) so they fit well under the server's byte cap.
+ */
+function fileToDownscaledDataUrl(file: File, max = 512): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Not a valid image"));
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas not supported"));
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 function isoDaysAgo(n: number) {
   const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10);

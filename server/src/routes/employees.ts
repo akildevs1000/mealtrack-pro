@@ -2,8 +2,37 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth, requireRole } from "../middleware/auth.js";
+import {
+  decodeImagePayload,
+  deletePhoto,
+  findPhotoFile,
+  safeCode,
+  writePhoto,
+} from "../lib/employee-photos.js";
 
 const router = Router();
+
+// ---- Profile photo (PUBLIC GET) --------------------------------------------
+// Served without auth so it can be used directly in <img src> on the web roster
+// / access card and in the mobile app, none of which can attach a Bearer token.
+// Photos live on disk, keyed by laborCode (see lib/employee-photos.ts) — never
+// in Oracle or the CmsEmployee table, so a CMS sync / Excel re-import can't wipe
+// them. Upload/delete (below) stay behind auth.
+const PHOTO_EXT_RE = /\.(jpe?g|png|webp)$/i;
+router.get("/photo/:file", (req, res, next) => {
+  try {
+    const code = req.params.file.replace(PHOTO_EXT_RE, "");
+    const found = findPhotoFile(code);
+    if (!found) return res.status(404).json({ error: "No photo" });
+    res.type(found.mime);
+    // `no-cache` = browsers may store but must revalidate; sendFile answers the
+    // conditional request with 304 when unchanged, so a replaced photo shows
+    // immediately while unchanged photos stay cheap.
+    res.set("Cache-Control", "no-cache");
+    res.sendFile(found.file);
+  } catch (e) { next(e); }
+});
+
 router.use(requireAuth);
 
 // List CMS employees (the labour roster)
@@ -119,6 +148,40 @@ router.put("/:laborId", requireRole("admin", "operator"), async (req, res, next)
       },
     });
     res.json(toApi(updated));
+  } catch (e) { next(e); }
+});
+
+// ---- Profile photo: upload / remove (AUTH) ---------------------------------
+const photoSchema = z.object({
+  // Either a full data URL, or a {mimeType, data} split. Clients should
+  // downscale before upload — the byte cap is enforced server-side.
+  dataUrl: z.string().optional(),
+  mimeType: z.string().optional(),
+  data: z.string().optional(),
+});
+
+router.put("/photo/:laborCode", requireRole("admin", "operator"), async (req, res, next) => {
+  try {
+    const code = safeCode(req.params.laborCode.replace(PHOTO_EXT_RE, ""));
+    if (!code) return res.status(400).json({ error: "Invalid employee code" });
+    const body = photoSchema.parse(req.body);
+    const { mime, bytes } = decodeImagePayload(body);
+    writePhoto(code, mime, bytes);
+    res.json({ ok: true, laborCode: code });
+  } catch (e) {
+    if (e instanceof Error && /image|large|unsupported|empty|invalid/i.test(e.message)) {
+      return res.status(400).json({ error: e.message });
+    }
+    next(e);
+  }
+});
+
+router.delete("/photo/:laborCode", requireRole("admin", "operator"), async (req, res, next) => {
+  try {
+    const code = safeCode(req.params.laborCode.replace(PHOTO_EXT_RE, ""));
+    if (!code) return res.status(400).json({ error: "Invalid employee code" });
+    deletePhoto(code);
+    res.status(204).end();
   } catch (e) { next(e); }
 });
 

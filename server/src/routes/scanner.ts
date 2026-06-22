@@ -1,9 +1,11 @@
 import { Router } from "express";
+import type { Request } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { signScannerToken, verifyPin } from "../lib/auth.js";
 import { requireScannerAuth } from "../middleware/auth.js";
 import { dubaiHHMM, dubaiStartOfToday, formatDubaiTime } from "../lib/time.js";
+import { photoUrl } from "../lib/employee-photos.js";
 
 const router = Router();
 
@@ -176,7 +178,7 @@ router.get("/logs", requireScannerAuth, async (req, res, next) => {
       take: limit + 1,
     });
     const hasMore = rows.length > limit;
-    const data = rows.slice(0, limit).map(toLogApi);
+    const data = rows.slice(0, limit).map((s) => toLogApi(s, req));
 
     res.json({ data, hasMore });
   } catch (e) { next(e); }
@@ -284,7 +286,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
       return res.json({
         status: "not_eligible",
         reason: employee.status !== "Active" ? "employee_inactive" : "meal_ineligible",
-        employee: toEmployeeApi(employee),
+        employee: toEmployeeApi(employee, req),
         scan: toScanApi(scan),
       });
     }
@@ -305,7 +307,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
       return res.json({
         status: "already_served",
         reason: `already_${meal.toLowerCase()}`,
-        employee: toEmployeeApi(employee),
+        employee: toEmployeeApi(employee, req),
         scan: toScanApi(scan),
       });
     }
@@ -330,7 +332,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
 
     res.json({
       status: "eligible",
-      employee: toEmployeeApi(employee),
+      employee: toEmployeeApi(employee, req),
       meal,
       time: timeStr,
       scan: toScanApi(scan),
@@ -367,7 +369,7 @@ function toScanApi(s: any) {
 // Maps a Scan row to the log shape the mobile HomeScreen renders. The Scan
 // table only persists a coarse status (not the granular scan reason), so we
 // derive a reason code the app's reasonLabel() understands.
-function toLogApi(s: any) {
+function toLogApi(s: any, req: Request) {
   const allowed = s.status === "Eligible";
   let reason: string | null = null;
   if (!allowed) {
@@ -379,13 +381,14 @@ function toLogApi(s: any) {
     id: s.id,
     result: allowed ? "allowed" : "denied",
     reason,
-    employee: { name: s.name, employee_code: s.labourId, profile_picture: null },
+    // Scan.labourId holds the laborCode, which keys the on-disk photo.
+    employee: { name: s.name, employee_code: s.labourId, profile_picture: photoUrl(req, s.labourId) },
     meal_rule: { name: s.meal },
     scanned_at: new Date(s.time).toISOString(),
   };
 }
 
-function toEmployeeApi(e: any) {
+function toEmployeeApi(e: any, req: Request) {
   return {
     id: e.id,
     laborId: e.laborId,
@@ -395,6 +398,8 @@ function toEmployeeApi(e: any) {
     company: e.company,
     campCode: e.campCode,
     campName: e.campName,
+    profile_picture: photoUrl(req, e.laborCode),
+    profilePicture: photoUrl(req, e.laborCode),
   };
 }
 

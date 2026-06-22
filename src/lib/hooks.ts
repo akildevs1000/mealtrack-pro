@@ -2,7 +2,7 @@
  * React Query hooks for all backend resources.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "./api";
+import { api, API_BASE } from "./api";
 
 export type Role = "admin" | "operator" | "user" | "manager";
 export type UserStatus = "Active" | "Inactive";
@@ -225,6 +225,38 @@ export function useUpdateEmployee() {
       qc.invalidateQueries({ queryKey: ["employees"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
     },
+  });
+}
+
+/**
+ * Public URL of an employee's profile photo (served from disk by the backend,
+ * keyed on laborCode). Usable directly in `<img src>`. Returns 404 when no
+ * photo is uploaded — render with an onError fallback to initials.
+ */
+export function employeePhotoUrl(laborCode: string): string {
+  return `${API_BASE}/employees/photo/${encodeURIComponent(laborCode)}`;
+}
+
+/** Upload/replace an employee's profile photo. `dataUrl` is a base64 data URL. */
+export function useSetEmployeePhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ laborCode, dataUrl }: { laborCode: string; dataUrl: string }) =>
+      api<{ ok: boolean }>(`/employees/photo/${encodeURIComponent(laborCode)}`, {
+        method: "PUT",
+        body: JSON.stringify({ dataUrl }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
+  });
+}
+
+/** Remove an employee's profile photo. */
+export function useDeleteEmployeePhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (laborCode: string) =>
+      api<void>(`/employees/photo/${encodeURIComponent(laborCode)}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
   });
 }
 

@@ -4,5 +4,8 @@ dist/
 .env.local
 *.log
 
+# Uploaded employee profile photos — runtime data, persists across deploys.
+uploads/
+
 # Synced from frontend by scripts/sync-ssr.ts (predev/prebuild). Do not edit.
 src/ssr/
