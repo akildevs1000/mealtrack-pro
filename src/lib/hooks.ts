@@ -47,6 +47,9 @@ export type CmsEmployee = {
   status: "Active" | "InActive" | "leave";
   effectiveDate: string | null;
   lastUpdated: string;
+  /** True when a profile photo is stored on disk (false for un-photographed,
+   *  Oracle-synced rows). Lets the UI skip the <img> + 404 fallback. */
+  hasPhoto: boolean;
 };
 
 export type MealRecord = {
@@ -714,6 +717,7 @@ export type CmsSyncSummary = {
 export type CmsSyncStatus = {
   configured: boolean;
   enabled: boolean;
+  intervalSec?: number;
   intervalMin: number;
   running: boolean;
   lastRun: CmsSyncSummary | null;

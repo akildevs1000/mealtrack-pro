@@ -381,8 +381,11 @@ function EditEmployeeDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () =>
     }
   }
 
-  const showPlaceholder = localPhoto === null || (localPhoto === undefined && photoFailed);
-  const hasPhoto = localPhoto != null || (localPhoto === undefined && !photoFailed);
+  // localPhoto: undefined = use server state; string = just-uploaded preview;
+  // null = removed. Fall back to emp.hasPhoto for the initial server state so we
+  // don't probe (and 404) for employees that have no photo.
+  const serverHasPhoto = localPhoto === undefined && emp.hasPhoto && !photoFailed;
+  const hasPhotoNow = typeof localPhoto === "string" || serverHasPhoto;
 
   function set<K extends keyof EmployeeUpdate>(key: K, value: EmployeeUpdate[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -425,17 +428,17 @@ function EditEmployeeDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () =>
           <span className="text-xs font-medium text-muted-foreground">Profile photo</span>
           <div className="mt-2 flex items-center gap-4">
             <div className="size-20 rounded-2xl overflow-hidden border border-border bg-secondary grid place-items-center shrink-0">
-              {showPlaceholder ? (
-                <span className="text-lg font-semibold text-muted-foreground">{initials(emp.name)}</span>
-              ) : localPhoto ? (
+              {typeof localPhoto === "string" ? (
                 <img src={localPhoto} alt={emp.name} className="size-full object-cover" />
-              ) : (
+              ) : serverHasPhoto ? (
                 <img
                   src={employeePhotoUrl(emp.laborCode)}
                   alt={emp.name}
                   onError={() => setPhotoFailed(true)}
                   className="size-full object-cover"
                 />
+              ) : (
+                <span className="text-lg font-semibold text-muted-foreground">{initials(emp.name)}</span>
               )}
             </div>
             <div className="flex flex-col gap-2">
@@ -457,9 +460,9 @@ function EditEmployeeDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () =>
                   className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/60 hover:bg-secondary px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50"
                 >
                   {photoBusy ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
-                  {hasPhoto ? "Replace" : "Upload"}
+                  {hasPhotoNow ? "Replace" : "Upload"}
                 </button>
-                {hasPhoto && (
+                {hasPhotoNow && (
                   <button
                     type="button"
                     onClick={onRemovePhoto}
@@ -829,7 +832,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
 // gray placeholder icon. Fills the circular frame from AccessCard.
 function CardPhoto({ emp }: { emp: CmsEmployee }) {
   const [failed, setFailed] = useState(false);
-  if (failed) {
+  if (!emp.hasPhoto || failed) {
     return <UserIcon style={{ width: "60%", height: "60%", color: "#94a3b8" }} strokeWidth={1.25} />;
   }
   return (
@@ -1023,7 +1026,10 @@ function EmployeeAvatar({
 }) {
   const [failed, setFailed] = useState(false);
   const base = `${size} ${rounded} shrink-0 ${className}`;
-  if (failed) {
+  // Skip the network round-trip entirely for employees with no stored photo
+  // (every Oracle-synced row until one is uploaded) — fall straight back to
+  // the initials tile, exactly as before photos existed.
+  if (!emp.hasPhoto || failed) {
     return (
       <div className={`${base} gradient-primary text-primary-foreground grid place-items-center font-semibold ${text}`}>
         {initials(emp.name)}

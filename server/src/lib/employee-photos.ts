@@ -49,6 +49,31 @@ function ensureDir() {
   fs.mkdirSync(PHOTO_DIR, { recursive: true });
 }
 
+/** True if any photo file is stored for this code. */
+export function hasPhoto(code: string): boolean {
+  return findPhotoFile(code) !== null;
+}
+
+/**
+ * Set of laborCodes that have a stored photo, built from a single directory
+ * read. Use this to flag a whole roster cheaply instead of stat-ing per row.
+ * Returns an empty set when nothing has been uploaded yet.
+ */
+export function photoCodeSet(): Set<string> {
+  const set = new Set<string>();
+  let names: string[];
+  try {
+    names = fs.readdirSync(PHOTO_DIR);
+  } catch {
+    return set; // dir doesn't exist yet → no photos
+  }
+  for (const n of names) {
+    const code = n.replace(/\.(jpe?g|png|webp)$/i, "");
+    if (code !== n) set.add(code); // only count recognised image files
+  }
+  return set;
+}
+
 /** Locate the stored photo file for a code, if any. */
 export function findPhotoFile(code: string): { file: string; mime: string } | null {
   const safe = safeCode(code);

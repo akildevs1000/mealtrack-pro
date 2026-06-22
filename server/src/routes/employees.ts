@@ -6,6 +6,8 @@ import {
   decodeImagePayload,
   deletePhoto,
   findPhotoFile,
+  hasPhoto,
+  photoCodeSet,
   safeCode,
   writePhoto,
 } from "../lib/employee-photos.js";
@@ -60,7 +62,11 @@ router.get("/", async (req, res, next) => {
       where,
       orderBy: { laborCode: "asc" },
     });
-    res.json(rows.map(toApi));
+    // Flag photo-bearing rows from a single directory read so the client can
+    // skip loading <img> (and the 404 fallback) for the many photo-less,
+    // Oracle-synced employees.
+    const withPhoto = photoCodeSet();
+    res.json(rows.map((r) => toApi(r, withPhoto.has(r.laborCode))));
   } catch (e) { next(e); }
 });
 
@@ -69,7 +75,7 @@ router.get("/:laborId", async (req, res, next) => {
     const id = Number(req.params.laborId);
     const emp = await prisma.cmsEmployee.findUnique({ where: { laborId: id } });
     if (!emp) return res.status(404).json({ error: "Employee not found" });
-    res.json(toApi(emp));
+    res.json(toApi(emp, hasPhoto(emp.laborCode)));
   } catch (e) { next(e); }
 });
 
@@ -93,7 +99,7 @@ router.get("/:laborId/meals", async (req, res, next) => {
     });
 
     res.json({
-      employee: toApi(emp),
+      employee: toApi(emp, hasPhoto(emp.laborCode)),
       records: records.map((r) => ({
         date: r.date.toISOString().slice(0, 10),
         breakfast: { taken: r.breakfastTaken, time: r.breakfastTime },
@@ -147,7 +153,7 @@ router.put("/:laborId", requireRole("admin", "operator"), async (req, res, next)
         lastUpdated: new Date(body.lastUpdated),
       },
     });
-    res.json(toApi(updated));
+    res.json(toApi(updated, hasPhoto(updated.laborCode)));
   } catch (e) { next(e); }
 });
 
@@ -258,7 +264,7 @@ router.post("/import", requireRole("admin", "operator"), async (req, res, next) 
   } catch (e) { next(e); }
 });
 
-function toApi(e: any) {
+function toApi(e: any, withPhoto = false) {
   return {
     id: e.id,
     company: e.company,
@@ -273,6 +279,10 @@ function toApi(e: any) {
     status: e.status,
     effectiveDate: e.effectiveDate ? e.effectiveDate.toISOString().slice(0, 10) : null,
     lastUpdated: e.lastUpdated.toISOString().slice(0, 10),
+    // Whether a profile photo is stored on disk for this employee (false for
+    // every freshly Oracle-synced row until one is uploaded). The client uses
+    // this to decide whether to render <img> or fall straight back to initials.
+    hasPhoto: withPhoto,
   };
 }
 
