@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { KpiCard } from "@/components/app/KpiCard";
-import { Building2, Users, Utensils, Target, AlertTriangle, Smartphone, TrendingUp, Activity, Coffee, Sun, Moon, CalendarDays, Clock, Download, ChevronRight } from "lucide-react";
+import { Building2, Users, Utensils, Target, AlertTriangle, Smartphone, TrendingUp, Activity, Coffee, Sun, Moon, CalendarDays, Clock, ChevronRight } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 import { useCampScope } from "@/lib/session";
@@ -114,10 +114,6 @@ function Overview() {
           <div className="h-9 px-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold inline-flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Lunch active
           </div>
-          <button className="h-9 px-4 rounded-lg gradient-primary text-primary-foreground text-xs font-semibold shadow-elegant inline-flex items-center gap-2">
-            <Download className="size-3.5" />
-            Export report
-          </button>
         </div>
       </div>
 
