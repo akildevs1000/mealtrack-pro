@@ -15,10 +15,15 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/", (_req, res) => {
+  // Effective interval in seconds: CMS_SYNC_INTERVAL_SEC wins, else minutes×60.
+  const intervalSec = process.env.CMS_SYNC_INTERVAL_SEC
+    ? Number(process.env.CMS_SYNC_INTERVAL_SEC)
+    : Number(process.env.CMS_SYNC_INTERVAL_MIN || 60) * 60;
   res.json({
     configured: isOracleConfigured(),
     enabled: process.env.CMS_SYNC_ENABLED === "1",
-    intervalMin: Number(process.env.CMS_SYNC_INTERVAL_MIN || 60),
+    intervalSec,
+    intervalMin: Math.round((intervalSec / 60) * 100) / 100, // back-compat
     running: isSyncRunning(),
     lastRun: getLastSync(),
   });

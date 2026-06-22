@@ -6,9 +6,17 @@
 import { isOracleConfigured } from "../lib/cms-oracle.js";
 import { runCmsSync } from "../lib/cms-sync.js";
 
-// Default: hourly. Override with CMS_SYNC_INTERVAL_MIN.
-const intervalMin = Number(process.env.CMS_SYNC_INTERVAL_MIN || 60);
-const TICK_MS = Math.max(1, intervalMin) * 60_000;
+// Interval: default hourly. CMS_SYNC_INTERVAL_SEC (seconds) takes precedence
+// over CMS_SYNC_INTERVAL_MIN (minutes) when set — lets the interval go
+// sub-minute. The overlap guard means if a run is still going when the next
+// tick fires, the tick is skipped, so a too-short interval degrades to
+// "back-to-back" rather than piling up. Floor of 5s as a sanity stop.
+const intervalSec = process.env.CMS_SYNC_INTERVAL_SEC
+  ? Number(process.env.CMS_SYNC_INTERVAL_SEC)
+  : Number(process.env.CMS_SYNC_INTERVAL_MIN || 60) * 60;
+const TICK_MS = Math.max(5, intervalSec) * 1000;
+const intervalLabel =
+  TICK_MS >= 60_000 ? `${TICK_MS / 60_000} min` : `${TICK_MS / 1000} sec`;
 
 let timer: NodeJS.Timeout | null = null;
 let running = false;
@@ -41,7 +49,7 @@ export function startCmsSync() {
     console.log("[cms-sync] enabled but Oracle is not configured — skipping start");
     return;
   }
-  console.log(`[cms-sync] starting, syncing every ${intervalMin} min`);
+  console.log(`[cms-sync] starting, syncing every ${intervalLabel}`);
   // Fire once on boot so a restart picks up roster changes promptly.
   tick();
   timer = setInterval(tick, TICK_MS);
