@@ -717,7 +717,6 @@ export type CmsSyncSummary = {
 export type CmsSyncStatus = {
   configured: boolean;
   enabled: boolean;
-  intervalSec?: number;
   intervalMin: number;
   running: boolean;
   lastRun: CmsSyncSummary | null;
