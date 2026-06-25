@@ -25,6 +25,16 @@ const camps = [
     breakfastStart: "05:45", breakfastEnd: "08:45", lunchStart: "12:15", lunchEnd: "14:15", dinnerStart: "18:45", dinnerEnd: "21:45" },
 ];
 
+const companies = [
+  // INNOVOBLD matches the `company` field on every seeded CMS employee below.
+  { code: "INNOVOBLD", name: "Innovo Building Contracting", contact: "Ahmed Khan", email: "ops@innovo.ae", phone: "+971 4 123 4567", employees: 32, active: true },
+  { code: "ALFUTTAIM", name: "Al Futtaim Construction", contact: "Rashid Al Mansoori", email: "hr@alfuttaim-c.ae", phone: "+971 4 222 1100", employees: 1840, active: true },
+  { code: "ARABTEC", name: "Arabtec Holding", contact: "Samir Haddad", email: "contact@arabtec.ae", phone: "+971 4 333 9000", employees: 2750, active: true },
+  { code: "DUTCOBALFR", name: "Dutco Balfour Beatty", contact: "John Pereira", email: "info@dutcobb.ae", phone: "+971 4 444 7788", employees: 1120, active: true },
+  { code: "KHANSAHEB", name: "Khansaheb Civil Engineering", contact: "Imran Sheikh", email: "careers@khansaheb.ae", phone: "+971 4 555 6677", employees: 960, active: false },
+  { code: "GINCON", name: "Ginco General Contracting", contact: "Fatima Al Zahra", email: "admin@ginco.ae", phone: "+971 2 666 5544", employees: 1430, active: true },
+];
+
 const cmsEmployees = [
   { company: "INNOVOBLD", laborId: 57175, laborCode: "INVOW00001", name: "INNOVO EMPLOYEE 1", designation: "STEEL FITTER", doj: "2021-07-07", campCode: "CAMP 19", campName: "Al Quoz Rent Camp- 02", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2026-01-01" },
   { company: "INNOVOBLD", laborId: 57180, laborCode: "INVOW00002", name: "INNOVO EMPLOYEE 2", designation: "HELPER", doj: "2021-07-12", campCode: "CAMP 04", campName: "M-2", mealsEligibility: "Y", status: "InActive", effectiveDate: "2025-08-01", lastUpdated: "2024-10-01" },
@@ -124,6 +134,16 @@ async function main() {
     });
   }
   console.log(`[seed] camps: ${camps.length}`);
+
+  // Companies
+  for (const co of companies) {
+    await prisma.company.upsert({
+      where: { code: co.code },
+      create: co,
+      update: co,
+    });
+  }
+  console.log(`[seed] companies: ${companies.length}`);
 
   // CMS employees
   for (const e of cmsEmployees) {

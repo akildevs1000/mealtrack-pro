@@ -33,6 +33,17 @@ export type Camp = {
   };
 };
 
+export type Company = {
+  id: string;
+  code: string;
+  name: string;
+  contact: string;
+  email: string;
+  phone: string;
+  employees: number;
+  active: boolean;
+};
+
 export type CmsEmployee = {
   id: string;
   company: string;
@@ -150,6 +161,32 @@ export function useDeleteCamp() {
   return useMutation({
     mutationFn: (code: string) => api<void>(`/camps/${code}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["camps"] }),
+  });
+}
+
+// Companies
+export function useCompanies() {
+  return useQuery({ queryKey: ["companies"], queryFn: () => api<Company[]>("/companies") });
+}
+
+export function useUpsertCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { existingCode?: string } & Omit<Company, "id">) => {
+      const { existingCode, ...body } = input;
+      return existingCode
+        ? api<Company>(`/companies/${existingCode}`, { method: "PUT", body: JSON.stringify(body) })
+        : api<Company>(`/companies`, { method: "POST", body: JSON.stringify(body) });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
+  });
+}
+
+export function useDeleteCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api<void>(`/companies/${code}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
   });
 }
 

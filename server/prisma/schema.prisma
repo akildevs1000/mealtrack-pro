@@ -122,6 +122,21 @@ model Camp {
   updatedAt DateTime @updatedAt
 }
 
+// Contractor / employer companies. Standalone directory (no FK joins yet).
+model Company {
+  id        String   @id @default(cuid())
+  code      String   @unique // e.g. "INNOVO"
+  name      String
+  contact   String   @default("") // primary contact person
+  email     String   @default("")
+  phone     String   @default("")
+  employees Int      @default(0)
+  active    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // CMS employee roster (different camp coding scheme: "CAMP 19")
 model CmsEmployee {
   id              String             @id @default(cuid())

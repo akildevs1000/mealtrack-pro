@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Users, BuildingIcon, Smartphone, FileBarChart, CalendarRange,
+  LayoutDashboard, Users, BuildingIcon, Building2, Smartphone, FileBarChart, CalendarRange,
   Bell, Settings, UtensilsCrossed, Moon, Sun, Search, KeyRound, ShieldCheck,
   LogOut, Loader2, CalendarClock,
 } from "lucide-react";
@@ -10,6 +10,7 @@ import { Login } from "@/components/app/Login";
 
 const nav: { to: string; label: string; icon: typeof LayoutDashboard; key: TabKey }[] = [
   { to: "/overview", label: "Overview", icon: LayoutDashboard, key: "overview" },
+  { to: "/companies", label: "Companies", icon: Building2, key: "companies" },
   { to: "/camps", label: "Camps", icon: BuildingIcon, key: "camps" },
   { to: "/employees", label: "Employees", icon: Users, key: "employees" },
   { to: "/managers", label: "Camp Managers", icon: KeyRound, key: "managers" },

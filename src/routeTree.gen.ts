@@ -19,6 +19,7 @@ import { Route as ForecastRouteImport } from './routes/forecast'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as DrilldownRouteImport } from './routes/drilldown'
 import { Route as DevicesRouteImport } from './routes/devices'
+import { Route as CompaniesRouteImport } from './routes/companies'
 import { Route as CampsRouteImport } from './routes/camps'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
@@ -73,6 +74,11 @@ const DevicesRoute = DevicesRouteImport.update({
   path: '/devices',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompaniesRoute = CompaniesRouteImport.update({
+  id: '/companies',
+  path: '/companies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CampsRoute = CampsRouteImport.update({
   id: '/camps',
   path: '/camps',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/camps': typeof CampsRoute
+  '/companies': typeof CompaniesRoute
   '/devices': typeof DevicesRoute
   '/drilldown': typeof DrilldownRoute
   '/employees': typeof EmployeesRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/camps': typeof CampsRoute
+  '/companies': typeof CompaniesRoute
   '/devices': typeof DevicesRoute
   '/drilldown': typeof DrilldownRoute
   '/employees': typeof EmployeesRoute
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/camps': typeof CampsRoute
+  '/companies': typeof CompaniesRoute
   '/devices': typeof DevicesRoute
   '/drilldown': typeof DrilldownRoute
   '/employees': typeof EmployeesRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/camps'
+    | '/companies'
     | '/devices'
     | '/drilldown'
     | '/employees'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/camps'
+    | '/companies'
     | '/devices'
     | '/drilldown'
     | '/employees'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/camps'
+    | '/companies'
     | '/devices'
     | '/drilldown'
     | '/employees'
@@ -187,6 +199,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
   CampsRoute: typeof CampsRoute
+  CompaniesRoute: typeof CompaniesRoute
   DevicesRoute: typeof DevicesRoute
   DrilldownRoute: typeof DrilldownRoute
   EmployeesRoute: typeof EmployeesRoute
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevicesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/companies': {
+      id: '/companies'
+      path: '/companies'
+      fullPath: '/companies'
+      preLoaderRoute: typeof CompaniesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/camps': {
       id: '/camps'
       path: '/camps'
@@ -299,6 +319,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
   CampsRoute: CampsRoute,
+  CompaniesRoute: CompaniesRoute,
   DevicesRoute: DevicesRoute,
   DrilldownRoute: DrilldownRoute,
   EmployeesRoute: EmployeesRoute,
