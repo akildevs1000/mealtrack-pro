@@ -6,6 +6,7 @@ import {
   useProjects,
   useManagers,
   useCreateFoodEstimation,
+  useFoodEstimations,
   type Camp,
 } from "@/lib/hooks";
 import { KpiCard } from "@/components/app/KpiCard";
@@ -20,7 +21,6 @@ import {
   CalendarDays,
   RotateCcw,
   Save,
-  Pencil,
   ClipboardList,
   CheckCircle2,
   Plus,
@@ -319,9 +319,6 @@ function Forecast() {
             <span className="text-xs text-muted-foreground">{rows.length} day(s)</span>
           </>
         )}
-        <div className="ml-auto text-xs text-muted-foreground inline-flex items-center gap-1">
-          <Pencil className="size-3" /> Click any cell to edit
-        </div>
       </div>
 
       {/* KPIs */}
@@ -424,91 +421,8 @@ function Forecast() {
         </div>
       </div>
 
-      {/* Editable table */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-card">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-          <div>
-            <h2 className="font-display text-lg font-semibold">
-              {mode === "weekday" ? "Weekday forecast" : "Daily forecast"} — {camp.code}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {mode === "weekday"
-                ? "Edit baseline demand per weekday — applies to every matching day in the range view."
-                : "Edit demand for each specific date — overrides the weekday template."}
-            </p>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="text-left px-6 py-3 font-medium">
-                  {mode === "weekday" ? "Weekday" : "Date"}
-                </th>
-                <th className="text-right px-4 py-3 font-medium">Breakfast</th>
-                <th className="text-right px-4 py-3 font-medium">Lunch</th>
-                <th className="text-right px-4 py-3 font-medium">Dinner</th>
-                <th className="text-right px-6 py-3 font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const total = r.breakfast + r.lunch + r.dinner;
-                const isSunday = mode === "weekday" ? r.key === "Sun" : r.sub === "Sun";
-                return (
-                  <tr
-                    key={r.key}
-                    className={`border-t border-border transition-colors ${isSunday ? "bg-amber-500/10 hover:bg-amber-500/15" : "hover:bg-muted/30"}`}
-                  >
-                    <td className="px-6 py-2.5">
-                      <div
-                        className={`font-medium inline-flex items-center gap-2 ${isSunday ? "text-amber-600 dark:text-amber-400" : ""}`}
-                      >
-                        {r.label}
-                        {isSunday && (
-                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-semibold">
-                            Sun
-                          </span>
-                        )}
-                      </div>
-                      {r.sub && <div className="text-xs text-muted-foreground">{r.sub}</div>}
-                    </td>
-                    <NumCell
-                      value={r.breakfast}
-                      onChange={(v) => updateRow(r.key, "breakfast", v)}
-                    />
-                    <NumCell value={r.lunch} onChange={(v) => updateRow(r.key, "lunch", v)} />
-                    <NumCell value={r.dinner} onChange={(v) => updateRow(r.key, "dinner", v)} />
-                    <td className="px-6 py-2.5 text-right tabular-nums font-semibold">
-                      {total.toLocaleString()}
-                    </td>
-                  </tr>
-                );
-              })}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
-                    Pick a valid date range.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            {rows.length > 0 && (
-              <tfoot className="bg-secondary/40 text-sm font-semibold">
-                <tr className="border-t border-border">
-                  <td className="px-6 py-3">Totals</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{totals.b.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{totals.l.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {totals.dn.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-3 text-right tabular-nums">{grand.toLocaleString()}</td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
+      {/* Saved food estimation entries */}
+      <FoodEstimationList companyCode={company === "all" ? undefined : company} />
     </div>
   );
 }
@@ -843,5 +757,114 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</span>
       {children}
     </label>
+  );
+}
+
+// Paginated list of saved food-estimation entries. Resolves the stored codes
+// (company / supplier / project / camp) to display names.
+function FoodEstimationList({ companyCode }: { companyCode?: string }) {
+  const { data: rows = [] } = useFoodEstimations(companyCode ? { companyCode } : undefined);
+  const { data: companies = [] } = useCompanies();
+  const { data: projects = [] } = useProjects();
+  const { data: camps = [] } = useCamps();
+  const { data: suppliers = [] } = useManagers();
+  const [page, setPage] = useState(0);
+  const pageSize = 10;
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const cur = Math.min(page, pageCount - 1);
+  const slice = rows.slice(cur * pageSize, cur * pageSize + pageSize);
+
+  const companyName = (code: string) => companies.find((c) => c.code === code)?.name ?? code;
+  const projectName = (code: string | null) =>
+    code ? (projects.find((p) => p.code === code)?.name ?? code) : "—";
+  const campName = (code: string | null) =>
+    code ? (camps.find((c) => c.code === code)?.name ?? code) : "—";
+  const supplierName = (id: string | null) =>
+    id ? (suppliers.find((s) => s.id === id)?.name ?? "—") : "—";
+
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-card">
+      <div className="px-6 py-4 border-b border-border">
+        <h2 className="font-display text-lg font-semibold">Food Estimation Entries</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Saved meal-headcount estimations{companyCode ? ` for ${companyName(companyCode)}` : ""}.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="text-left px-6 py-3 font-medium">Date</th>
+              <th className="text-left px-4 py-3 font-medium">Company</th>
+              <th className="text-left px-4 py-3 font-medium">Supplier</th>
+              <th className="text-left px-4 py-3 font-medium">Project</th>
+              <th className="text-left px-4 py-3 font-medium">Camp</th>
+              <th className="text-right px-4 py-3 font-medium">Breakfast</th>
+              <th className="text-right px-4 py-3 font-medium">Lunch</th>
+              <th className="text-right px-4 py-3 font-medium">Dinner</th>
+              <th className="text-right px-6 py-3 font-medium">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {slice.map((r) => {
+              const total = r.breakfast + r.lunch + r.dinner;
+              return (
+                <tr key={r.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-6 py-2.5 whitespace-nowrap">
+                    {new Date(r.date).toLocaleDateString(undefined, {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="px-4 py-2.5">{companyName(r.companyCode)}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{supplierName(r.supplierId)}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{projectName(r.projectCode)}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{campName(r.campCode)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{r.breakfast.toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{r.lunch.toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{r.dinner.toLocaleString()}</td>
+                  <td className="px-6 py-2.5 text-right tabular-nums font-semibold">{total.toLocaleString()}</td>
+                </tr>
+              );
+            })}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground">
+                  No food estimations recorded yet. Use “New Food Estimation” above to add one.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > pageSize && (
+        <div className="flex items-center justify-between px-6 py-3 border-t border-border text-xs text-muted-foreground">
+          <span>
+            Showing {cur * pageSize + 1}–{Math.min((cur + 1) * pageSize, rows.length)} of {rows.length}
+          </span>
+          <div className="inline-flex items-center gap-2">
+            <button
+              onClick={() => setPage(cur - 1)}
+              disabled={cur === 0}
+              className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <span className="font-medium text-foreground">
+              Page {cur + 1} / {pageCount}
+            </span>
+            <button
+              onClick={() => setPage(cur + 1)}
+              disabled={cur >= pageCount - 1}
+              className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
