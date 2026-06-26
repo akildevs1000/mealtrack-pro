@@ -645,6 +645,62 @@ export function useReportEmployees(p: { campCode?: string; companyCode?: string;
   });
 }
 
+// ---------------- Integrated Reports Suite (5 components) ----------------
+export type DailyDistRow = {
+  company: string; employeeId: string; name: string;
+  breakfast: string; lunch: string; dinner: string;
+};
+export function useReportDailyDistribution(p: { date: string; companyCode?: string; campCode?: string }) {
+  return useQuery({
+    queryKey: ["reports", "daily-distribution", p],
+    queryFn: () => api<{ date: string; rows: DailyDistRow[] }>(`/reports/daily-distribution${reportQs(p)}`),
+  });
+}
+
+type MealTriple = { breakfast: number; lunch: number; dinner: number };
+export type BySupplierData = {
+  camps: { code: string; name: string }[];
+  rows: { date: string; perCamp: Record<string, MealTriple>; totals: MealTriple; avgPerDay: number }[];
+};
+export function useReportBySupplier(p: { from: string; to: string; companyCode?: string; campCode?: string; supplierId?: string }) {
+  return useQuery({
+    queryKey: ["reports", "by-supplier", p],
+    queryFn: () => api<BySupplierData>(`/reports/by-supplier${reportQs(p)}`),
+  });
+}
+
+export type ByLocationRow = { date: string } & MealTriple;
+export function useReportByLocation(p: { from: string; to: string; companyCode?: string; campCode?: string }) {
+  return useQuery({
+    queryKey: ["reports", "by-location", p],
+    queryFn: () => api<{ rows: ByLocationRow[] }>(`/reports/by-location${reportQs(p)}`),
+  });
+}
+
+export type ComparisonRow = {
+  date: string; supplier: string; site: string; meal: string;
+  requestedYesterday: number | null; requestedToday: number;
+  variance: number | null; pctChange: number | null;
+};
+export function useReportRequestComparison(p: { from: string; to: string; companyCode?: string; supplierId?: string }) {
+  return useQuery({
+    queryKey: ["reports", "request-comparison", p],
+    queryFn: () => api<{ rows: ComparisonRow[] }>(`/reports/request-comparison${reportQs(p)}`),
+  });
+}
+
+export type DuplicateRow = {
+  workerId: string; actualLocation: string; scanLocation: string;
+  status: string; severity: "duplicate" | "ineligible"; reason: string;
+  meal: string; date: string; time: string;
+};
+export function useReportDuplicateEligibility(p: { from: string; to: string; companyCode?: string; campCode?: string }) {
+  return useQuery({
+    queryKey: ["reports", "duplicate-eligibility", p],
+    queryFn: () => api<{ from: string; to: string; rows: DuplicateRow[] }>(`/reports/duplicate-eligibility${reportQs(p)}`),
+  });
+}
+
 // Overview / dashboard. Pass a camp code to narrow to one camp and/or a company
 // code to narrow to that parent company's camps (Camp is a sibling of Company).
 export function useOverview(campCode?: string | null, companyCode?: string | null) {

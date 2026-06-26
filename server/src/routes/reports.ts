@@ -358,6 +358,278 @@ router.get("/employees", async (req, res, next) => {
   }
 });
 
+// ===================================================================
+// Integrated Reports Architecture Suite — 5 report components.
+// All follow the parent-Company filter rule (companyCode resolves to the
+// company's camps; supplier/camp/project are sibling filters).
+// ===================================================================
+
+function parseDay(s: unknown): { from: Date; to: Date; iso: string } {
+  const iso =
+    typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : new Date().toISOString().slice(0, 10);
+  return {
+    from: new Date(`${iso}T00:00:00.000Z`),
+    to: new Date(`${iso}T23:59:59.999Z`),
+    iso,
+  };
+}
+
+const MEAL_KEYS = ["Breakfast", "Lunch", "Dinner"] as const;
+function emptyMeals() {
+  return { breakfast: 0, lunch: 0, dinner: 0 };
+}
+function addMeal(acc: { breakfast: number; lunch: number; dinner: number }, meal: string) {
+  if (meal === "Breakfast") acc.breakfast++;
+  else if (meal === "Lunch") acc.lunch++;
+  else if (meal === "Dinner") acc.dinner++;
+}
+
+// ---------------- Report 1: Daily distribution (per employee, by date) ----------------
+router.get("/daily-distribution", async (req, res, next) => {
+  try {
+    const { from, to, iso } = parseDay(req.query.date);
+    const { codes } = await scopeForReports(
+      req,
+      req.query.campCode as string,
+      req.query.companyCode as string,
+    );
+    const scans = await prisma.scan.findMany({
+      where: { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) },
+      orderBy: { time: "asc" },
+    });
+    // One row per worker who was served that day; meal cell = the camp/location.
+    const byLabour = new Map<string, { name: string; meals: Record<string, string> }>();
+    for (const s of scans) {
+      const e = byLabour.get(s.labourId) ?? { name: s.name, meals: {} };
+      e.meals[s.meal] = s.campCode;
+      byLabour.set(s.labourId, e);
+    }
+    const ids = [...byLabour.keys()];
+    const emps = await prisma.cmsEmployee.findMany({ where: { laborCode: { in: ids } } });
+    const empByCode = new Map(emps.map((e) => [e.laborCode, e]));
+    const rows = ids.map((id) => {
+      const e = byLabour.get(id)!;
+      const emp = empByCode.get(id);
+      return {
+        company: emp?.company ?? "",
+        employeeId: id,
+        name: emp?.name ?? e.name,
+        breakfast: e.meals["Breakfast"] ?? "",
+        lunch: e.meals["Lunch"] ?? "",
+        dinner: e.meals["Dinner"] ?? "",
+      };
+    });
+    res.json({ date: iso, rows });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------- Report 2: Distribution point meal by supplier (pivot) ----------------
+router.get("/by-supplier", async (req, res, next) => {
+  try {
+    const from = parseFrom(req.query.from);
+    const to = parseTo(req.query.to);
+    const { where: campWhere, codes } = await scopeForReports(
+      req,
+      req.query.campCode as string,
+      req.query.companyCode as string,
+    );
+    const camps = await prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } });
+    const supplierId = req.query.supplierId as string | undefined;
+    const scanWhere: any = { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) };
+    if (supplierId && supplierId !== "all") scanWhere.managerId = supplierId;
+    const scans = await prisma.scan.findMany({
+      where: scanWhere,
+      select: { time: true, campCode: true, meal: true },
+    });
+    const byDate = new Map<string, Map<string, { breakfast: number; lunch: number; dinner: number }>>();
+    for (const s of scans) {
+      const day = s.time.toISOString().slice(0, 10);
+      const m = byDate.get(day) ?? new Map();
+      const cell = m.get(s.campCode) ?? emptyMeals();
+      addMeal(cell, s.meal);
+      m.set(s.campCode, cell);
+      byDate.set(day, m);
+    }
+    const rows = [...byDate.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, m]) => {
+        const perCamp: Record<string, { breakfast: number; lunch: number; dinner: number }> = {};
+        const totals = emptyMeals();
+        for (const c of camps) {
+          const cell = m.get(c.code) ?? emptyMeals();
+          perCamp[c.code] = cell;
+          totals.breakfast += cell.breakfast;
+          totals.lunch += cell.lunch;
+          totals.dinner += cell.dinner;
+        }
+        const grand = totals.breakfast + totals.lunch + totals.dinner;
+        return { date, perCamp, totals, avgPerDay: Math.round(grand / 3) };
+      });
+    res.json({ camps: camps.map((c) => ({ code: c.code, name: c.name })), rows });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------- Report 3: Meal distribution by location (single camp, daily) ----------------
+router.get("/by-location", async (req, res, next) => {
+  try {
+    const from = parseFrom(req.query.from);
+    const to = parseTo(req.query.to);
+    const { codes } = await scopeForReports(
+      req,
+      req.query.campCode as string,
+      req.query.companyCode as string,
+    );
+    const scans = await prisma.scan.findMany({
+      where: { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) },
+      select: { time: true, meal: true },
+    });
+    const byDate = new Map<string, { breakfast: number; lunch: number; dinner: number }>();
+    for (const s of scans) {
+      const day = s.time.toISOString().slice(0, 10);
+      const cell = byDate.get(day) ?? emptyMeals();
+      addMeal(cell, s.meal);
+      byDate.set(day, cell);
+    }
+    const rows = [...byDate.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
+    res.json({ rows });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------- Report 4: Request comparison (Food Estimation day-over-day) ----------------
+router.get("/request-comparison", async (req, res, next) => {
+  try {
+    const from = parseFrom(req.query.from);
+    const to = parseTo(req.query.to);
+    const companyCode =
+      typeof req.query.companyCode === "string" && req.query.companyCode !== "all"
+        ? req.query.companyCode
+        : undefined;
+    const supplierId = req.query.supplierId as string | undefined;
+    const where: any = { date: { gte: from, lte: to } };
+    if (companyCode) where.companyCode = companyCode;
+    if (supplierId && supplierId !== "all") where.supplierId = supplierId;
+    const ests = await prisma.foodEstimation.findMany({ where, orderBy: { date: "asc" } });
+
+    const suppliers = await prisma.campManager.findMany({ select: { id: true, name: true } });
+    const supplierName = new Map(suppliers.map((s) => [s.id, s.name]));
+
+    // Flatten into (date, supplier, camp, meal) → requested, then compare to the
+    // previous calendar day for the same supplier+camp+meal.
+    type Key = string;
+    const k = (d: string, sup: string, camp: string, meal: string): Key => `${sup}|${camp}|${meal}|${d}`;
+    const requested = new Map<Key, number>();
+    const meta = new Map<Key, { date: string; supplierId: string; campCode: string; meal: string }>();
+    for (const e of ests) {
+      const d = e.date.toISOString().slice(0, 10);
+      const sup = e.supplierId ?? "";
+      const camp = e.campCode ?? "";
+      const cells: [string, number][] = [
+        ["Breakfast", e.breakfast],
+        ["Lunch", e.lunch],
+        ["Dinner", e.dinner],
+      ];
+      for (const [meal, qty] of cells) {
+        if (qty <= 0) continue;
+        const key = k(d, sup, camp, meal);
+        requested.set(key, (requested.get(key) ?? 0) + qty);
+        meta.set(key, { date: d, supplierId: sup, campCode: camp, meal });
+      }
+    }
+    const prevDay = (iso: string) => {
+      const d = new Date(`${iso}T00:00:00.000Z`);
+      d.setUTCDate(d.getUTCDate() - 1);
+      return d.toISOString().slice(0, 10);
+    };
+    const rows = [...meta.entries()]
+      .sort((a, b) => a[1].date.localeCompare(b[1].date))
+      .map(([key, m]) => {
+        const today = requested.get(key) ?? 0;
+        const yKey = k(prevDay(m.date), m.supplierId, m.campCode, m.meal);
+        const yesterday = requested.get(yKey);
+        const variance = yesterday === undefined ? null : today - yesterday;
+        const pct =
+          yesterday === undefined || yesterday === 0
+            ? null
+            : Math.round(((today - yesterday) / yesterday) * 100);
+        return {
+          date: m.date,
+          supplier: supplierName.get(m.supplierId) ?? "—",
+          site: m.campCode || "—",
+          meal: m.meal,
+          requestedYesterday: yesterday ?? null,
+          requestedToday: today,
+          variance,
+          pctChange: pct,
+        };
+      });
+    res.json({ rows });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------- Report 5: Duplicate / Eligibility ----------------
+router.get("/duplicate-eligibility", async (req, res, next) => {
+  try {
+    const from = parseFrom(req.query.from);
+    const to = parseTo(req.query.to);
+    const { codes } = await scopeForReports(
+      req,
+      req.query.campCode as string,
+      req.query.companyCode as string,
+    );
+    const scans = await prisma.scan.findMany({
+      where: {
+        time: { gte: from, lte: to },
+        status: { in: ["AlreadyServed", "NotEligible", "WrongCamp", "Expired"] },
+        ...scanCampWhere(codes),
+      },
+      orderBy: { time: "desc" },
+      take: 500,
+    });
+    const ids = [...new Set(scans.map((s) => s.labourId))];
+    const emps = await prisma.cmsEmployee.findMany({
+      where: { laborCode: { in: ids } },
+      select: { laborCode: true, campCode: true },
+    });
+    const empCamp = new Map(emps.map((e) => [e.laborCode, e.campCode]));
+    const reasonFor = (status: string, meal: string) =>
+      status === "AlreadyServed"
+        ? `Already scanned for ${meal}`
+        : status === "NotEligible"
+          ? "Not eligible — plan / HR record"
+          : status === "WrongCamp"
+            ? "Scanned at non-assigned camp"
+            : "Labour card expired";
+    const rows = scans.map((s) => ({
+      workerId: s.labourId,
+      actualLocation: empCamp.get(s.labourId) ?? "—",
+      scanLocation: s.campCode,
+      status: uiStatus(s.status),
+      severity: s.status === "AlreadyServed" ? "duplicate" : "ineligible",
+      reason: reasonFor(s.status, s.meal),
+      meal: s.meal,
+      date: s.time.toISOString().slice(0, 10),
+      time: s.time.toISOString().slice(11, 19),
+    }));
+    res.json({
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      rows,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ---------------- /reports/push-ftp ----------------
 // Uploads one or more report files to an FTP server using credentials supplied
 // in the request. The client encodes each file as base64 to keep the payload as
