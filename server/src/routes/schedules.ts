@@ -14,7 +14,6 @@ router.use(requireAuth);
 const p = prisma as any;
 
 const reportType = z.enum([
-  "consumption", "employee", "scans", "camp", "wastage",
   "dailyTransaction", "bySupplier", "byLocation", "requestComparison", "duplicateEligibility",
 ]);
 const format = z.enum(["pdf", "excel", "both"]);

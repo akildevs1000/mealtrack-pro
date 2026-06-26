@@ -591,18 +591,12 @@ export function useScans(limit = 50) {
 // can import them without dragging in this hooks module's React Query deps.
 export type {
   ReportConsumptionRow,
-  ReportCampRow,
-  ReportWastageRow,
   ReportScanRow,
-  ReportEmployeeRow,
 } from "@/components/app/report-preview-types";
 
 import type {
   ReportConsumptionRow,
-  ReportCampRow,
-  ReportWastageRow,
   ReportScanRow,
-  ReportEmployeeRow,
 } from "@/components/app/report-preview-types";
 
 type ReportRange<T> = { from: string; to: string; days: number; rows: T[] };
@@ -622,18 +616,6 @@ export function useReportConsumption(p: { from: string; to: string; campCode?: s
     queryFn: () => api<ReportRange<ReportConsumptionRow>>(`/reports/consumption${reportQs(p)}`),
   });
 }
-export function useReportCamps(p: { from: string; to: string; campCode?: string; companyCode?: string }) {
-  return useQuery({
-    queryKey: ["reports", "camps", p],
-    queryFn: () => api<ReportRange<ReportCampRow>>(`/reports/camps${reportQs(p)}`),
-  });
-}
-export function useReportWastage(p: { from: string; to: string; campCode?: string; companyCode?: string }) {
-  return useQuery({
-    queryKey: ["reports", "wastage", p],
-    queryFn: () => api<ReportRange<ReportWastageRow>>(`/reports/wastage${reportQs(p)}`),
-  });
-}
 export function useReportScans(p: {
   from: string; to: string; campCode?: string; companyCode?: string; meal?: string; status?: string; q?: string;
 }) {
@@ -642,13 +624,6 @@ export function useReportScans(p: {
     queryFn: () => api<ReportScanRow[]>(`/reports/scans${reportQs(p)}`),
   });
 }
-export function useReportEmployees(p: { campCode?: string; companyCode?: string; status?: string; q?: string }) {
-  return useQuery({
-    queryKey: ["reports", "employees", p],
-    queryFn: () => api<ReportEmployeeRow[]>(`/reports/employees${reportQs(p)}`),
-  });
-}
-
 // ---------------- Integrated Reports Suite (5 components) ----------------
 export type DailyDistRow = {
   company: string; employeeId: string; name: string;
@@ -721,7 +696,6 @@ export function useOverview(campCode?: string | null, companyCode?: string | nul
 // ---------------- Scheduled reports + FTP config ----------------
 
 export type ScheduleReportType =
-  | "consumption" | "employee" | "scans" | "camp" | "wastage"
   | "dailyTransaction" | "bySupplier" | "byLocation" | "requestComparison" | "duplicateEligibility";
 export type ScheduleFormat = "pdf" | "excel" | "both";
 export type ScheduleFrequency = "daily" | "weekly" | "monthly";

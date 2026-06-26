@@ -1,28 +1,28 @@
-// Report-data fetchers shared by the scheduler and the manual /reports endpoints.
-// Two output shapes are exposed:
-//   - fetchReportData → flat {title, columns, rows} for the XLSX builder and the
-//     plain PDFKit fallback.
-//   - fetchTypedReportData → the typed ReportData ReportPreview expects, used
-//     by the styled-PDF (Puppeteer) path.
+// Report-data fetchers used by the scheduler and the /reports endpoints.
+// All output is the flat {title, columns, rows} shape consumed by the XLSX
+// builder and the PDFKit builder (report-files.ts). The legacy styled-PDF
+// (Puppeteer + ReportPreview) path has been removed.
 
 import { prisma } from "./prisma.js";
 import type { ReportData as FlatReportData } from "./report-files.js";
-import type {
-  ReportData as TypedReportData,
-  ReportConsumptionRow,
-  ReportCampRow,
-  ReportWastageRow,
-  ReportScanRow,
-  ReportEmployeeRow,
-} from "../ssr/report-preview-types.js";
 
-export type { TypedReportData };
 // Local alias kept for callers that already use this name.
 export type ReportData = FlatReportData;
 export type ReportType = "consumption" | "employee" | "scans" | "camp" | "wastage";
 
-// Map a CmsEmployee row to the shared ReportEmployeeRow used by the on-screen
-// report, the styled PDF and the XLSX export. The CMS roster tracks a single
+export type ReportEmployeeRow = {
+  labourId: string;
+  name: string;
+  camp: string;
+  company: string;
+  designation: string;
+  status: "Active" | "Inactive" | "Leave";
+  breakfast: boolean;
+  lunch: boolean;
+  dinner: boolean;
+};
+
+// Map a CmsEmployee row to a ReportEmployeeRow. The CMS roster tracks a single
 // meals-eligibility flag (Y/N) rather than per-meal flags, so breakfast/lunch/
 // dinner all reflect that flag.
 function mapCmsStatus(s: string): ReportEmployeeRow["status"] {
@@ -74,7 +74,7 @@ export async function fetchReportData(
   window: { from: Date; to: Date },
 ): Promise<ReportData> {
   const { from, to } = window;
-  const subtitle = `Period: ${fmtDate(from)} → ${fmtDate(to)}`;
+  const subtitle = `Period: ${fmtDate(from)} â†’ ${fmtDate(to)}`;
 
   if (type === "consumption") {
     const camps = await prisma.camp.findMany({ orderBy: { code: "asc" } });
@@ -209,7 +209,7 @@ export async function fetchReportData(
     };
   }
 
-  // employee — the real CMS labour roster (CmsEmployee), not a synthetic set.
+  // employee â€” the real CMS labour roster (CmsEmployee), not a synthetic set.
   const employees = await prisma.cmsEmployee.findMany({ orderBy: { laborCode: "asc" } });
   const rows: (string | number)[][] = employees.map((e) => {
     const r = cmsEmployeeToReportRow(e);
@@ -243,245 +243,8 @@ export async function fetchReportData(
   };
 }
 
-// Typed variant used by the styled-PDF (Puppeteer) renderer. Matches the row
-// shapes ReportPreview expects, parallel to the /api/reports/* responses.
-//
-// Filters are optional so the scheduler can call this without one. The
-// /reports/render-pdf endpoint forwards the request filters so the printed PDF
-// matches the on-screen preview exactly.
-export type TypedReportFilters = {
-  campCodes?: string[] | null; // null = unrestricted; restrict to these codes if set
-  company?: string; // parent Company code; filters camps (camp reports) / company field (employee)
-  meal?: string; // "All" | "Breakfast" | "Lunch" | "Dinner"
-  status?: string; // "all" | "Eligible" | "Already Served" | ...
-  q?: string; // search query (name / labour id)
-};
-
-function dbStatus(s: string) {
-  return s === "Already Served"
-    ? "AlreadyServed"
-    : s === "Not Eligible"
-      ? "NotEligible"
-      : s === "Wrong Camp"
-        ? "WrongCamp"
-        : s;
-}
-
-function campWhere(filters: TypedReportFilters | undefined) {
-  if (filters?.campCodes && filters.campCodes.length > 0) {
-    return { code: { in: filters.campCodes } };
-  }
-  return undefined;
-}
-function scanCampWhere(filters: TypedReportFilters | undefined) {
-  if (filters?.campCodes && filters.campCodes.length > 0) {
-    return { campCode: { in: filters.campCodes } };
-  }
-  return {};
-}
-
-export async function fetchTypedReportData(
-  type: ReportType,
-  window: { from: Date; to: Date },
-  filters: TypedReportFilters = {},
-): Promise<TypedReportData> {
-  const { from, to } = window;
-  const days = dayCount(from, to);
-
-  // Parent-company filter: for camp-based reports, resolve the company's camps
-  // (Camp.companyCode) and fold them into campCodes so every camp/scan query
-  // narrows to that company. The employee branch filters on its own `company`
-  // field below, so we skip it there.
-  if (filters.company && type !== "employee") {
-    const cc = await prisma.camp.findMany({
-      where: { companyCode: filters.company },
-      select: { code: true },
-    });
-    const companyCamps = cc.map((c) => c.code);
-    const campCodes =
-      filters.campCodes && filters.campCodes.length > 0
-        ? filters.campCodes.filter((c) => companyCamps.includes(c))
-        : companyCamps;
-    filters = { ...filters, campCodes };
-  }
-
-  if (type === "consumption") {
-    const camps = await prisma.camp.findMany({
-      where: campWhere(filters),
-      orderBy: { code: "asc" },
-    });
-    const groups = await prisma.scan.groupBy({
-      by: ["campCode", "meal"],
-      where: { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(filters) },
-      _count: { _all: true },
-    });
-    const rows: ReportConsumptionRow[] = camps.map((c) => {
-      const get = (m: string) =>
-        groups.find((g) => g.campCode === c.code && g.meal === m)?._count._all ?? 0;
-      const breakfast = get("Breakfast");
-      const lunch = get("Lunch");
-      const dinner = get("Dinner");
-      const served = breakfast + lunch + dinner;
-      const estimated = Math.round(c.employees * days * 0.85);
-      return {
-        code: c.code,
-        name: c.name,
-        site: c.site,
-        employees: c.employees,
-        breakfast,
-        lunch,
-        dinner,
-        served,
-        estimated,
-        variance: served - estimated,
-      };
-    });
-    return { kind: "consumption", rows };
-  }
-
-  if (type === "camp") {
-    const [camps, scanGroups, devices] = await Promise.all([
-      prisma.camp.findMany({ where: campWhere(filters), orderBy: { code: "asc" } }),
-      prisma.scan.groupBy({
-        by: ["campCode", "status"],
-        where: { time: { gte: from, lte: to }, ...scanCampWhere(filters) },
-        _count: { _all: true },
-      }),
-      prisma.device.findMany({
-        where:
-          filters.campCodes && filters.campCodes.length > 0
-            ? { campCode: { in: filters.campCodes } }
-            : undefined,
-      }),
-    ]);
-    const rows: ReportCampRow[] = camps.map((c) => {
-      const served =
-        scanGroups.find((g) => g.campCode === c.code && g.status === "Eligible")?._count._all ?? 0;
-      const duplicates =
-        scanGroups.find((g) => g.campCode === c.code && g.status === "AlreadyServed")?._count
-          ._all ?? 0;
-      const estimated = Math.round(c.employees * days * 0.85);
-      const dev = devices.filter((d) => d.campCode === c.code);
-      return {
-        code: c.code,
-        name: c.name,
-        site: c.site,
-        employees: c.employees,
-        served,
-        estimated,
-        coverage: estimated > 0 ? Math.round((served / estimated) * 100) : 0,
-        balance: Math.max(0, estimated - served),
-        duplicates,
-        online: c.online,
-        devicesOnline: dev.filter((d) => d.online).length,
-        devicesTotal: dev.length,
-      };
-    });
-    return { kind: "camp", rows };
-  }
-
-  if (type === "wastage") {
-    const camps = await prisma.camp.findMany({
-      where: campWhere(filters),
-      orderBy: { code: "asc" },
-    });
-    const served = await prisma.scan.groupBy({
-      by: ["campCode"],
-      where: { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(filters) },
-      _count: { _all: true },
-    });
-    const rows: ReportWastageRow[] = camps.map((c) => {
-      const s = served.find((g) => g.campCode === c.code)?._count._all ?? 0;
-      const estimated = Math.round(c.employees * days * 0.85);
-      const wastage = Math.max(0, estimated - s);
-      const pct = estimated > 0 ? (wastage / estimated) * 100 : 0;
-      const status: ReportWastageRow["status"] =
-        pct <= 5 ? "healthy" : pct <= 10 ? "watch" : "critical";
-      return {
-        code: c.code,
-        name: c.name,
-        site: c.site,
-        estimated,
-        served: s,
-        wastage,
-        pct,
-        status,
-      };
-    });
-    return { kind: "wastage", rows };
-  }
-
-  if (type === "scans") {
-    const where: Record<string, unknown> = {
-      time: { gte: from, lte: to },
-      ...scanCampWhere(filters),
-    };
-    if (filters.meal && filters.meal !== "All") where.meal = filters.meal;
-    if (filters.status && filters.status !== "all") {
-      where.status = dbStatus(filters.status);
-    }
-    if (filters.q) {
-      where.OR = [
-        { name: { contains: filters.q, mode: "insensitive" } },
-        { labourId: { contains: filters.q, mode: "insensitive" } },
-      ];
-    }
-    const raw = await prisma.scan.findMany({
-      where,
-      orderBy: { time: "desc" },
-      take: 1000,
-    });
-    const rows: ReportScanRow[] = raw.map((s) => ({
-      id: s.id,
-      date: s.time.toISOString().slice(0, 10),
-      time: s.time.toISOString().slice(11, 19),
-      name: s.name,
-      labourId: s.labourId,
-      camp: s.campCode,
-      meal: s.meal as ReportScanRow["meal"],
-      status: (s.status === "AlreadyServed"
-        ? "Already Served"
-        : s.status === "NotEligible"
-          ? "Not Eligible"
-          : s.status === "WrongCamp"
-            ? "Wrong Camp"
-            : s.status) as ReportScanRow["status"],
-    }));
-    return { kind: "scans", rows };
-  }
-
-  // employee — the real CMS labour roster (CmsEmployee). Note the CMS roster
-  // uses its own camp-coding scheme ("CAMP 19"), which does not join to the
-  // dashboard Camp.code scheme ("AD-01"); filtering by a dashboard camp code
-  // therefore returns no rows, mirroring the Employees page.
-  const empWhere: Record<string, unknown> = {};
-  if (filters.campCodes && filters.campCodes.length > 0) {
-    empWhere.campCode = { in: filters.campCodes };
-  }
-  if (filters.company) empWhere.company = filters.company;
-  const employees = await prisma.cmsEmployee.findMany({
-    where: empWhere,
-    orderBy: { laborCode: "asc" },
-  });
-  const qLower = filters.q?.toLowerCase();
-  const erows: ReportEmployeeRow[] = [];
-  for (const e of employees) {
-    const row = cmsEmployeeToReportRow(e);
-    if (filters.status && filters.status !== "all" && row.status !== filters.status) continue;
-    if (
-      qLower &&
-      !row.name.toLowerCase().includes(qLower) &&
-      !row.labourId.toLowerCase().includes(qLower)
-    ) {
-      continue;
-    }
-    erows.push(row);
-  }
-  return { kind: "employee", rows: erows };
-}
-
 // ===================================================================
-// Integrated Reports Suite — flat builders for the scheduler (Automation).
+// Integrated Reports Suite â€” flat builders for the scheduler (Automation).
 // These mirror the on-screen /reports tables and feed buildPdfBuffer (PDFKit)
 // + buildXlsxBuffer, so scheduled email/FTP delivery works without Puppeteer.
 // ===================================================================
@@ -513,7 +276,7 @@ export async function fetchSuiteReportFlat(
   window: { from: Date; to: Date },
 ): Promise<ReportData> {
   const { from, to } = window;
-  const subtitle = `Period: ${fmtDate(from)} → ${fmtDate(to)}`;
+  const subtitle = `Period: ${fmtDate(from)} â†’ ${fmtDate(to)}`;
   const title = SUITE_LABELS[type];
 
   if (type === "byLocation") {
@@ -555,7 +318,7 @@ export async function fetchSuiteReportFlat(
     }
     const rows = [...byKey.values()]
       .sort((a, b) => a.date.localeCompare(b.date) || a.code.localeCompare(b.code))
-      .map((r) => [r.date, `${r.code} — ${nameByCode.get(r.code) ?? ""}`, r.b, r.l, r.d, r.b + r.l + r.d]);
+      .map((r) => [r.date, `${r.code} â€” ${nameByCode.get(r.code) ?? ""}`, r.b, r.l, r.d, r.b + r.l + r.d]);
     return { title, subtitle, columns: ["Date", "Distribution Point", "Breakfast", "Lunch", "Dinner", "Total"], rows };
   }
 
@@ -571,10 +334,10 @@ export async function fetchSuiteReportFlat(
     const stat = (s: string) =>
       s === "AlreadyServed" ? "Duplicate Scan" : s === "NotEligible" ? "Not Eligible" : s === "WrongCamp" ? "Wrong Camp" : s;
     const reason = (s: string, m: string) =>
-      s === "AlreadyServed" ? `Already scanned for ${m}` : s === "NotEligible" ? "Not eligible — plan / HR record" : s === "WrongCamp" ? "Scanned at non-assigned camp" : "Labour card expired";
+      s === "AlreadyServed" ? `Already scanned for ${m}` : s === "NotEligible" ? "Not eligible â€” plan / HR record" : s === "WrongCamp" ? "Scanned at non-assigned camp" : "Labour card expired";
     const rows = scans.map((s) => [
       s.labourId,
-      empCamp.get(s.labourId) ?? "—",
+      empCamp.get(s.labourId) ?? "â€”",
       s.campCode,
       stat(s.status),
       reason(s.status, s.meal),
@@ -613,14 +376,14 @@ export async function fetchSuiteReportFlat(
       .map(([key, m]) => {
         const today = requested.get(key) ?? 0;
         const y = requested.get(k(prev(m.date), m.sup, m.camp, m.meal));
-        const variance = y === undefined ? "—" : today - y;
-        const pct = y === undefined || y === 0 ? "—" : `${Math.round(((today - y) / y) * 100)}%`;
-        return [m.date, supName.get(m.sup) ?? "—", m.camp || "—", m.meal, y ?? "—", today, variance, pct];
+        const variance = y === undefined ? "â€”" : today - y;
+        const pct = y === undefined || y === 0 ? "â€”" : `${Math.round(((today - y) / y) * 100)}%`;
+        return [m.date, supName.get(m.sup) ?? "â€”", m.camp || "â€”", m.meal, y ?? "â€”", today, variance, pct];
       });
     return { title, subtitle, columns: ["Date", "Supplier", "Site", "Meal", "Req. Yesterday", "Req. Today", "Variance", "% Change"], rows };
   }
 
-  // dailyTransaction — one row per worker; meal cell = the camp/location.
+  // dailyTransaction â€” one row per worker; meal cell = the camp/location.
   const scans = await prisma.scan.findMany({
     where: { time: { gte: from, lte: to }, status: "Eligible" },
     orderBy: { time: "asc" },
@@ -637,7 +400,7 @@ export async function fetchSuiteReportFlat(
   const rows = ids.map((id) => {
     const e = byLabour.get(id)!;
     const emp = empByCode.get(id);
-    return [emp?.company ?? "", id, emp?.name ?? e.name, e.meals["Breakfast"] ?? "—", e.meals["Lunch"] ?? "—", e.meals["Dinner"] ?? "—"];
+    return [emp?.company ?? "", id, emp?.name ?? e.name, e.meals["Breakfast"] ?? "â€”", e.meals["Lunch"] ?? "â€”", e.meals["Dinner"] ?? "â€”"];
   });
   return { title, subtitle, columns: ["Company", "Employee ID", "Employee Name", "Breakfast", "Lunch", "Dinner"], rows };
 }

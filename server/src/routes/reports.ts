@@ -3,12 +3,7 @@ import { Readable } from "node:stream";
 import { Client as FtpClient } from "basic-ftp";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth } from "../middleware/auth.js";
-import {
-  fetchTypedReportData,
-  cmsEmployeeToReportRow,
-  type ReportType,
-} from "../lib/report-data.js";
-import { buildStyledPdfBuffer } from "../lib/report-pdf-styled.js";
+import { cmsEmployeeToReportRow } from "../lib/report-data.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -722,84 +717,6 @@ router.post("/push-ftp", json({ limit: "25mb" }), async (req, res, next) => {
     // dialog can show the actual reason (auth, network, path not creatable…).
     const msg = e instanceof Error ? e.message : "FTP upload failed";
     res.status(502).json({ error: msg });
-  }
-});
-
-// ---------------- /reports/render-pdf ----------------
-// Renders the same styled PDF the scheduler uses, but on demand for the
-// /reports page's Download PDF button. Filters mirror the GET data endpoints.
-
-const REPORT_TYPES: ReportType[] = ["consumption", "employee", "scans", "camp", "wastage"];
-
-router.get("/render-pdf", async (req, res, next) => {
-  try {
-    const type = String(req.query.type ?? "") as ReportType;
-    if (!REPORT_TYPES.includes(type)) {
-      return res.status(400).json({ error: "Invalid report type" });
-    }
-    const from = parseFrom(req.query.from);
-    const to = parseTo(req.query.to);
-    const scope = campScopeOf(req);
-    const campParam =
-      typeof req.query.camp === "string" && req.query.camp !== "all" ? req.query.camp : undefined;
-    // Effective camp restriction: intersect manager scope with explicit filter.
-    let campCodes: string[] | null = null;
-    if (campParam) {
-      if (scope && !scope.includes(campParam))
-        campCodes = []; // no overlap → empty result
-      else campCodes = [campParam];
-    } else if (scope) {
-      campCodes = scope;
-    }
-
-    const meal = typeof req.query.meal === "string" ? req.query.meal : undefined;
-    const status = typeof req.query.status === "string" ? req.query.status : undefined;
-    const q = typeof req.query.q === "string" ? req.query.q.trim() : undefined;
-    const companyCode =
-      typeof req.query.companyCode === "string" && req.query.companyCode !== "all"
-        ? req.query.companyCode
-        : undefined;
-
-    const data = await fetchTypedReportData(
-      type,
-      { from, to },
-      {
-        campCodes,
-        company: companyCode,
-        meal,
-        status,
-        q: q || undefined,
-      },
-    );
-
-    const fromIso = from.toISOString().slice(0, 10);
-    const toIso = to.toISOString().slice(0, 10);
-    const scopeLabel =
-      companyCode ??
-      campParam ??
-      (scope ? (scope.length === 1 ? scope[0]! : `${scope.length} camps`) : "All Camps");
-
-    const buffer = await buildStyledPdfBuffer({
-      type,
-      filters: {
-        from: fromIso,
-        to: toIso,
-        camp: campParam ?? "all",
-        meal: (meal as "All" | "Breakfast" | "Lunch" | "Dinner" | undefined) ?? "All",
-        status: status ?? "all",
-        query: q ?? "",
-      },
-      scopeLabel,
-      data,
-    });
-
-    const filename = `${type}_${fromIso}_to_${toIso}${companyCode ? "_" + companyCode : ""}${campParam ? "_" + campParam : ""}.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Length", String(buffer.length));
-    res.end(buffer);
-  } catch (e) {
-    next(e);
   }
 });
 

@@ -6,7 +6,6 @@ import { Client as FtpClient } from "basic-ftp";
 import { prisma } from "./prisma.js";
 import {
   fetchReportData,
-  fetchTypedReportData,
   fetchSuiteReportFlat,
   isSuiteReportType,
   suiteReportLabel,
@@ -14,7 +13,6 @@ import {
   type ReportType,
 } from "./report-data.js";
 import { buildXlsxBuffer, buildPdfBuffer } from "./report-files.js";
-import { buildStyledPdfBuffer } from "./report-pdf-styled.js";
 import { sendReportEmail } from "./mailer.js";
 
 export type RunOutcome = {
@@ -93,31 +91,15 @@ async function buildFiles(
   const base = `${reportType}_${stamp}`;
   const out: { name: string; buffer: Buffer }[] = [];
 
-  // New Integrated Reports Suite → flat PDFKit/XLSX (no Puppeteer).
-  if (isSuiteReportType(reportType)) {
-    const flat = await fetchSuiteReportFlat(reportType, window);
-    if (format === "pdf" || format === "both") out.push({ name: `${base}.pdf`, buffer: await buildPdfBuffer(flat) });
-    if (format === "excel" || format === "both") out.push({ name: `${base}.xlsx`, buffer: buildXlsxBuffer(flat) });
-    return out;
-  }
+  // All report types render through the flat PDFKit + XLSX builders (no
+  // Puppeteer). New suite types use fetchSuiteReportFlat; legacy types use
+  // fetchReportData — both return the same flat {title, columns, rows} shape.
+  const flat = isSuiteReportType(reportType)
+    ? await fetchSuiteReportFlat(reportType, window)
+    : await fetchReportData(reportType as ReportType, window);
 
-  const oldType = reportType as ReportType;
-  if (format === "pdf" || format === "both") {
-    const typed = await fetchTypedReportData(oldType, window);
-    const fromIso = window.from.toISOString().slice(0, 10);
-    const toIso = window.to.toISOString().slice(0, 10);
-    const buffer = await buildStyledPdfBuffer({
-      type: oldType,
-      filters: { from: fromIso, to: toIso, camp: "all", meal: "All", status: "all", query: "" },
-      scopeLabel: "All Camps",
-      data: typed,
-    });
-    out.push({ name: `${base}.pdf`, buffer });
-  }
-  if (format === "excel" || format === "both") {
-    const flat = await fetchReportData(oldType, window);
-    out.push({ name: `${base}.xlsx`, buffer: buildXlsxBuffer(flat) });
-  }
+  if (format === "pdf" || format === "both") out.push({ name: `${base}.pdf`, buffer: await buildPdfBuffer(flat) });
+  if (format === "excel" || format === "both") out.push({ name: `${base}.xlsx`, buffer: buildXlsxBuffer(flat) });
   return out;
 }
 

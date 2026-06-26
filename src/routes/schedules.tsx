@@ -51,18 +51,11 @@ export const Route = createFileRoute("/schedules")({
 });
 
 const REPORT_LABEL: Record<ScheduleReportType, string> = {
-  // Integrated Reports Suite (the 5 current reports).
   dailyTransaction: "Daily Transaction Report",
   bySupplier: "Reports by Supplier",
   byLocation: "Reports by Location",
   requestComparison: "Request Comparison",
   duplicateEligibility: "Duplicate / Eligibility",
-  // Legacy report types (kept for existing schedules).
-  consumption: "Daily Meal Consumption",
-  employee: "Employee Master",
-  scans: "Scan Activity Log",
-  camp: "Camp Performance",
-  wastage: "Wastage & Variance",
 };
 
 const REPORT_DEFAULT_FORMAT: Record<ScheduleReportType, ScheduleFormat> = {
@@ -71,11 +64,6 @@ const REPORT_DEFAULT_FORMAT: Record<ScheduleReportType, ScheduleFormat> = {
   byLocation: "both",
   requestComparison: "both",
   duplicateEligibility: "pdf",
-  consumption: "pdf",
-  employee: "excel",
-  scans: "excel",
-  camp: "both",
-  wastage: "pdf",
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

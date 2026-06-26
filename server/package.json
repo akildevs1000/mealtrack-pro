@@ -4,9 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "sync-ssr": "tsx scripts/sync-ssr.ts",
-    "predev": "npm run sync-ssr",
-    "prebuild": "npm run sync-ssr",
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
