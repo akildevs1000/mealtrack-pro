@@ -279,7 +279,7 @@ function DevicesPage() {
                 <input value={form.ipAddress} onChange={(e) => setForm({ ...form, ipAddress: e.target.value })} placeholder="10.42.10.23" className={`${inputCls} font-mono`} />
               </Field>
               <Field label="Assigned To">
-                <input value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} placeholder="Camp manager name" className={inputCls} />
+                <input value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} placeholder="Supplier name" className={inputCls} />
               </Field>
               <Field label="Registered On">
                 <input type="date" value={form.registeredOn} onChange={(e) => setForm({ ...form, registeredOn: e.target.value })} className={inputCls} />

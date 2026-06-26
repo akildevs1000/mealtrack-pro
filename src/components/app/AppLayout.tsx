@@ -14,7 +14,7 @@ const nav: { to: string; label: string; icon: typeof LayoutDashboard; key: TabKe
   { to: "/camps", label: "Camps", icon: BuildingIcon, key: "camps" },
   { to: "/projects", label: "Projects", icon: FolderKanban, key: "projects" },
   { to: "/employees", label: "Employees", icon: Users, key: "employees" },
-  { to: "/managers", label: "Camp Managers", icon: KeyRound, key: "managers" },
+  { to: "/managers", label: "Suppliers", icon: KeyRound, key: "managers" },
   { to: "/forecast", label: "Forecast", icon: CalendarRange, key: "forecast" },
   { to: "/devices", label: "Devices", icon: Smartphone, key: "devices" },
   { to: "/reports", label: "Reports", icon: FileBarChart, key: "reports" },

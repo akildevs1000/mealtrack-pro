@@ -30,7 +30,7 @@ import {
 
 export const Route = createFileRoute("/managers")({
   component: Managers,
-  head: () => ({ meta: [{ title: "Camp Managers — MyMeals" }] }),
+  head: () => ({ meta: [{ title: "Suppliers — MyMeals" }] }),
 });
 
 type FormState = {
@@ -153,9 +153,9 @@ function Managers() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">Camp Managers</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Suppliers</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Add, edit and manage canteen managers — assign each to a camp and control access.
+            Add, edit and manage suppliers — assign each to a camp and control access.
           </p>
         </div>
         <button
@@ -251,7 +251,7 @@ function Managers() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs">
-                      <div>{m.role}</div>
+                      <div>{m.role === "Camp Manager" ? "Supplier" : m.role}</div>
                       <div className="text-muted-foreground">{m.shift}</div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
@@ -483,7 +483,7 @@ function ManagerDialog({
             <div>
               <div className="font-semibold">{manager ? "Edit Manager" : "Add New Manager"}</div>
               <div className="text-xs text-muted-foreground">
-                {manager ? `Updating @${manager.username}` : "Create a new camp manager account"}
+                {manager ? `Updating @${manager.username}` : "Create a new supplier account"}
               </div>
             </div>
           </div>
@@ -589,7 +589,7 @@ function ManagerDialog({
               onChange={(e) => setForm({ ...form, role: e.target.value as CampManager["role"] })}
               className={inputCls}
             >
-              <option>Camp Manager</option>
+              <option value="Camp Manager">Supplier</option>
               <option>Senior Manager</option>
               <option>Supervisor</option>
             </select>

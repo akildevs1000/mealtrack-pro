@@ -22,7 +22,7 @@ const ROLES: { key: Role; label: string; tone: string }[] = [
   { key: "admin", label: "Administrator", tone: "bg-primary/10 text-primary border-primary/20" },
   { key: "operator", label: "Operator", tone: "bg-accent/10 text-accent-foreground border-accent/30" },
   { key: "user", label: "User", tone: "bg-secondary text-foreground border-border" },
-  { key: "manager", label: "Camp Manager", tone: "bg-amber-500/10 text-amber-500 border-amber-500/20" },
+  { key: "manager", label: "Supplier", tone: "bg-amber-500/10 text-amber-500 border-amber-500/20" },
 ];
 
 type FormUser = {
@@ -87,7 +87,7 @@ function UsersPage() {
           <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Access Control</div>
           <h1 className="font-display text-2xl font-bold tracking-tight mt-1">User Profiles & Permissions</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage software operators, users and camp managers. Assign per-tab View / Edit / Delete permissions.
+            Manage software operators, users and suppliers. Assign per-tab View / Edit / Delete permissions.
           </p>
         </div>
         {tab === "users" && canManage && (
@@ -306,7 +306,7 @@ function PermissionsMatrix() {
           <div className="px-5 py-3 border-b border-border bg-secondary/30 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className={`text-xs px-2 py-1 rounded-full border ${role.tone}`}>{role.label}</span>
-              <span className="text-xs text-muted-foreground">{role.key === "manager" ? "Camp manager — sees only their assigned camp" : ""}</span>
+              <span className="text-xs text-muted-foreground">{role.key === "manager" ? "Supplier — sees only their assigned camp" : ""}</span>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -372,7 +372,7 @@ function UserDialog({ initial, onClose, onSave }: {
       return;
     }
     if (form.role === "manager" && !form.assignedCampCode) {
-      alert("Camp managers must be assigned a camp.");
+      alert("Suppliers must be assigned a camp.");
       return;
     }
     onSave(form);
@@ -385,7 +385,7 @@ function UserDialog({ initial, onClose, onSave }: {
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <div>
             <div className="font-display font-semibold">{isEdit ? "Edit user" : "Add new user"}</div>
-            <div className="text-xs text-muted-foreground">{isEdit ? `Updating ${initial.username}` : "Create a software operator, user or camp manager"}</div>
+            <div className="text-xs text-muted-foreground">{isEdit ? `Updating ${initial.username}` : "Create a software operator, user or supplier"}</div>
           </div>
           <button type="button" onClick={onClose} className="size-8 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground"><X className="size-4" /></button>
         </div>
