@@ -11,7 +11,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useCampScope, useSession } from "@/lib/session";
 import { CmsSyncCard } from "@/components/app/CmsSyncCard";
 import {
-  useEmployees, useEmployeeMeals, useImportEmployees, useUpdateEmployee,
+  useEmployees, useEmployeeMeals, useImportEmployees, useUpdateEmployee, useCompanies,
   useSetEmployeePhoto, useDeleteEmployeePhoto, employeePhotoUrl,
   type CmsEmployee, type MealRecord, type EmployeeImportRow, type EmployeeUpdate,
 } from "@/lib/hooks";
@@ -26,6 +26,7 @@ function EmployeesPage() {
   const { can } = useSession();
   const canImport = can("employees", "edit");
   const { data: employees = [] } = useEmployees();
+  const { data: companies = [] } = useCompanies();
   const importMutation = useImportEmployees();
   // Backend already applies camp scope based on the auth context; this is
   // a defensive belt-and-braces in case the response includes anything wider.
@@ -79,11 +80,6 @@ function EmployeesPage() {
 
   const camps = useMemo(
     () => Array.from(new Set(scopedEmployees.map((e) => e.campCode))).sort(),
-    [scopedEmployees],
-  );
-  // Parent companies present in the roster (CmsEmployee.company holds the code).
-  const companyCodes = useMemo(
-    () => Array.from(new Set(scopedEmployees.map((e) => e.company).filter(Boolean))).sort(),
     [scopedEmployees],
   );
 
@@ -174,7 +170,7 @@ function EmployeesPage() {
         <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}
           className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none">
           <option value="all">All companies</option>
-          {companyCodes.map((c) => <option key={c} value={c}>{c}</option>)}
+          {companies.map((co) => <option key={co.id} value={co.code}>{co.code} — {co.name}</option>)}
         </select>
         <select value={campFilter} onChange={(e) => setCampFilter(e.target.value)}
           className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none">

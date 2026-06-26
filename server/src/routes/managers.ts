@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth, requireRole } from "../middleware/auth.js";
@@ -23,7 +24,10 @@ const pinSchema = z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits");
 const createSchema = z.object({
   name: z.string(),
   username: z.string().regex(/^[a-z0-9_.-]+$/i, "username must be alphanumeric, dot, underscore or dash"),
-  password: z.string().min(6),
+  // Optional: suppliers aren't given an admin-panel login, so the dialog omits
+  // the password. When absent we generate a random one below to keep the
+  // CampManager + linked User account record valid.
+  password: z.string().min(6).optional(),
   // Mobile-app PIN. Pass "" or null to clear on update; omit to leave unchanged.
   pin: z.union([pinSchema, z.literal(""), z.null()]).optional(),
   email: z.string().email(),
@@ -47,7 +51,9 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
   try {
     const body = createSchema.parse(req.body);
     const status = body.status ?? "Active";
-    const passwordHash = await hashPassword(body.password);
+    // No password supplied (supplier with no admin login) → generate a random
+    // one so the account record is valid; it simply isn't shared with anyone.
+    const passwordHash = await hashPassword(body.password ?? randomBytes(18).toString("base64url"));
 
     // Reject if the username is already taken in either table — keeps the
     // two-row link (CampManager + User) consistent and avoids surprises.

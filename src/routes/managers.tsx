@@ -127,7 +127,9 @@ function Managers() {
     const payload = {
       name: form.name,
       username: form.username,
-      password: form.password,
+      // Suppliers aren't given an admin-panel login, so no password is entered.
+      // The server generates a random one to satisfy the account record.
+      password: form.password || undefined,
       pin,
       email: form.email,
       phone: form.phone,
@@ -459,10 +461,6 @@ function ManagerDialog({
       setError("Name, username and camp are required.");
       return;
     }
-    if (!manager && !form.password) {
-      setError("Password is required when creating a new manager.");
-      return;
-    }
     if (form.pin && !/^\d{4}$/.test(form.pin)) {
       setError("Mobile PIN must be exactly 4 digits.");
       return;
@@ -500,7 +498,7 @@ function ManagerDialog({
               <KeyRound className="size-4" />
             </div>
             <div>
-              <div className="font-semibold">{manager ? "Edit Manager" : "Add New Manager"}</div>
+              <div className="font-semibold">{manager ? "Edit Supplier" : "Add New Supplier"}</div>
               <div className="text-xs text-muted-foreground">
                 {manager ? `Updating @${manager.username}` : "Create a new supplier account"}
               </div>
@@ -530,16 +528,6 @@ function ManagerDialog({
               onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase() })}
               className={`${inputCls} font-mono`}
               placeholder="ahmed.mansouri"
-            />
-          </Field>
-          <Field label={manager ? "Password (leave blank to keep existing)" : "Password *"}>
-            <input
-              required={!manager}
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className={`${inputCls} font-mono`}
-              placeholder={manager ? "Unchanged" : ""}
             />
           </Field>
           <Field
@@ -616,28 +604,6 @@ function ManagerDialog({
               ))}
             </select>
           </Field>
-          <Field label="Role">
-            <select
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value as CampManager["role"] })}
-              className={inputCls}
-            >
-              <option value="Camp Manager">Supplier</option>
-              <option>Senior Manager</option>
-              <option>Supervisor</option>
-            </select>
-          </Field>
-          <Field label="Shift">
-            <select
-              value={form.shift}
-              onChange={(e) => setForm({ ...form, shift: e.target.value as CampManager["shift"] })}
-              className={inputCls}
-            >
-              <option>Morning</option>
-              <option>Evening</option>
-              <option>Full Day</option>
-            </select>
-          </Field>
           <Field label="Status">
             <select
               value={form.status}
@@ -668,29 +634,6 @@ function ManagerDialog({
             />
           </Field>
 
-          <div className="md:col-span-2">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Permissions
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {(["breakfast", "lunch", "dinner", "reports"] as const).map((p) => {
-                const on = form.permissions[p];
-                return (
-                  <button
-                    type="button"
-                    key={p}
-                    onClick={() =>
-                      setForm({ ...form, permissions: { ...form.permissions, [p]: !on } })
-                    }
-                    className={`text-xs px-3 py-1.5 rounded-full border capitalize transition ${on ? "bg-primary/10 text-primary border-primary/30" : "bg-secondary text-muted-foreground border-border"}`}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {error && (
             <div className="md:col-span-2 rounded-lg bg-destructive/10 text-destructive text-sm px-3 py-2">
               {error}
@@ -711,7 +654,7 @@ function ManagerDialog({
               disabled={submitting}
               className="rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {submitting ? "Saving…" : manager ? "Save Changes" : "Create Manager"}
+              {submitting ? "Saving…" : manager ? "Save Changes" : "Create Supplier"}
             </button>
           </div>
         </form>
