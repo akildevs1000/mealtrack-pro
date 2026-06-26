@@ -9,7 +9,7 @@ import { prisma } from "./prisma.js";
 import type { Role } from "@prisma/client";
 
 const TABS = [
-  "overview", "scanner", "companies", "camps", "employees", "managers",
+  "overview", "scanner", "companies", "camps", "projects", "employees", "managers",
   "forecast", "devices", "reports", "automation", "users",
 ];
 
@@ -21,17 +21,17 @@ const NONE = { view: false, edit: false, delete: false };
 const DEFAULTS: Record<Role, Record<string, typeof ALL>> = {
   admin: Object.fromEntries(TABS.map((t) => [t, ALL])) as Record<string, typeof ALL>,
   operator: {
-    overview: VIEW, scanner: EDIT, companies: EDIT, camps: EDIT, employees: EDIT,
+    overview: VIEW, scanner: EDIT, companies: EDIT, camps: EDIT, projects: EDIT, employees: EDIT,
     managers: VIEW, forecast: EDIT, devices: EDIT, reports: VIEW,
     automation: EDIT, users: NONE,
   },
   user: {
-    overview: VIEW, scanner: VIEW, companies: VIEW, camps: VIEW, employees: VIEW,
+    overview: VIEW, scanner: VIEW, companies: VIEW, camps: VIEW, projects: VIEW, employees: VIEW,
     managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
     automation: NONE, users: NONE,
   },
   manager: {
-    overview: VIEW, scanner: EDIT, companies: VIEW, camps: VIEW, employees: VIEW,
+    overview: VIEW, scanner: EDIT, companies: VIEW, camps: VIEW, projects: VIEW, employees: VIEW,
     managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
     automation: NONE, users: NONE,
   },

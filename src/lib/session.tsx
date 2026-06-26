@@ -3,7 +3,7 @@ import { api, setToken } from "./api";
 
 export type Role = "admin" | "operator" | "user" | "manager";
 export type TabKey =
-  | "overview" | "scanner" | "companies" | "camps" | "employees" | "managers"
+  | "overview" | "scanner" | "companies" | "camps" | "projects" | "employees" | "managers"
   | "forecast" | "devices" | "reports" | "automation" | "users";
 
 export type Perm = { view: boolean; edit: boolean; delete: boolean };
@@ -24,6 +24,7 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: "scanner", label: "QR Scanner" },
   { key: "companies", label: "Companies" },
   { key: "camps", label: "Camps" },
+  { key: "projects", label: "Projects" },
   { key: "employees", label: "Employees" },
   { key: "managers", label: "Camp Managers" },
   { key: "forecast", label: "Forecast" },
@@ -162,19 +163,19 @@ function defaultPermsFor(role: Role): Record<Role, RolePermissions> {
   };
   if (role === "operator") {
     apply("operator", {
-      overview: VIEW, scanner: EDIT, companies: EDIT, camps: EDIT, employees: EDIT,
+      overview: VIEW, scanner: EDIT, companies: EDIT, camps: EDIT, projects: EDIT, employees: EDIT,
       managers: VIEW, forecast: EDIT, devices: EDIT, reports: VIEW,
       automation: EDIT, users: NONE,
     });
   } else if (role === "user") {
     apply("user", {
-      overview: VIEW, scanner: VIEW, companies: VIEW, camps: VIEW, employees: VIEW,
+      overview: VIEW, scanner: VIEW, companies: VIEW, camps: VIEW, projects: VIEW, employees: VIEW,
       managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
       automation: NONE, users: NONE,
     });
   } else if (role === "manager") {
     apply("manager", {
-      overview: VIEW, scanner: EDIT, companies: VIEW, camps: VIEW, employees: VIEW,
+      overview: VIEW, scanner: EDIT, companies: VIEW, camps: VIEW, projects: VIEW, employees: VIEW,
       managers: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
       automation: NONE, users: NONE,
     });

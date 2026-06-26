@@ -13,6 +13,7 @@ import { Route as UsersRouteImport } from './routes/users'
 import { Route as SchedulesRouteImport } from './routes/schedules'
 import { Route as ScannerRouteImport } from './routes/scanner'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as ManagersRouteImport } from './routes/managers'
 import { Route as ForecastRouteImport } from './routes/forecast'
@@ -42,6 +43,11 @@ const ScannerRoute = ScannerRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OverviewRoute = OverviewRouteImport.update({
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/forecast': typeof ForecastRoute
   '/managers': typeof ManagersRoute
   '/overview': typeof OverviewRoute
+  '/projects': typeof ProjectsRoute
   '/reports': typeof ReportsRoute
   '/scanner': typeof ScannerRoute
   '/schedules': typeof SchedulesRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/forecast': typeof ForecastRoute
   '/managers': typeof ManagersRoute
   '/overview': typeof OverviewRoute
+  '/projects': typeof ProjectsRoute
   '/reports': typeof ReportsRoute
   '/scanner': typeof ScannerRoute
   '/schedules': typeof SchedulesRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/forecast': typeof ForecastRoute
   '/managers': typeof ManagersRoute
   '/overview': typeof OverviewRoute
+  '/projects': typeof ProjectsRoute
   '/reports': typeof ReportsRoute
   '/scanner': typeof ScannerRoute
   '/schedules': typeof SchedulesRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/forecast'
     | '/managers'
     | '/overview'
+    | '/projects'
     | '/reports'
     | '/scanner'
     | '/schedules'
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/forecast'
     | '/managers'
     | '/overview'
+    | '/projects'
     | '/reports'
     | '/scanner'
     | '/schedules'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/forecast'
     | '/managers'
     | '/overview'
+    | '/projects'
     | '/reports'
     | '/scanner'
     | '/schedules'
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   ForecastRoute: typeof ForecastRoute
   ManagersRoute: typeof ManagersRoute
   OverviewRoute: typeof OverviewRoute
+  ProjectsRoute: typeof ProjectsRoute
   ReportsRoute: typeof ReportsRoute
   ScannerRoute: typeof ScannerRoute
   SchedulesRoute: typeof SchedulesRoute
@@ -240,6 +253,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/overview': {
@@ -326,6 +346,7 @@ const rootRouteChildren: RootRouteChildren = {
   ForecastRoute: ForecastRoute,
   ManagersRoute: ManagersRoute,
   OverviewRoute: OverviewRoute,
+  ProjectsRoute: ProjectsRoute,
   ReportsRoute: ReportsRoute,
   ScannerRoute: ScannerRoute,
   SchedulesRoute: SchedulesRoute,

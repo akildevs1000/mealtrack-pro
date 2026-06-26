@@ -44,6 +44,17 @@ export type Company = {
   active: boolean;
 };
 
+export type Project = {
+  id: string;
+  code: string;
+  name: string;
+  location: string;
+  company: string;
+  manager: string;
+  employees: number;
+  active: boolean;
+};
+
 export type CmsEmployee = {
   id: string;
   company: string;
@@ -187,6 +198,32 @@ export function useDeleteCompany() {
   return useMutation({
     mutationFn: (code: string) => api<void>(`/companies/${code}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
+  });
+}
+
+// Projects
+export function useProjects() {
+  return useQuery({ queryKey: ["projects"], queryFn: () => api<Project[]>("/projects") });
+}
+
+export function useUpsertProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { existingCode?: string } & Omit<Project, "id">) => {
+      const { existingCode, ...body } = input;
+      return existingCode
+        ? api<Project>(`/projects/${existingCode}`, { method: "PUT", body: JSON.stringify(body) })
+        : api<Project>(`/projects`, { method: "POST", body: JSON.stringify(body) });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api<void>(`/projects/${code}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
 }
 

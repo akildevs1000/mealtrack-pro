@@ -35,6 +35,15 @@ const companies = [
   { code: "GINCON", name: "Ginco General Contracting", contact: "Fatima Al Zahra", email: "admin@ginco.ae", phone: "+971 2 666 5544", employees: 1430, active: true },
 ];
 
+const projects = [
+  { code: "PRJ-01", name: "Reem Tower", location: "Al Reem Island, Abu Dhabi", company: "Innovo Building Contracting", manager: "Ahmed Khan", employees: 420, active: true },
+  { code: "PRJ-02", name: "Marina Heights", location: "Dubai Marina", company: "Arabtec Holding", manager: "Samir Haddad", employees: 610, active: true },
+  { code: "PRJ-03", name: "Industrial Park 7", location: "Sharjah", company: "Al Futtaim Construction", manager: "Rashid Al Mansoori", employees: 380, active: true },
+  { code: "PRJ-04", name: "Mussafah Bridge Works", location: "Mussafah, Abu Dhabi", company: "Dutco Balfour Beatty", manager: "John Pereira", employees: 540, active: false },
+  { code: "PRJ-05", name: "Al Hamra Mall Extension", location: "Ras Al Khaimah", company: "Khansaheb Civil Engineering", manager: "Imran Sheikh", employees: 260, active: true },
+  { code: "PRJ-06", name: "Corniche Towers", location: "Ajman", company: "Ginco General Contracting", manager: "Fatima Al Zahra", employees: 470, active: true },
+];
+
 const cmsEmployees = [
   { company: "INNOVOBLD", laborId: 57175, laborCode: "INVOW00001", name: "INNOVO EMPLOYEE 1", designation: "STEEL FITTER", doj: "2021-07-07", campCode: "CAMP 19", campName: "Al Quoz Rent Camp- 02", mealsEligibility: "Y", status: "Active", effectiveDate: null, lastUpdated: "2026-01-01" },
   { company: "INNOVOBLD", laborId: 57180, laborCode: "INVOW00002", name: "INNOVO EMPLOYEE 2", designation: "HELPER", doj: "2021-07-12", campCode: "CAMP 04", campName: "M-2", mealsEligibility: "Y", status: "InActive", effectiveDate: "2025-08-01", lastUpdated: "2024-10-01" },
@@ -144,6 +153,16 @@ async function main() {
     });
   }
   console.log(`[seed] companies: ${companies.length}`);
+
+  // Projects
+  for (const pr of projects) {
+    await prisma.project.upsert({
+      where: { code: pr.code },
+      create: pr,
+      update: pr,
+    });
+  }
+  console.log(`[seed] projects: ${projects.length}`);
 
   // CMS employees
   for (const e of cmsEmployees) {

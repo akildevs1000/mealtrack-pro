@@ -137,6 +137,21 @@ model Company {
   updatedAt DateTime @updatedAt
 }
 
+// Construction projects / sites. Standalone directory (no FK joins yet).
+model Project {
+  id        String   @id @default(cuid())
+  code      String   @unique // e.g. "PRJ-01"
+  name      String
+  location  String   @default("") // site / area
+  company   String   @default("") // owning company (free text for now)
+  manager   String   @default("") // project manager / contact
+  employees Int      @default(0)
+  active    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // CMS employee roster (different camp coding scheme: "CAMP 19")
 model CmsEmployee {
   id              String             @id @default(cuid())

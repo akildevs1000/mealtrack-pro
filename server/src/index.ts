@@ -6,6 +6,7 @@ import morgan from "morgan";
 import authRouter from "./routes/auth.js";
 import campsRouter from "./routes/camps.js";
 import companiesRouter from "./routes/companies.js";
+import projectsRouter from "./routes/projects.js";
 import employeesRouter from "./routes/employees.js";
 import devicesRouter from "./routes/devices.js";
 import managersRouter from "./routes/managers.js";
@@ -38,6 +39,7 @@ app.get("/api/health", (_req, res) => res.json({ ok: true, ts: new Date().toISOS
 app.use("/api/auth", authRouter);
 app.use("/api/camps", campsRouter);
 app.use("/api/companies", companiesRouter);
+app.use("/api/projects", projectsRouter);
 app.use("/api/employees", employeesRouter);
 app.use("/api/devices", devicesRouter);
 app.use("/api/managers", managersRouter);
