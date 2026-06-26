@@ -7,10 +7,13 @@ import { prisma } from "./prisma.js";
 import {
   fetchReportData,
   fetchTypedReportData,
+  fetchSuiteReportFlat,
+  isSuiteReportType,
+  suiteReportLabel,
   windowForFrequency,
   type ReportType,
 } from "./report-data.js";
-import { buildXlsxBuffer } from "./report-files.js";
+import { buildXlsxBuffer, buildPdfBuffer } from "./report-files.js";
 import { buildStyledPdfBuffer } from "./report-pdf-styled.js";
 import { sendReportEmail } from "./mailer.js";
 
@@ -27,8 +30,9 @@ const REPORT_LABELS: Record<ReportType, string> = {
   camp: "Camp Performance",
   wastage: "Wastage & Variance",
 };
-function reportLabel(t: ReportType): string {
-  return REPORT_LABELS[t] ?? t;
+function reportLabel(t: string): string {
+  if (isSuiteReportType(t)) return suiteReportLabel(t);
+  return REPORT_LABELS[t as ReportType] ?? t;
 }
 
 // Schedule times are Dubai wall-clock (the app reasons in Asia/Dubai — see
@@ -80,7 +84,7 @@ function sanitiseRemoteName(name: string): string {
 // the on-screen /reports preview pixel-for-pixel. XLSX uses the flat table
 // shape from fetchReportData.
 async function buildFiles(
-  reportType: ReportType,
+  reportType: string,
   format: "pdf" | "excel" | "both",
   frequency: "daily" | "weekly" | "monthly",
 ): Promise<{ name: string; buffer: Buffer }[]> {
@@ -89,12 +93,21 @@ async function buildFiles(
   const base = `${reportType}_${stamp}`;
   const out: { name: string; buffer: Buffer }[] = [];
 
+  // New Integrated Reports Suite → flat PDFKit/XLSX (no Puppeteer).
+  if (isSuiteReportType(reportType)) {
+    const flat = await fetchSuiteReportFlat(reportType, window);
+    if (format === "pdf" || format === "both") out.push({ name: `${base}.pdf`, buffer: await buildPdfBuffer(flat) });
+    if (format === "excel" || format === "both") out.push({ name: `${base}.xlsx`, buffer: buildXlsxBuffer(flat) });
+    return out;
+  }
+
+  const oldType = reportType as ReportType;
   if (format === "pdf" || format === "both") {
-    const typed = await fetchTypedReportData(reportType, window);
+    const typed = await fetchTypedReportData(oldType, window);
     const fromIso = window.from.toISOString().slice(0, 10);
     const toIso = window.to.toISOString().slice(0, 10);
     const buffer = await buildStyledPdfBuffer({
-      type: reportType,
+      type: oldType,
       filters: { from: fromIso, to: toIso, camp: "all", meal: "All", status: "all", query: "" },
       scopeLabel: "All Camps",
       data: typed,
@@ -102,7 +115,7 @@ async function buildFiles(
     out.push({ name: `${base}.pdf`, buffer });
   }
   if (format === "excel" || format === "both") {
-    const flat = await fetchReportData(reportType, window);
+    const flat = await fetchReportData(oldType, window);
     out.push({ name: `${base}.xlsx`, buffer: buildXlsxBuffer(flat) });
   }
   return out;

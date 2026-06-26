@@ -51,6 +51,13 @@ export const Route = createFileRoute("/schedules")({
 });
 
 const REPORT_LABEL: Record<ScheduleReportType, string> = {
+  // Integrated Reports Suite (the 5 current reports).
+  dailyTransaction: "Daily Transaction Report",
+  bySupplier: "Reports by Supplier",
+  byLocation: "Reports by Location",
+  requestComparison: "Request Comparison",
+  duplicateEligibility: "Duplicate / Eligibility",
+  // Legacy report types (kept for existing schedules).
   consumption: "Daily Meal Consumption",
   employee: "Employee Master",
   scans: "Scan Activity Log",
@@ -59,6 +66,11 @@ const REPORT_LABEL: Record<ScheduleReportType, string> = {
 };
 
 const REPORT_DEFAULT_FORMAT: Record<ScheduleReportType, ScheduleFormat> = {
+  dailyTransaction: "both",
+  bySupplier: "both",
+  byLocation: "both",
+  requestComparison: "both",
+  duplicateEligibility: "pdf",
   consumption: "pdf",
   employee: "excel",
   scans: "excel",
@@ -159,7 +171,7 @@ function SchedulesPage() {
     const body: ScheduleInput = {
       name: "New scheduled report",
       enabled: false,
-      reportType: "consumption",
+      reportType: "dailyTransaction",
       format: "pdf",
       frequency: "daily",
       time: "08:00",

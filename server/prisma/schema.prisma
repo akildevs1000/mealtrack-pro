@@ -369,6 +369,12 @@ enum ScheduleReportType {
   scans
   camp
   wastage
+  // Integrated Reports Suite (the 5 new reports).
+  dailyTransaction
+  bySupplier
+  byLocation
+  requestComparison
+  duplicateEligibility
 }
 
 enum ScheduleFormat {

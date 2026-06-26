@@ -720,7 +720,9 @@ export function useOverview(campCode?: string | null, companyCode?: string | nul
 
 // ---------------- Scheduled reports + FTP config ----------------
 
-export type ScheduleReportType = "consumption" | "employee" | "scans" | "camp" | "wastage";
+export type ScheduleReportType =
+  | "consumption" | "employee" | "scans" | "camp" | "wastage"
+  | "dailyTransaction" | "bySupplier" | "byLocation" | "requestComparison" | "duplicateEligibility";
 export type ScheduleFormat = "pdf" | "excel" | "both";
 export type ScheduleFrequency = "daily" | "weekly" | "monthly";
 export type ScheduleDestination = "email" | "ftp";

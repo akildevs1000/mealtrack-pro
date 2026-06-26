@@ -13,7 +13,10 @@ router.use(requireAuth);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const p = prisma as any;
 
-const reportType = z.enum(["consumption", "employee", "scans", "camp", "wastage"]);
+const reportType = z.enum([
+  "consumption", "employee", "scans", "camp", "wastage",
+  "dailyTransaction", "bySupplier", "byLocation", "requestComparison", "duplicateEligibility",
+]);
 const format = z.enum(["pdf", "excel", "both"]);
 const frequency = z.enum(["daily", "weekly", "monthly"]);
 const destination = z.enum(["email", "ftp"]);
