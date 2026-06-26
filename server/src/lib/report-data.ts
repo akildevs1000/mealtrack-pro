@@ -251,6 +251,7 @@ export async function fetchReportData(
 // matches the on-screen preview exactly.
 export type TypedReportFilters = {
   campCodes?: string[] | null; // null = unrestricted; restrict to these codes if set
+  company?: string; // parent Company code; filters camps (camp reports) / company field (employee)
   meal?: string; // "All" | "Breakfast" | "Lunch" | "Dinner"
   status?: string; // "all" | "Eligible" | "Already Served" | ...
   q?: string; // search query (name / labour id)
@@ -286,6 +287,23 @@ export async function fetchTypedReportData(
 ): Promise<TypedReportData> {
   const { from, to } = window;
   const days = dayCount(from, to);
+
+  // Parent-company filter: for camp-based reports, resolve the company's camps
+  // (Camp.companyCode) and fold them into campCodes so every camp/scan query
+  // narrows to that company. The employee branch filters on its own `company`
+  // field below, so we skip it there.
+  if (filters.company && type !== "employee") {
+    const cc = await prisma.camp.findMany({
+      where: { companyCode: filters.company },
+      select: { code: true },
+    });
+    const companyCamps = cc.map((c) => c.code);
+    const campCodes =
+      filters.campCodes && filters.campCodes.length > 0
+        ? filters.campCodes.filter((c) => companyCamps.includes(c))
+        : companyCamps;
+    filters = { ...filters, campCodes };
+  }
 
   if (type === "consumption") {
     const camps = await prisma.camp.findMany({
@@ -440,6 +458,7 @@ export async function fetchTypedReportData(
   if (filters.campCodes && filters.campCodes.length > 0) {
     empWhere.campCode = { in: filters.campCodes };
   }
+  if (filters.company) empWhere.company = filters.company;
   const employees = await prisma.cmsEmployee.findMany({
     where: empWhere,
     orderBy: { laborCode: "asc" },

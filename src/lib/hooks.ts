@@ -612,33 +612,33 @@ function reportQs(p: Record<string, string | undefined>) {
   return out ? `?${out}` : "";
 }
 
-export function useReportConsumption(p: { from: string; to: string; campCode?: string }) {
+export function useReportConsumption(p: { from: string; to: string; campCode?: string; companyCode?: string }) {
   return useQuery({
     queryKey: ["reports", "consumption", p],
     queryFn: () => api<ReportRange<ReportConsumptionRow>>(`/reports/consumption${reportQs(p)}`),
   });
 }
-export function useReportCamps(p: { from: string; to: string; campCode?: string }) {
+export function useReportCamps(p: { from: string; to: string; campCode?: string; companyCode?: string }) {
   return useQuery({
     queryKey: ["reports", "camps", p],
     queryFn: () => api<ReportRange<ReportCampRow>>(`/reports/camps${reportQs(p)}`),
   });
 }
-export function useReportWastage(p: { from: string; to: string; campCode?: string }) {
+export function useReportWastage(p: { from: string; to: string; campCode?: string; companyCode?: string }) {
   return useQuery({
     queryKey: ["reports", "wastage", p],
     queryFn: () => api<ReportRange<ReportWastageRow>>(`/reports/wastage${reportQs(p)}`),
   });
 }
 export function useReportScans(p: {
-  from: string; to: string; campCode?: string; meal?: string; status?: string; q?: string;
+  from: string; to: string; campCode?: string; companyCode?: string; meal?: string; status?: string; q?: string;
 }) {
   return useQuery({
     queryKey: ["reports", "scans", p],
     queryFn: () => api<ReportScanRow[]>(`/reports/scans${reportQs(p)}`),
   });
 }
-export function useReportEmployees(p: { campCode?: string; status?: string; q?: string }) {
+export function useReportEmployees(p: { campCode?: string; companyCode?: string; status?: string; q?: string }) {
   return useQuery({
     queryKey: ["reports", "employees", p],
     queryFn: () => api<ReportEmployeeRow[]>(`/reports/employees${reportQs(p)}`),

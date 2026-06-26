@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileBarChart,
   FileSpreadsheet,
@@ -16,6 +16,7 @@ import {
 import { useCampScope } from "@/lib/session";
 import {
   useCamps,
+  useCompanies,
   useReportConsumption,
   useReportCamps,
   useReportWastage,
@@ -104,14 +105,23 @@ function deriveReason(scanId: string, status: string) {
 function ReportsPage() {
   const scope = useCampScope();
   const { data: campsApi } = useCamps();
-  const visibleCamps = useMemo(
-    () => (scope ? (campsApi ?? []).filter((c) => scope.includes(c.code)) : (campsApi ?? [])),
-    [scope, campsApi],
-  );
+  const { data: companiesApi } = useCompanies();
   const [active, setActive] = useState<ReportType>("consumption");
   const [from, setFrom] = useState(monthAgoIso);
   const [to, setTo] = useState(todayIso);
+  // Parent-company filter. "all" = no company restriction. Camp is a sibling:
+  // selecting a company narrows the camp dropdown to that company's camps.
+  const [company, setCompany] = useState("all");
   const [camp, setCamp] = useState(scope ? scope[0] : "all");
+  const visibleCamps = useMemo(() => {
+    let cs = scope ? (campsApi ?? []).filter((c) => scope.includes(c.code)) : (campsApi ?? []);
+    if (company !== "all") cs = cs.filter((c) => c.companyCode === company);
+    return cs;
+  }, [scope, campsApi, company]);
+  // If the selected camp no longer belongs to the chosen company, reset to all.
+  useEffect(() => {
+    if (camp !== "all" && !visibleCamps.some((c) => c.code === camp)) setCamp("all");
+  }, [visibleCamps, camp]);
   const [meal, setMeal] = useState<Meal>("All");
   const [status, setStatus] = useState<string>("all");
   const [query, setQuery] = useState("");
@@ -121,14 +131,15 @@ function ReportsPage() {
   const previewRef = useRef<HTMLDivElement>(null);
 
   const campParam = camp !== "all" ? camp : undefined;
+  const companyParam = company !== "all" ? company : undefined;
   // Fire only the query matching the active report. The others stay disabled.
-  const consumption = useReportConsumption({ from, to, campCode: campParam });
-  const camps = useReportCamps({ from, to, campCode: campParam });
-  const wastage = useReportWastage({ from, to, campCode: campParam });
+  const consumption = useReportConsumption({ from, to, campCode: campParam, companyCode: companyParam });
+  const camps = useReportCamps({ from, to, campCode: campParam, companyCode: companyParam });
+  const wastage = useReportWastage({ from, to, campCode: campParam, companyCode: companyParam });
   // "mismatch" is a synthetic option: don't pass it server-side, filter client-side below.
   const scanStatusParam = status === "mismatch" ? "all" : status;
-  const scans = useReportScans({ from, to, campCode: campParam, meal, status: scanStatusParam, q: query });
-  const employees = useReportEmployees({ campCode: campParam, status, q: query });
+  const scans = useReportScans({ from, to, campCode: campParam, companyCode: companyParam, meal, status: scanStatusParam, q: query });
+  const employees = useReportEmployees({ campCode: campParam, companyCode: companyParam, status, q: query });
 
   const previewFilters = useMemo(
     () => ({ from, to, camp, meal, status, query }),
@@ -299,6 +310,7 @@ function ReportsPage() {
       // Server renders the same ReportPreview component with Puppeteer and
       // streams back a real PDF — single click download, no print dialog.
       const params = new URLSearchParams({ type: active, from, to });
+      if (company !== "all") params.set("companyCode", company);
       if (camp !== "all") params.set("camp", camp);
       if (meal !== "All") params.set("meal", meal);
       if (status !== "all") params.set("status", status);
@@ -423,6 +435,16 @@ function ReportsPage() {
               onChange={(e) => setTo(e.target.value)}
               className={inputCls}
             />
+          </Field>
+          <Field label="Company">
+            <select value={company} onChange={(e) => setCompany(e.target.value)} className={inputCls}>
+              <option value="all">All companies</option>
+              {(companiesApi ?? []).map((co) => (
+                <option key={co.id} value={co.code}>
+                  {co.code}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Camp">
             <select value={camp} onChange={(e) => setCamp(e.target.value)} className={inputCls}>

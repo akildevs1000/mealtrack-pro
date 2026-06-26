@@ -45,6 +45,24 @@ function campFilter(req: any, codeParam?: string): { where: any; codes: string[]
   if (scope) return { where: { code: { in: scope } }, codes: scope };
   return { where: undefined, codes: null };
 }
+// Parent-Company filter rule: a Company is the parent of Camp/Project/Supplier.
+// When ?companyCode= is supplied, restrict the camp-based reports to that
+// company's camps (Camp.companyCode), intersected with the caller's camp scope
+// and any explicit ?campCode=. Resolves to concrete camp codes so the Scan
+// aggregations (which key on campCode) stay correct.
+async function scopeForReports(
+  req: any,
+  campCodeParam?: string,
+  companyCodeParam?: string,
+): Promise<{ where: any; codes: string[] | null }> {
+  const base = campFilter(req, campCodeParam);
+  const companyCode =
+    typeof companyCodeParam === "string" && companyCodeParam !== "all" ? companyCodeParam : undefined;
+  if (!companyCode) return base;
+  const combined = base.where ? { AND: [base.where, { companyCode }] } : { companyCode };
+  const camps = await prisma.camp.findMany({ where: combined, select: { code: true } });
+  return { where: combined, codes: camps.map((c) => c.code) };
+}
 // Build the Scan campCode filter from the *resolved* scope codes only. Do NOT
 // trust the raw ?campCode= param here — campFilter() already validated it against
 // the caller's scope and folded it into `codes` ([] = requested an out-of-scope
@@ -79,7 +97,11 @@ router.get("/consumption", async (req, res, next) => {
   try {
     const from = parseFrom(req.query.from);
     const to = parseTo(req.query.to);
-    const { where: campWhere, codes } = campFilter(req, req.query.campCode as string);
+    const { where: campWhere, codes } = await scopeForReports(
+      req,
+      req.query.campCode as string,
+      req.query.companyCode as string,
+    );
     const camps = await prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } });
 
     const groups = await prisma.scan.groupBy({
@@ -135,7 +157,11 @@ router.get("/scans", async (req, res, next) => {
     const status = req.query.status as string | undefined;
     const q = (req.query.q as string | undefined)?.toLowerCase().trim();
     const limit = Math.min(Number(req.query.limit) || 500, 2000);
-    const { codes } = campFilter(req, req.query.campCode as string);
+    const { codes } = await scopeForReports(
+      req,
+      req.query.campCode as string,
+      req.query.companyCode as string,
+    );
 
     const where: any = {
       time: { gte: from, lte: to },
@@ -178,7 +204,11 @@ router.get("/camps", async (req, res, next) => {
   try {
     const from = parseFrom(req.query.from);
     const to = parseTo(req.query.to);
-    const { where: campWhere, codes } = campFilter(req, req.query.campCode as string);
+    const { where: campWhere, codes } = await scopeForReports(
+      req,
+      req.query.campCode as string,
+      req.query.companyCode as string,
+    );
 
     const [camps, scanGroups, devices] = await Promise.all([
       prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } }),
@@ -236,7 +266,11 @@ router.get("/wastage", async (req, res, next) => {
   try {
     const from = parseFrom(req.query.from);
     const to = parseTo(req.query.to);
-    const { where: campWhere, codes } = campFilter(req, req.query.campCode as string);
+    const { where: campWhere, codes } = await scopeForReports(
+      req,
+      req.query.campCode as string,
+      req.query.companyCode as string,
+    );
     const camps = await prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } });
 
     const served = await prisma.scan.groupBy({
@@ -288,12 +322,21 @@ router.get("/wastage", async (req, res, next) => {
 router.get("/employees", async (req, res, next) => {
   try {
     const { codes } = campFilter(req, req.query.campCode as string);
+    // Parent-company filter: the CMS roster's `company` field already holds the
+    // Company code (e.g. "INNOVOBLD"), so employees are a sibling of Camp/Project
+    // under a Company. Filter on it directly rather than via camp codes (the CMS
+    // camp scheme doesn't join to Camp.code anyway — see header comment).
+    const companyCode =
+      typeof req.query.companyCode === "string" && req.query.companyCode !== "all"
+        ? req.query.companyCode
+        : undefined;
     const statusFilter = req.query.status as string | undefined;
     const q = (req.query.q as string | undefined)?.toLowerCase().trim();
     const limit = Math.min(Number(req.query.limit) || 300, 1000);
 
     const where: any = {};
     if (codes) where.campCode = { in: codes };
+    if (companyCode) where.company = companyCode;
 
     const employees = await prisma.cmsEmployee.findMany({
       where,
@@ -440,12 +483,17 @@ router.get("/render-pdf", async (req, res, next) => {
     const meal = typeof req.query.meal === "string" ? req.query.meal : undefined;
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const q = typeof req.query.q === "string" ? req.query.q.trim() : undefined;
+    const companyCode =
+      typeof req.query.companyCode === "string" && req.query.companyCode !== "all"
+        ? req.query.companyCode
+        : undefined;
 
     const data = await fetchTypedReportData(
       type,
       { from, to },
       {
         campCodes,
+        company: companyCode,
         meal,
         status,
         q: q || undefined,
@@ -455,6 +503,7 @@ router.get("/render-pdf", async (req, res, next) => {
     const fromIso = from.toISOString().slice(0, 10);
     const toIso = to.toISOString().slice(0, 10);
     const scopeLabel =
+      companyCode ??
       campParam ??
       (scope ? (scope.length === 1 ? scope[0]! : `${scope.length} camps`) : "All Camps");
 
@@ -472,7 +521,7 @@ router.get("/render-pdf", async (req, res, next) => {
       data,
     });
 
-    const filename = `${type}_${fromIso}_to_${toIso}${campParam ? "_" + campParam : ""}.pdf`;
+    const filename = `${type}_${fromIso}_to_${toIso}${companyCode ? "_" + companyCode : ""}${campParam ? "_" + campParam : ""}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Length", String(buffer.length));
