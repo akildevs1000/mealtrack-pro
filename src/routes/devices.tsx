@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Smartphone, Wifi, WifiOff, BatteryFull, BatteryLow, Plus, Search, Copy, Check, X, Cpu, Network, User, Calendar } from "lucide-react";
 import { useCampScope } from "@/lib/session";
-import { useCamps, useCompanies, useDevices, useCreateDevice, type Device } from "@/lib/hooks";
+import { useCamps, useCompanies, useDevices, useManagers, useCreateDevice, type Device } from "@/lib/hooks";
 
 export const Route = createFileRoute("/devices")({
   component: DevicesPage,
@@ -22,6 +22,7 @@ function DevicesPage() {
   const scope = useCampScope();
   const { data: camps = [] } = useCamps();
   const { data: companies = [] } = useCompanies();
+  const { data: suppliers = [] } = useManagers();
   const { data: list = [] } = useDevices();
   const createDevice = useCreateDevice();
   const [query, setQuery] = useState("");
@@ -76,8 +77,8 @@ function DevicesPage() {
       setError("This MAC address is already registered.");
       return;
     }
-    if (!form.name || !form.serial || !form.camp) {
-      setError("Device name, serial and camp are required.");
+    if (!form.name || !form.camp) {
+      setError("Device name and camp are required.");
       return;
     }
     try {
@@ -277,11 +278,8 @@ function DevicesPage() {
               <Field label="MAC Address *">
                 <input required value={form.macAddress} onChange={(e) => setForm({ ...form, macAddress: e.target.value.toUpperCase() })} placeholder="A4:5E:60:11:8C:23" className={`${inputCls} font-mono`} />
               </Field>
-              <Field label="Serial Number *">
-                <input required value={form.serial} onChange={(e) => setForm({ ...form, serial: e.target.value })} placeholder="ZBR-AD01C-7783" className={`${inputCls} font-mono`} />
-              </Field>
               <Field label="Camp">
-                <select value={form.camp} onChange={(e) => setForm({ ...form, camp: e.target.value })} className={inputCls}>
+                <select value={form.camp} onChange={(e) => setForm({ ...form, camp: e.target.value, assignedTo: "" })} className={inputCls}>
                   {visibleCamps.map((c) => <option key={c.id} value={c.code}>{c.code} — {c.name}</option>)}
                 </select>
               </Field>
@@ -290,17 +288,16 @@ function DevicesPage() {
               </Field>
               <Field label="Android Version">
                 <select value={form.androidVersion} onChange={(e) => setForm({ ...form, androidVersion: e.target.value })} className={inputCls}>
-                  {["Android 11", "Android 12", "Android 13", "Android 14"].map((v) => <option key={v}>{v}</option>)}
+                  {["Android 7", "Android 8", "Android 9", "Android 10", "Android 11", "Android 12", "Android 13", "Android 14", "Android 15"].map((v) => <option key={v}>{v}</option>)}
                 </select>
               </Field>
-              <Field label="App Version">
-                <input value={form.appVersion} onChange={(e) => setForm({ ...form, appVersion: e.target.value })} className={inputCls} />
-              </Field>
-              <Field label="IP Address">
-                <input value={form.ipAddress} onChange={(e) => setForm({ ...form, ipAddress: e.target.value })} placeholder="10.42.10.23" className={`${inputCls} font-mono`} />
-              </Field>
-              <Field label="Assigned To">
-                <input value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} placeholder="Supplier name" className={inputCls} />
+              <Field label="Assigned To (Supplier)">
+                <select value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} className={inputCls}>
+                  <option value="">{form.camp ? "— Select supplier —" : "Select a camp first"}</option>
+                  {suppliers.filter((s) => s.camp === form.camp).map((s) => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="Registered On">
                 <input type="date" value={form.registeredOn} onChange={(e) => setForm({ ...form, registeredOn: e.target.value })} className={inputCls} />

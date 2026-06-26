@@ -31,20 +31,43 @@ const upsertSchema = z.object({
   battery: z.number().int().min(0).max(100),
   online: z.boolean(),
   macAddress: z.string(),
-  serial: z.string(),
-  model: z.string(),
+  // Serial / App Version / IP Address are no longer captured in the register
+  // dialog. Serial is generated from the MAC when absent (it's unique).
+  serial: z.string().optional(),
+  model: z.string().optional(),
   androidVersion: z.string(),
-  appVersion: z.string(),
-  ipAddress: z.string(),
-  assignedTo: z.string(),
+  appVersion: z.string().optional(),
+  ipAddress: z.string().optional(),
+  assignedTo: z.string().optional(),
   registeredOn: z.string(),
 });
+
+function buildDeviceData(body: z.infer<typeof upsertSchema>) {
+  const serial =
+    body.serial && body.serial.trim().length > 0
+      ? body.serial
+      : `SCN-${body.macAddress.replace(/[^0-9A-Za-z]/g, "").toUpperCase()}`;
+  return {
+    name: body.name,
+    campCode: body.campCode,
+    battery: body.battery,
+    online: body.online,
+    macAddress: body.macAddress,
+    serial,
+    model: body.model ?? "",
+    androidVersion: body.androidVersion,
+    appVersion: body.appVersion ?? "",
+    ipAddress: body.ipAddress ?? "",
+    assignedTo: body.assignedTo ?? "",
+    registeredOn: new Date(body.registeredOn),
+  };
+}
 
 router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const d = await prisma.device.create({
-      data: { ...body, lastSync: new Date(), registeredOn: new Date(body.registeredOn) },
+      data: { ...buildDeviceData(body), lastSync: new Date() },
     });
     res.status(201).json(toApi(d));
   } catch (e) { next(e); }
@@ -55,7 +78,7 @@ router.put("/:id", requireRole("admin", "operator"), async (req, res, next) => {
     const body = upsertSchema.parse(req.body);
     const d = await prisma.device.update({
       where: { id: req.params.id },
-      data: { ...body, registeredOn: new Date(body.registeredOn) },
+      data: buildDeviceData(body),
     });
     res.json(toApi(d));
   } catch (e) { next(e); }
