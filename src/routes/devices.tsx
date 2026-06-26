@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Smartphone, Wifi, WifiOff, BatteryFull, BatteryLow, Plus, Search, Copy, Check, X, Cpu, User, Calendar } from "lucide-react";
+import { Smartphone, Wifi, WifiOff, BatteryLow, Plus, Search, Copy, Check, X, Cpu, User, Calendar } from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import { useCamps, useCompanies, useDevices, useManagers, useCreateDevice, type Device } from "@/lib/hooks";
 
@@ -174,9 +174,7 @@ function DevicesPage() {
                 <th className="px-4 py-3 font-medium">MAC Address</th>
                 <th className="px-4 py-3 font-medium">Model</th>
                 <th className="px-4 py-3 font-medium">Camp</th>
-                <th className="px-4 py-3 font-medium">Battery</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Last Sync</th>
+                <th className="px-4 py-3 font-medium">Registered On</th>
               </tr>
             </thead>
             <tbody>
@@ -211,35 +209,12 @@ function DevicesPage() {
                   <td className="px-4 py-3">
                     <span className="inline-flex rounded-md bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">{d.camp}</span>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {d.battery >= 20 ? <BatteryFull className="size-4 text-success" /> : <BatteryLow className="size-4 text-warning" />}
-                      <div className="w-16 h-1.5 rounded-full bg-secondary overflow-hidden">
-                        <div
-                          className={`h-full ${d.battery >= 50 ? "bg-success" : d.battery >= 20 ? "bg-warning" : "bg-destructive"}`}
-                          style={{ width: `${d.battery}%` }}
-                        />
-                      </div>
-                      <span className="text-xs tabular-nums">{d.battery}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {d.online ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 text-success px-2 py-0.5 text-xs font-medium">
-                        <span className="size-1.5 rounded-full bg-success animate-pulse" /> Online
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 text-destructive px-2 py-0.5 text-xs font-medium">
-                        <span className="size-1.5 rounded-full bg-destructive" /> Offline
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{d.lastSync}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{d.registeredOn}</td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">No devices match these filters.</td>
+                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground text-sm">No devices match these filters.</td>
                 </tr>
               )}
             </tbody>
