@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Download, AlertTriangle } from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import {
@@ -92,24 +92,12 @@ function ReportsPage() {
     if (tab === "supplier") {
       const d = bySupplier.data;
       if (!d) return [];
-      const head1: (string | number)[] = ["Date"];
-      const head2: (string | number)[] = [""];
-      for (const c of d.camps) {
-        head1.push(c.code, "", "");
-        head2.push("B/F", "Lunch", "Dinner");
-      }
-      head1.push("Total", "", "", "Avg/Day");
-      head2.push("B/F", "Lunch", "Dinner", "");
-      const body = d.rows.map((r) => {
-        const row: (string | number)[] = [r.date];
-        for (const c of d.camps) {
-          const cell = r.perCamp[c.code] ?? { breakfast: 0, lunch: 0, dinner: 0 };
-          row.push(cell.breakfast, cell.lunch, cell.dinner);
-        }
-        row.push(r.totals.breakfast, r.totals.lunch, r.totals.dinner, r.avgPerDay);
-        return row;
-      });
-      return [head1, head2, ...body];
+      const nm = new Map(d.camps.map((c) => [c.code, c.name]));
+      const rows = supplierStackedRows(d);
+      return [
+        ["Date", "Distribution Point", "Breakfast", "Lunch", "Dinner", "Total"],
+        ...rows.map((r) => [r.date, `${r.code} — ${nm.get(r.code) ?? ""}`, r.breakfast, r.lunch, r.dinner, r.total]),
+      ];
     }
     if (tab === "location") {
       const rows = byLocation.data?.rows ?? [];
@@ -237,7 +225,7 @@ function ReportsPage() {
       {/* Report body */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-card">
         {tab === "daily" && <DailyTable rows={daily.data?.rows ?? []} loading={daily.isLoading} />}
-        {tab === "supplier" && <SupplierPivot data={bySupplier.data} loading={bySupplier.isLoading} />}
+        {tab === "supplier" && <SupplierStacked data={bySupplier.data} loading={bySupplier.isLoading} />}
         {tab === "location" && <LocationTable rows={byLocation.data?.rows ?? []} loading={byLocation.isLoading} />}
         {tab === "comparison" && <ComparisonTable rows={comparison.data?.rows ?? []} loading={comparison.isLoading} />}
         {tab === "duplicate" && <DuplicateTable rows={duplicate.data?.rows ?? []} loading={duplicate.isLoading} from={from} to={to} />}
@@ -301,64 +289,48 @@ function DailyTable({ rows, loading }: { rows: import("@/lib/hooks").DailyDistRo
   );
 }
 
-// ── Report 2 (pivot) ─────────────────────────────────────────────────────
-function SupplierPivot({ data, loading }: { data: import("@/lib/hooks").BySupplierData | undefined; loading: boolean }) {
-  const camps = data?.camps ?? [];
-  const rows = data?.rows ?? [];
-  const cols = 1 + camps.length * 3 + 3 + 1;
+// ── Report 2 (stacked: one row per Date × distribution point) ─────────────
+function supplierStackedRows(d: import("@/lib/hooks").BySupplierData) {
+  return d.rows.flatMap((r) =>
+    Object.entries(r.perCamp)
+      .map(([code, cell]) => ({ date: r.date, code, ...cell, total: cell.breakfast + cell.lunch + cell.dinner }))
+      .filter((x) => x.total > 0),
+  );
+}
+function SupplierStacked({ data, loading }: { data: import("@/lib/hooks").BySupplierData | undefined; loading: boolean }) {
+  const campName = new Map((data?.camps ?? []).map((c) => [c.code, c.name]));
+  const rows = data ? supplierStackedRows(data) : [];
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-secondary/60 text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th rowSpan={2} className={`${thL} align-bottom`}>Date</th>
-            {camps.map((c) => (
-              <th key={c.code} colSpan={3} className="text-center px-4 py-2 font-medium border-l border-border">{c.code}</th>
-            ))}
-            <th colSpan={3} className="text-center px-4 py-2 font-medium border-l border-border text-primary">Total</th>
-            <th rowSpan={2} className={`${thR} align-bottom border-l border-border`}>Avg/Day</th>
-          </tr>
-          <tr>
-            {camps.map((c) => (
-              <MealSubHead key={c.code} bordered />
-            ))}
-            <MealSubHead bordered primary />
+            <th className={thL}>Date</th>
+            <th className={thL}>Distribution Point</th>
+            <th className={thR}>Breakfast</th>
+            <th className={thR}>Lunch</th>
+            <th className={thR}>Dinner</th>
+            <th className={thR}>Total</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.date} className="border-t border-border hover:bg-secondary/30">
+          {rows.map((r, i) => (
+            <tr key={`${r.date}-${r.code}-${i}`} className="border-t border-border hover:bg-secondary/30">
               <td className={`${tdL} whitespace-nowrap`}>{fmtDate(r.date)}</td>
-              {camps.map((c) => {
-                const cell = r.perCamp[c.code] ?? { breakfast: 0, lunch: 0, dinner: 0 };
-                return (
-                  <Fragment key={c.code}>
-                    <td className={`${tdR} border-l border-border`}>{cell.breakfast}</td>
-                    <td className={tdR}>{cell.lunch}</td>
-                    <td className={tdR}>{cell.dinner}</td>
-                  </Fragment>
-                );
-              })}
-              <td className={`${tdR} border-l border-border font-semibold text-primary`}>{r.totals.breakfast}</td>
-              <td className={`${tdR} font-semibold text-primary`}>{r.totals.lunch}</td>
-              <td className={`${tdR} font-semibold text-primary`}>{r.totals.dinner}</td>
-              <td className={`${tdR} border-l border-border font-semibold`}>{r.avgPerDay}</td>
+              <td className={tdL}>
+                <span className="rounded-md bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">{r.code}</span>
+                <span className="text-muted-foreground text-xs ml-2">{campName.get(r.code)}</span>
+              </td>
+              <td className={tdR}>{r.breakfast}</td>
+              <td className={tdR}>{r.lunch}</td>
+              <td className={tdR}>{r.dinner}</td>
+              <td className={`${tdR} font-semibold`}>{r.total}</td>
             </tr>
           ))}
-          {rows.length === 0 && <Empty cols={cols} msg={loading ? "Loading…" : "No served meals in this range."} />}
+          {rows.length === 0 && <Empty cols={6} msg={loading ? "Loading…" : "No served meals in this range."} />}
         </tbody>
       </table>
     </div>
-  );
-}
-function MealSubHead({ bordered, primary }: { bordered?: boolean; primary?: boolean }) {
-  const base = `text-right px-4 py-2 font-medium text-[11px] ${primary ? "text-primary" : ""}`;
-  return (
-    <>
-      <th className={`${base} ${bordered ? "border-l border-border" : ""}`}>B/F</th>
-      <th className={base}>Lunch</th>
-      <th className={base}>Dinner</th>
-    </>
   );
 }
 
