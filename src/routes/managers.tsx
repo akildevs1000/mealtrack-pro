@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Search,
@@ -15,6 +15,8 @@ import {
   X,
   AlertTriangle,
   CheckCircle2,
+  Check,
+  ChevronDown,
   Clock,
   Smartphone,
 } from "lucide-react";
@@ -600,42 +602,11 @@ function ManagerDialog({
             </select>
           </Field>
           <Field label="Assigned Camps *">
-            <div className="rounded-lg bg-secondary border border-transparent max-h-44 overflow-y-auto divide-y divide-border/60">
-              {camps.length === 0 && (
-                <div className="px-3 py-2 text-xs text-muted-foreground">No camps available.</div>
-              )}
-              {camps.map((c) => {
-                const checked = form.camps.includes(c.code);
-                return (
-                  <label
-                    key={c.id}
-                    className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-secondary/60"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          // First selected stays first → it becomes the primary camp.
-                          camps: e.target.checked
-                            ? [...form.camps, c.code]
-                            : form.camps.filter((x) => x !== c.code),
-                        })
-                      }
-                      className="size-4 accent-primary"
-                    />
-                    <span className="font-mono text-xs">{c.code}</span>
-                    <span className="text-muted-foreground truncate">— {c.name}</span>
-                    {form.camps[0] === c.code && form.camps.length > 1 && (
-                      <span className="ml-auto text-[10px] uppercase tracking-wide text-primary">
-                        Primary
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
+            <MultiCampSelect
+              camps={camps}
+              value={form.camps}
+              onChange={(camps) => setForm({ ...form, camps })}
+            />
           </Field>
           <Field label="Status">
             <select
@@ -702,6 +673,109 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
       <span className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</span>
       {children}
     </label>
+  );
+}
+
+// Multi-camp picker styled like a single <select>: a chip-filled trigger that
+// opens a checklist dropdown. Self-contained (no portal) so it plays nicely
+// inside the hand-rolled modal; closes on outside click. First selected camp
+// is the primary.
+function MultiCampSelect({
+  camps,
+  value,
+  onChange,
+}: {
+  camps: { id: string; code: string; name: string }[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const toggle = (code: string) =>
+    onChange(value.includes(code) ? value.filter((c) => c !== code) : [...value, code]);
+
+  // Preserve selection order so value[0] stays the primary camp.
+  const selected = value
+    .map((code) => camps.find((c) => c.code === code))
+    .filter((c): c is { id: string; code: string; name: string } => Boolean(c));
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${inputCls} flex items-center gap-1.5 flex-wrap text-left min-h-[2.625rem] cursor-pointer`}
+      >
+        {selected.length === 0 ? (
+          <span className="text-muted-foreground">— Select camps —</span>
+        ) : (
+          selected.map((c, i) => (
+            <span
+              key={c.code}
+              className="inline-flex items-center gap-1 rounded-md bg-primary/10 text-primary pl-1.5 pr-1 py-0.5 text-xs font-medium"
+            >
+              <span className="font-mono">{c.code}</span>
+              {i === 0 && selected.length > 1 && (
+                <span className="text-[9px] uppercase tracking-wide opacity-70">primary</span>
+              )}
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggle(c.code);
+                }}
+                className="grid place-items-center rounded hover:bg-primary/20"
+              >
+                <X className="size-3" />
+              </span>
+            </span>
+          ))
+        )}
+        <ChevronDown
+          className={`size-4 text-muted-foreground ml-auto shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-lg bg-card border border-border shadow-elegant max-h-56 overflow-y-auto py-1">
+          {camps.length === 0 && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">No camps available.</div>
+          )}
+          {camps.map((c) => {
+            const checked = value.includes(c.code);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggle(c.code)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-secondary"
+              >
+                <span
+                  className={`size-4 rounded border grid place-items-center shrink-0 ${
+                    checked ? "bg-primary border-primary text-primary-foreground" : "border-border"
+                  }`}
+                >
+                  {checked && <Check className="size-3" />}
+                </span>
+                <span className="font-mono text-xs">{c.code}</span>
+                <span className="text-muted-foreground truncate">— {c.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
