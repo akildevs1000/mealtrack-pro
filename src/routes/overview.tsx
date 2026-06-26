@@ -4,7 +4,7 @@ import { Building2, Users, Utensils, Target, AlertTriangle, Smartphone, Trending
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 import { useCampScope } from "@/lib/session";
-import { useOverview, useCamps, useScans } from "@/lib/hooks";
+import { useOverview, useCamps, useCompanies, useScans } from "@/lib/hooks";
 
 const MEAL_COLORS: Record<string, string> = {
   Breakfast: "var(--chart-3)",
@@ -40,17 +40,29 @@ export const Route = createFileRoute("/overview")({
 function Overview() {
   const campScope = useCampScope();
   const { data: camps = [] } = useCamps();
-  const visibleCamps = useMemo(
-    () => (campScope ? camps.filter((c) => campScope.includes(c.code)) : camps),
-    [campScope, camps],
-  );
+  const { data: companies = [] } = useCompanies();
+  // Parent-company filter. "all" = no company restriction; camps are siblings,
+  // so picking a company narrows the branch dropdown to that company's camps.
+  const [company, setCompany] = useState<string>("all");
+  const visibleCamps = useMemo(() => {
+    let cs = campScope ? camps.filter((c) => campScope.includes(c.code)) : camps;
+    if (company !== "all") cs = cs.filter((c) => c.companyCode === company);
+    return cs;
+  }, [campScope, camps, company]);
   const [branch, setBranch] = useState<string>("all");
   useEffect(() => {
     if (campScope && visibleCamps[0] && branch === "all") setBranch(visibleCamps[0].code);
   }, [campScope, visibleCamps, branch]);
+  // If the selected branch no longer belongs to the chosen company, reset it.
+  useEffect(() => {
+    if (branch !== "all" && !visibleCamps.some((c) => c.code === branch)) setBranch("all");
+  }, [visibleCamps, branch]);
 
-  // Backend filters the entire overview payload by the chosen camp.
-  const { data: overview } = useOverview(branch === "all" ? null : branch);
+  // Backend filters the entire overview payload by the chosen camp + company.
+  const { data: overview } = useOverview(
+    branch === "all" ? null : branch,
+    company === "all" ? null : company,
+  );
   const { data: recentScans = [] } = useScans(20);
 
   const kpis = overview?.kpis ?? DEFAULT_KPIS;
@@ -96,6 +108,20 @@ function Overview() {
           <div className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-card border border-border text-xs">
             <Clock className="size-3.5 text-muted-foreground" />
             <span className="font-mono font-semibold tabular-nums">{timeStr}</span>
+          </div>
+          <div className="inline-flex items-center h-9 pl-3 pr-1 rounded-lg bg-card border border-border">
+            <Building2 className="size-3.5 text-muted-foreground mr-2" />
+            <select
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className="bg-transparent text-xs font-medium pr-2 py-1 outline-none cursor-pointer text-foreground [&>option]:bg-card [&>option]:text-foreground"
+              aria-label="Filter by company"
+            >
+              <option value="all">All companies</option>
+              {companies.map((co) => (
+                <option key={co.code} value={co.code}>{co.code} — {co.name}</option>
+              ))}
+            </select>
           </div>
           <div className="inline-flex items-center h-9 pl-3 pr-1 rounded-lg bg-card border border-border">
             <Building2 className="size-3.5 text-muted-foreground mr-2" />

@@ -21,6 +21,21 @@ router.get("/", async (req, res, next) => {
       }
       filterCodes = [requested];
     }
+    // Parent-company filter: narrow to the company's camps (Camp.companyCode),
+    // intersected with the camp scope / explicit camp. Camp is a sibling of the
+    // Company, so picking a company restricts the whole dashboard to its camps.
+    const companyCode =
+      typeof req.query.companyCode === "string" && req.query.companyCode !== "all"
+        ? req.query.companyCode
+        : null;
+    if (companyCode) {
+      const companyCamps = await prisma.camp.findMany({
+        where: { companyCode },
+        select: { code: true },
+      });
+      const companyCodes = companyCamps.map((c) => c.code);
+      filterCodes = filterCodes ? filterCodes.filter((c) => companyCodes.includes(c)) : companyCodes;
+    }
     const campsWhere = filterCodes ? { code: { in: filterCodes } } : undefined;
     const scanFilter = filterCodes ? { campCode: { in: filterCodes } } : {};
 

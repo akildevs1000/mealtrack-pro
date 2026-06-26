@@ -36,6 +36,7 @@ function EmployeesPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "Active" | "InActive" | "leave">("all");
   const [campFilter, setCampFilter] = useState<string>("all");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [view, setView] = useState<"card" | "list">("list");
   const [selected, setSelected] = useState<CmsEmployee | null>(null);
   const [editing, setEditing] = useState<CmsEmployee | null>(null);
@@ -80,12 +81,18 @@ function EmployeesPage() {
     () => Array.from(new Set(scopedEmployees.map((e) => e.campCode))).sort(),
     [scopedEmployees],
   );
+  // Parent companies present in the roster (CmsEmployee.company holds the code).
+  const companyCodes = useMemo(
+    () => Array.from(new Set(scopedEmployees.map((e) => e.company).filter(Boolean))).sort(),
+    [scopedEmployees],
+  );
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     return scopedEmployees.filter((e) => {
       if (statusFilter !== "all" && e.status !== statusFilter) return false;
       if (campFilter !== "all" && e.campCode !== campFilter) return false;
+      if (companyFilter !== "all" && e.company !== companyFilter) return false;
       if (!q) return true;
       return (
         e.name.toLowerCase().includes(q) ||
@@ -95,7 +102,7 @@ function EmployeesPage() {
         e.campName.toLowerCase().includes(q)
       );
     });
-  }, [query, statusFilter, campFilter, scopedEmployees]);
+  }, [query, statusFilter, campFilter, companyFilter, scopedEmployees]);
 
   return (
     <div className="space-y-6">
@@ -163,6 +170,11 @@ function EmployeesPage() {
           <option value="Active">Active</option>
           <option value="InActive">Inactive</option>
           <option value="leave">On Leave</option>
+        </select>
+        <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}
+          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none">
+          <option value="all">All companies</option>
+          {companyCodes.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={campFilter} onChange={(e) => setCampFilter(e.target.value)}
           className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none">

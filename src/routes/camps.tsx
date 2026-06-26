@@ -18,22 +18,25 @@ const emptyForm: FormState = { code: "", name: "", site: "", companyCode: null, 
 function CampsPage() {
   const scope = useCampScope();
   const { data: list = [] } = useCamps();
+  const { data: companies = [] } = useCompanies();
   const upsert = useUpsertCamp();
   const del = useDeleteCamp();
   const [view, setView] = useState<View>("card");
   const [query, setQuery] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("all");
   const [editing, setEditing] = useState<Camp | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Camp | null>(null);
 
   const filtered = useMemo(() => {
-    const scoped = scope ? list.filter((c) => scope.includes(c.code)) : list;
+    let scoped = scope ? list.filter((c) => scope.includes(c.code)) : list;
+    if (companyFilter !== "all") scoped = scoped.filter((c) => c.companyCode === companyFilter);
     if (!query) return scoped;
     const q = query.toLowerCase();
     return scoped.filter((c) =>
       c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.site.toLowerCase().includes(q),
     );
-  }, [list, query, scope]);
+  }, [list, query, scope, companyFilter]);
 
   async function save(form: FormState, id?: string) {
     const existing = id ? list.find((c) => c.id === id)?.code : undefined;
@@ -73,6 +76,16 @@ function CampsPage() {
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
           />
         </div>
+        <select
+          value={companyFilter}
+          onChange={(e) => setCompanyFilter(e.target.value)}
+          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
+        >
+          <option value="all">All companies</option>
+          {companies.map((co) => (
+            <option key={co.id} value={co.code}>{co.code} — {co.name}</option>
+          ))}
+        </select>
         <div className="ml-auto inline-flex rounded-lg border border-border bg-card p-1">
           <button
             onClick={() => setView("card")}

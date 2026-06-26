@@ -645,12 +645,16 @@ export function useReportEmployees(p: { campCode?: string; companyCode?: string;
   });
 }
 
-// Overview / dashboard. Pass a camp code to narrow the dashboard to one camp.
-export function useOverview(campCode?: string | null) {
-  const qs = campCode ? `?campCode=${encodeURIComponent(campCode)}` : "";
+// Overview / dashboard. Pass a camp code to narrow to one camp and/or a company
+// code to narrow to that parent company's camps (Camp is a sibling of Company).
+export function useOverview(campCode?: string | null, companyCode?: string | null) {
+  const params = new URLSearchParams();
+  if (campCode) params.set("campCode", campCode);
+  if (companyCode) params.set("companyCode", companyCode);
+  const qs = params.toString();
   return useQuery({
-    queryKey: ["overview", campCode ?? "all"],
-    queryFn: () => api<Overview>(`/overview${qs}`),
+    queryKey: ["overview", campCode ?? "all", companyCode ?? "all"],
+    queryFn: () => api<Overview>(`/overview${qs ? `?${qs}` : ""}`),
   });
 }
 
