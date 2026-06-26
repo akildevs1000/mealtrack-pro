@@ -240,7 +240,14 @@ function Managers() {
         </select>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div
+        className={
+          viewingLive
+            ? "grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-4 items-start"
+            : ""
+        }
+      >
+      <div className="rounded-xl border border-border bg-card overflow-hidden min-w-0">
         <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border bg-secondary/30">
           Tip: double-click a row to view the full supplier profile.
         </div>
@@ -386,6 +393,19 @@ function Managers() {
         </div>
       </div>
 
+      {viewingLive && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden xl:sticky xl:top-4">
+          <SupplierDetail
+            m={viewingLive}
+            onEdit={() => setEditing(viewingLive)}
+            onToggle={() => toggleStatus(viewingLive.id)}
+            onDelete={() => setConfirmDelete(viewingLive)}
+            onClose={() => setViewing(null)}
+          />
+        </div>
+      )}
+      </div>
+
       {(creating || editing) && (
         <ManagerDialog
           manager={editing}
@@ -404,31 +424,6 @@ function Managers() {
           onCancel={() => setConfirmDelete(null)}
           onConfirm={() => remove(confirmDelete.id)}
         />
-      )}
-      {viewingLive && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
-          onClick={() => setViewing(null)}
-        >
-          <div
-            className="w-full max-w-2xl rounded-2xl bg-card border border-border shadow-elegant my-8"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <SupplierDetail
-              m={viewingLive}
-              onEdit={() => {
-                setViewing(null);
-                setEditing(viewingLive);
-              }}
-              onToggle={() => toggleStatus(viewingLive.id)}
-              onDelete={() => {
-                setViewing(null);
-                setConfirmDelete(viewingLive);
-              }}
-              onClose={() => setViewing(null)}
-            />
-          </div>
-        </div>
       )}
     </div>
   );
@@ -914,8 +909,8 @@ function SupplierDetail({
       </div>
 
       {/* Body */}
-      <div className="p-5 grid sm:grid-cols-2 gap-4">
-        <DetailCard icon={<Building2 className="size-4" />} title="Assigned Camps" className="sm:col-span-2">
+      <div className="p-5 grid grid-cols-1 gap-3">
+        <DetailCard icon={<Building2 className="size-4" />} title="Assigned Camps">
           <div className="flex flex-wrap gap-1.5">
             {allCamps.map((code, i) => (
               <span
