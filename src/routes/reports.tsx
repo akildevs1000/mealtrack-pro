@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Download, AlertTriangle } from "lucide-react";
+import { Download, FileText, AlertTriangle } from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import {
   useCompanies,
@@ -121,6 +121,8 @@ function ReportsPage() {
     ];
   }, [tab, daily.data, bySupplier.data, byLocation.data, comparison.data, duplicate.data]);
 
+  const companyLabel = company === "all" ? "All companies" : companies.find((c) => c.code === company)?.name ?? company;
+
   function exportExcel() {
     if (exportMatrix.length === 0) return;
     const ws = XLSX.utils.aoa_to_sheet(exportMatrix);
@@ -129,6 +131,44 @@ function ReportsPage() {
     XLSX.utils.book_append_sheet(wb, ws, meta.title.slice(0, 28));
     const range = tab === "daily" ? date : `${from}_to_${to}`;
     XLSX.writeFile(wb, `${meta.title.replace(/\s+/g, "_")}_${range}.xlsx`);
+  }
+
+  async function exportPdf() {
+    if (exportMatrix.length <= 1) return;
+    const { jsPDF } = await import("jspdf");
+    const autoTable = (await import("jspdf-autotable")).default;
+    const meta = TABS.find((t) => t.id === tab)!;
+    const landscape = exportMatrix[0].length > 6;
+    const doc = new jsPDF({ orientation: landscape ? "landscape" : "portrait", unit: "pt", format: "a4" });
+    const rangeLabel = tab === "daily" ? fmtDate(date) : `${fmtDate(from)} → ${fmtDate(to)}`;
+
+    doc.setFontSize(15);
+    doc.setTextColor(20);
+    doc.text(`${meta.n}. ${meta.title}`, 40, 40);
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(`Company: ${companyLabel}     Period: ${rangeLabel}`, 40, 57);
+    doc.text(`MyMeals — Integrated Reports Suite`, 40, 70);
+
+    const head = [exportMatrix[0].map(String)];
+    const body = exportMatrix.slice(1).map((r) => r.map((c) => String(c)));
+    autoTable(doc, {
+      head,
+      body,
+      startY: 84,
+      styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
+      headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      didParseCell: (d: any) => {
+        // Report 5 — colour rows by Status (Duplicate = amber, else red).
+        if (tab === "duplicate" && d.section === "body") {
+          const status = String(body[d.row.index]?.[3] ?? "").toLowerCase();
+          d.cell.styles.fillColor = status.includes("duplicate") ? [254, 243, 199] : [254, 226, 226];
+        }
+      },
+    });
+    const range = tab === "daily" ? date : `${from}_to_${to}`;
+    doc.save(`${meta.title.replace(/\s+/g, "_")}_${range}.pdf`);
   }
 
   const showDate = tab === "daily";
@@ -146,12 +186,20 @@ function ReportsPage() {
             Transactional performance and volume metrics under the selected Company filter.
           </p>
         </div>
-        <button
-          onClick={exportExcel}
-          className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold shadow-glow hover:opacity-95"
-        >
-          <Download className="size-4" /> Export Excel
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportPdf}
+            className="inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold hover:bg-secondary/80"
+          >
+            <FileText className="size-4" /> Download PDF
+          </button>
+          <button
+            onClick={exportExcel}
+            className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold shadow-glow hover:opacity-95"
+          >
+            <Download className="size-4" /> Export Excel
+          </button>
+        </div>
       </div>
 
       {/* Report tabs */}
