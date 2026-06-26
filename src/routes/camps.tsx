@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { defaultSchedule, type MealSchedule } from "@/lib/mock-data";
 import { Building2, Users, MapPin, Wifi, WifiOff, Plus, Pencil, Trash2, LayoutGrid, List, Search, X, AlertTriangle, Sunrise, Sun, Moon } from "lucide-react";
 import { useCampScope } from "@/lib/session";
-import { useCamps, useUpsertCamp, useDeleteCamp, type Camp } from "@/lib/hooks";
+import { useCamps, useUpsertCamp, useDeleteCamp, useCompanies, type Camp } from "@/lib/hooks";
 
 export const Route = createFileRoute("/camps")({
   component: CampsPage,
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/camps")({
 type View = "card" | "list";
 type FormState = Omit<Camp, "id">;
 
-const emptyForm: FormState = { code: "", name: "", site: "", employees: 0, online: true, schedule: defaultSchedule };
+const emptyForm: FormState = { code: "", name: "", site: "", companyCode: null, employees: 0, online: true, schedule: defaultSchedule };
 
 function CampsPage() {
   const scope = useCampScope();
@@ -237,8 +237,9 @@ function CampDialog({ camp, existingCodes, onClose, onSave }: {
   onClose: () => void;
   onSave: (form: FormState, id?: string) => void;
 }) {
+  const { data: companies = [] } = useCompanies();
   const [form, setForm] = useState<FormState>(camp
-    ? { code: camp.code, name: camp.name, site: camp.site, employees: camp.employees, online: camp.online, schedule: camp.schedule ?? defaultSchedule }
+    ? { code: camp.code, name: camp.name, site: camp.site, companyCode: camp.companyCode, employees: camp.employees, online: camp.online, schedule: camp.schedule ?? defaultSchedule }
     : emptyForm);
   const [error, setError] = useState<string | null>(null);
 
@@ -285,6 +286,20 @@ function CampDialog({ camp, existingCodes, onClose, onSave }: {
               <option value="offline">Offline</option>
             </select>
           </Field>
+          <div className="md:col-span-2">
+            <Field label="Company">
+              <select
+                value={form.companyCode ?? ""}
+                onChange={(e) => setForm({ ...form, companyCode: e.target.value || null })}
+                className={inputCls}
+              >
+                <option value="">— Select company —</option>
+                {companies.map((co) => (
+                  <option key={co.id} value={co.code}>{co.code} — {co.name}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
           <div className="md:col-span-2">
             <Field label="Camp Name *">
               <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Al Reem Camp" className={inputCls} />

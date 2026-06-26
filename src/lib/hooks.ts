@@ -24,6 +24,7 @@ export type Camp = {
   code: string;
   name: string;
   site: string;
+  companyCode: string | null;
   employees: number;
   online: boolean;
   schedule: {
@@ -50,9 +51,22 @@ export type Project = {
   name: string;
   location: string;
   company: string;
+  companyCode: string | null;
   manager: string;
   employees: number;
   active: boolean;
+};
+
+export type FoodEstimation = {
+  id: string;
+  date: string;
+  companyCode: string;
+  supplierId: string | null;
+  projectCode: string | null;
+  campCode: string | null;
+  breakfast: number;
+  lunch: number;
+  dinner: number;
 };
 
 export type CmsEmployee = {
@@ -106,6 +120,7 @@ export type Manager = {
   phone: string;
   emiratesId: string;
   camp: string;
+  companyCode: string | null;
   role: "Camp Manager" | "Senior Manager" | "Supervisor";
   shift: "Morning" | "Evening" | "Full Day";
   joinDate: string;
@@ -224,6 +239,28 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: (code: string) => api<void>(`/projects/${code}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+// Food estimations
+export function useFoodEstimations(params?: { companyCode?: string; from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.companyCode) qs.set("companyCode", params.companyCode);
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  const s = qs.toString();
+  return useQuery({
+    queryKey: ["food-estimations", params ?? {}],
+    queryFn: () => api<FoodEstimation[]>(`/food-estimations${s ? `?${s}` : ""}`),
+  });
+}
+
+export function useCreateFoodEstimation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<FoodEstimation, "id" | "date"> & { date?: string }) =>
+      api<FoodEstimation>("/food-estimations", { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["food-estimations"] }),
   });
 }
 
@@ -400,6 +437,7 @@ export type ManagerInput = {
   phone: string;
   emiratesId: string;
   campCode: string;
+  companyCode?: string | null;
   role: "Camp Manager" | "Senior Manager" | "Supervisor";
   shift: "Morning" | "Evening" | "Full Day";
   joinDate: string;
@@ -418,6 +456,7 @@ function packManager(input: ManagerInput) {
     phone: input.phone,
     emiratesId: input.emiratesId,
     campCode: input.campCode,
+    companyCode: input.companyCode ?? null,
     role: input.role === "Camp Manager" ? "CampManager"
         : input.role === "Senior Manager" ? "SeniorManager" : "Supervisor",
     shift: input.shift === "Full Day" ? "FullDay" : input.shift,

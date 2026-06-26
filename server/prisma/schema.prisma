@@ -118,11 +118,15 @@ model Camp {
   devices   Device[]
   managers  CampManager[]
 
+  // Parent company (siblings: Camp, Project, Supplier all hang off a Company).
+  companyCode String?
+  companyRef  Company? @relation(fields: [companyCode], references: [code])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// Contractor / employer companies. Standalone directory (no FK joins yet).
+// Contractor / employer companies. Parent of Camp / Project / Supplier.
 model Company {
   id        String   @id @default(cuid())
   code      String   @unique // e.g. "INNOVO"
@@ -133,23 +137,52 @@ model Company {
   employees Int      @default(0)
   active    Boolean  @default(true)
 
+  // Children (all siblings to each other, parented by this Company).
+  camps       Camp[]
+  projects    Project[]
+  suppliers   CampManager[]
+  estimations FoodEstimation[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// Construction projects / sites. Standalone directory (no FK joins yet).
+// Construction projects / sites. Parented by a Company.
 model Project {
   id        String   @id @default(cuid())
   code      String   @unique // e.g. "PRJ-01"
   name      String
   location  String   @default("") // site / area
-  company   String   @default("") // owning company (free text for now)
+  company   String   @default("") // owning company name (display)
   manager   String   @default("") // project manager / contact
   employees Int      @default(0)
   active    Boolean  @default(true)
 
+  companyCode String?
+  companyRef  Company? @relation(fields: [companyCode], references: [code])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Food estimation entry: estimated meal headcounts for a
+// Company / Supplier / Project / Camp on a given date.
+model FoodEstimation {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now()) // the estimation date (records current date)
+  companyCode String
+  company     Company  @relation(fields: [companyCode], references: [code])
+  supplierId  String? // CampManager id
+  projectCode String?
+  campCode    String?
+  breakfast   Int      @default(0)
+  lunch       Int      @default(0)
+  dinner      Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyCode, date])
 }
 
 // CMS employee roster (different camp coding scheme: "CAMP 19")
@@ -245,6 +278,9 @@ model CampManager {
   emiratesId  String
   camp        Camp          @relation(fields: [campCode], references: [code])
   campCode    String
+  // Parent company (a Supplier belongs to a Company).
+  companyCode String?
+  companyRef  Company?      @relation(fields: [companyCode], references: [code])
   role        ManagerRole
   shift       ManagerShift
   joinDate    DateTime

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { FolderKanban, Users, Plus, Pencil, Trash2, LayoutGrid, List, Search, X, AlertTriangle, MapPin, Building2, User } from "lucide-react";
-import { useProjects, useUpsertProject, useDeleteProject, type Project } from "@/lib/hooks";
+import { useProjects, useUpsertProject, useDeleteProject, useCompanies, type Project } from "@/lib/hooks";
 
 export const Route = createFileRoute("/projects")({
   component: ProjectsPage,
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/projects")({
 type View = "card" | "list";
 type FormState = Omit<Project, "id">;
 
-const emptyForm: FormState = { code: "", name: "", location: "", company: "", manager: "", employees: 0, active: true };
+const emptyForm: FormState = { code: "", name: "", location: "", company: "", companyCode: null, manager: "", employees: 0, active: true };
 
 function ProjectsPage() {
   const { data: list = [] } = useProjects();
@@ -230,8 +230,9 @@ function ProjectDialog({ project, existingCodes, onClose, onSave }: {
   onClose: () => void;
   onSave: (form: FormState, id?: string) => void;
 }) {
+  const { data: companies = [] } = useCompanies();
   const [form, setForm] = useState<FormState>(project
-    ? { code: project.code, name: project.name, location: project.location, company: project.company, manager: project.manager, employees: project.employees, active: project.active }
+    ? { code: project.code, name: project.name, location: project.location, company: project.company, companyCode: project.companyCode, manager: project.manager, employees: project.employees, active: project.active }
     : emptyForm);
   const [error, setError] = useState<string | null>(null);
 
@@ -280,7 +281,19 @@ function ProjectDialog({ project, existingCodes, onClose, onSave }: {
             </Field>
           </div>
           <Field label="Company">
-            <input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Innovo Building Contracting" className={inputCls} />
+            <select
+              value={form.companyCode ?? ""}
+              onChange={(e) => {
+                const co = companies.find((x) => x.code === e.target.value);
+                setForm({ ...form, companyCode: co ? co.code : null, company: co ? co.name : "" });
+              }}
+              className={inputCls}
+            >
+              <option value="">— Select company —</option>
+              {companies.map((co) => (
+                <option key={co.id} value={co.code}>{co.code} — {co.name}</option>
+              ))}
+            </select>
           </Field>
           <Field label="Project Manager">
             <input value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} placeholder="Ahmed Khan" className={inputCls} />

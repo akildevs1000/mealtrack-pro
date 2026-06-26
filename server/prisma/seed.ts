@@ -11,17 +11,17 @@ const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = "password123";
 
 const camps = [
-  { code: "AD-01", name: "Al Reem Camp", site: "Reem Tower Project", employees: 1240, online: true,
+  { code: "AD-01", name: "Al Reem Camp", site: "Reem Tower Project", employees: 1240, online: true, companyCode: "INNOVOBLD",
     breakfastStart: "05:30", breakfastEnd: "08:30", lunchStart: "12:00", lunchEnd: "14:00", dinnerStart: "18:30", dinnerEnd: "21:30" },
-  { code: "DXB-04", name: "Marina Workers Village", site: "Marina Heights", employees: 980, online: true,
+  { code: "DXB-04", name: "Marina Workers Village", site: "Marina Heights", employees: 980, online: true, companyCode: "ALFUTTAIM",
     breakfastStart: "06:00", breakfastEnd: "09:00", lunchStart: "12:30", lunchEnd: "14:30", dinnerStart: "19:00", dinnerEnd: "22:00" },
-  { code: "SHJ-02", name: "Sharjah Industrial Camp", site: "Industrial Park 7", employees: 1560, online: true,
+  { code: "SHJ-02", name: "Sharjah Industrial Camp", site: "Industrial Park 7", employees: 1560, online: true, companyCode: "ARABTEC",
     breakfastStart: "05:00", breakfastEnd: "08:00", lunchStart: "11:30", lunchEnd: "13:30", dinnerStart: "18:00", dinnerEnd: "21:00" },
-  { code: "AUH-09", name: "Mussafah Labour Camp", site: "Mussafah Bridge", employees: 2110, online: false,
+  { code: "AUH-09", name: "Mussafah Labour Camp", site: "Mussafah Bridge", employees: 2110, online: false, companyCode: "DUTCOBALFR",
     breakfastStart: "05:30", breakfastEnd: "08:30", lunchStart: "12:00", lunchEnd: "14:00", dinnerStart: "19:00", dinnerEnd: "22:00" },
-  { code: "RAK-01", name: "Al Hamra Camp", site: "Al Hamra Mall Ext.", employees: 740, online: true,
+  { code: "RAK-01", name: "Al Hamra Camp", site: "Al Hamra Mall Ext.", employees: 740, online: true, companyCode: "KHANSAHEB",
     breakfastStart: "06:00", breakfastEnd: "08:30", lunchStart: "12:00", lunchEnd: "13:30", dinnerStart: "18:30", dinnerEnd: "21:00" },
-  { code: "AJM-03", name: "Ajman Central Camp", site: "Corniche Towers", employees: 1320, online: true,
+  { code: "AJM-03", name: "Ajman Central Camp", site: "Corniche Towers", employees: 1320, online: true, companyCode: "GINCON",
     breakfastStart: "05:45", breakfastEnd: "08:45", lunchStart: "12:15", lunchEnd: "14:15", dinnerStart: "18:45", dinnerEnd: "21:45" },
 ];
 
@@ -36,12 +36,12 @@ const companies = [
 ];
 
 const projects = [
-  { code: "PRJ-01", name: "Reem Tower", location: "Al Reem Island, Abu Dhabi", company: "Innovo Building Contracting", manager: "Ahmed Khan", employees: 420, active: true },
-  { code: "PRJ-02", name: "Marina Heights", location: "Dubai Marina", company: "Arabtec Holding", manager: "Samir Haddad", employees: 610, active: true },
-  { code: "PRJ-03", name: "Industrial Park 7", location: "Sharjah", company: "Al Futtaim Construction", manager: "Rashid Al Mansoori", employees: 380, active: true },
-  { code: "PRJ-04", name: "Mussafah Bridge Works", location: "Mussafah, Abu Dhabi", company: "Dutco Balfour Beatty", manager: "John Pereira", employees: 540, active: false },
-  { code: "PRJ-05", name: "Al Hamra Mall Extension", location: "Ras Al Khaimah", company: "Khansaheb Civil Engineering", manager: "Imran Sheikh", employees: 260, active: true },
-  { code: "PRJ-06", name: "Corniche Towers", location: "Ajman", company: "Ginco General Contracting", manager: "Fatima Al Zahra", employees: 470, active: true },
+  { code: "PRJ-01", name: "Reem Tower", location: "Al Reem Island, Abu Dhabi", company: "Innovo Building Contracting", companyCode: "INNOVOBLD", manager: "Ahmed Khan", employees: 420, active: true },
+  { code: "PRJ-02", name: "Marina Heights", location: "Dubai Marina", company: "Arabtec Holding", companyCode: "ARABTEC", manager: "Samir Haddad", employees: 610, active: true },
+  { code: "PRJ-03", name: "Industrial Park 7", location: "Sharjah", company: "Al Futtaim Construction", companyCode: "ALFUTTAIM", manager: "Rashid Al Mansoori", employees: 380, active: true },
+  { code: "PRJ-04", name: "Mussafah Bridge Works", location: "Mussafah, Abu Dhabi", company: "Dutco Balfour Beatty", companyCode: "DUTCOBALFR", manager: "John Pereira", employees: 540, active: false },
+  { code: "PRJ-05", name: "Al Hamra Mall Extension", location: "Ras Al Khaimah", company: "Khansaheb Civil Engineering", companyCode: "KHANSAHEB", manager: "Imran Sheikh", employees: 260, active: true },
+  { code: "PRJ-06", name: "Corniche Towers", location: "Ajman", company: "Ginco General Contracting", companyCode: "GINCON", manager: "Fatima Al Zahra", employees: 470, active: true },
 ];
 
 const cmsEmployees = [
@@ -97,12 +97,12 @@ const addDays = (n: number) => {
 
 // `pin` is a demo Android-scanner PIN (4 digits) — admin should overwrite via the UI.
 const managers = [
-  { name: "Ahmed Al Mansouri", username: "ahmed.mansouri", password: "Ad@2025!Reem", pin: "1111", email: "ahmed.m@mymeals.ae", phone: "+971 50 442 8821", emiratesId: "784-1988-2237811-3", campCode: "AD-01", role: "CampManager", shift: "FullDay", joinDate: new Date("2023-03-12"), expiryDate: addDays(184), status: "Active", avatar: "AM", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
-  { name: "Rajesh Pillai", username: "rajesh.pillai", password: "Mar!na#0420", pin: "2222", email: "rajesh.p@mymeals.ae", phone: "+971 55 119 7733", emiratesId: "784-1985-9912334-1", campCode: "DXB-04", role: "SeniorManager", shift: "Morning", joinDate: new Date("2022-08-04"), expiryDate: addDays(42), status: "Active", avatar: "RP", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
-  { name: "Khalid Al Suwaidi", username: "khalid.suwaidi", password: "ShJ$Indus#02", pin: "3333", email: "khalid.s@mymeals.ae", phone: "+971 52 880 4471", emiratesId: "784-1990-5567129-7", campCode: "SHJ-02", role: "CampManager", shift: "FullDay", joinDate: new Date("2024-01-22"), expiryDate: addDays(310), status: "Active", avatar: "KS", permBreakfast: true, permLunch: true, permDinner: true, permReports: false },
-  { name: "Imran Sheikh", username: "imran.sheikh", password: "Mus@ffah*09", pin: null,   email: "imran.s@mymeals.ae", phone: "+971 56 339 0098", emiratesId: "784-1982-1133447-9", campCode: "AUH-09", role: "Supervisor", shift: "Evening", joinDate: new Date("2021-11-18"), expiryDate: addDays(-8), status: "Expired", avatar: "IS", permBreakfast: false, permLunch: true, permDinner: true, permReports: false },
-  { name: "Fatima Al Hosani", username: "fatima.hosani", password: "Hamr@2026$RAK", pin: "4444", email: "fatima.h@mymeals.ae", phone: "+971 50 778 1290", emiratesId: "784-1992-7782311-2", campCode: "RAK-01", role: "CampManager", shift: "Morning", joinDate: new Date("2023-09-30"), expiryDate: addDays(96), status: "Active", avatar: "FH", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
-  { name: "Bilal Ahmed", username: "bilal.ahmed", password: "Ajm@n!Cent03", pin: "5555", email: "bilal.a@mymeals.ae", phone: "+971 54 220 9981", emiratesId: "784-1987-4456789-5", campCode: "AJM-03", role: "CampManager", shift: "FullDay", joinDate: new Date("2022-05-14"), expiryDate: addDays(15), status: "Suspended", avatar: "BA", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
+  { name: "Ahmed Al Mansouri", username: "ahmed.mansouri", password: "Ad@2025!Reem", pin: "1111", email: "ahmed.m@mymeals.ae", phone: "+971 50 442 8821", emiratesId: "784-1988-2237811-3", campCode: "AD-01", companyCode: "INNOVOBLD", role: "CampManager", shift: "FullDay", joinDate: new Date("2023-03-12"), expiryDate: addDays(184), status: "Active", avatar: "AM", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
+  { name: "Rajesh Pillai", username: "rajesh.pillai", password: "Mar!na#0420", pin: "2222", email: "rajesh.p@mymeals.ae", phone: "+971 55 119 7733", emiratesId: "784-1985-9912334-1", campCode: "DXB-04", companyCode: "ALFUTTAIM", role: "SeniorManager", shift: "Morning", joinDate: new Date("2022-08-04"), expiryDate: addDays(42), status: "Active", avatar: "RP", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
+  { name: "Khalid Al Suwaidi", username: "khalid.suwaidi", password: "ShJ$Indus#02", pin: "3333", email: "khalid.s@mymeals.ae", phone: "+971 52 880 4471", emiratesId: "784-1990-5567129-7", campCode: "SHJ-02", companyCode: "ARABTEC", role: "CampManager", shift: "FullDay", joinDate: new Date("2024-01-22"), expiryDate: addDays(310), status: "Active", avatar: "KS", permBreakfast: true, permLunch: true, permDinner: true, permReports: false },
+  { name: "Imran Sheikh", username: "imran.sheikh", password: "Mus@ffah*09", pin: null,   email: "imran.s@mymeals.ae", phone: "+971 56 339 0098", emiratesId: "784-1982-1133447-9", campCode: "AUH-09", companyCode: "DUTCOBALFR", role: "Supervisor", shift: "Evening", joinDate: new Date("2021-11-18"), expiryDate: addDays(-8), status: "Expired", avatar: "IS", permBreakfast: false, permLunch: true, permDinner: true, permReports: false },
+  { name: "Fatima Al Hosani", username: "fatima.hosani", password: "Hamr@2026$RAK", pin: "4444", email: "fatima.h@mymeals.ae", phone: "+971 50 778 1290", emiratesId: "784-1992-7782311-2", campCode: "RAK-01", companyCode: "KHANSAHEB", role: "CampManager", shift: "Morning", joinDate: new Date("2023-09-30"), expiryDate: addDays(96), status: "Active", avatar: "FH", permBreakfast: true, permLunch: true, permDinner: true, permReports: true },
+  { name: "Bilal Ahmed", username: "bilal.ahmed", password: "Ajm@n!Cent03", pin: "5555", email: "bilal.a@mymeals.ae", phone: "+971 54 220 9981", emiratesId: "784-1987-4456789-5", campCode: "AJM-03", companyCode: "GINCON", role: "CampManager", shift: "FullDay", joinDate: new Date("2022-05-14"), expiryDate: addDays(15), status: "Suspended", avatar: "BA", permBreakfast: true, permLunch: true, permDinner: false, permReports: true },
 ];
 
 const TABS = ["overview", "scanner", "camps", "employees", "managers", "forecast", "devices", "reports", "automation", "users"];

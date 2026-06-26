@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import {
   useCamps,
+  useCompanies,
   useManagers,
   useCreateManager,
   useUpdateManager,
@@ -43,6 +44,7 @@ type FormState = {
   phone: string;
   emiratesId: string;
   camp: string;
+  companyCode: string | null;
   role: CampManager["role"];
   shift: CampManager["shift"];
   joinDate: string;
@@ -75,6 +77,7 @@ const emptyForm: FormState = {
   phone: "",
   emiratesId: "",
   camp: "",
+  companyCode: null,
   role: "Camp Manager",
   shift: "Full Day",
   joinDate: today(),
@@ -127,6 +130,7 @@ function Managers() {
       phone: form.phone,
       emiratesId: form.emiratesId,
       campCode: form.camp,
+      companyCode: form.companyCode,
       role: form.role,
       shift: form.shift,
       joinDate: form.joinDate,
@@ -410,6 +414,7 @@ function ManagerDialog({
   onClose: () => void;
   onSave: (form: FormState, id?: string) => void | Promise<void>;
 }) {
+  const { data: companies = [] } = useCompanies();
   const [form, setForm] = useState<FormState>(
     manager
       ? {
@@ -421,6 +426,7 @@ function ManagerDialog({
           phone: manager.phone,
           emiratesId: manager.emiratesId,
           camp: manager.camp,
+          companyCode: manager.companyCode,
           role: manager.role,
           shift: manager.shift,
           joinDate: manager.joinDate,
@@ -568,6 +574,20 @@ function ManagerDialog({
             />
           </Field>
 
+          <Field label="Company">
+            <select
+              value={form.companyCode ?? ""}
+              onChange={(e) => setForm({ ...form, companyCode: e.target.value || null })}
+              className={inputCls}
+            >
+              <option value="">— Select company —</option>
+              {companies.map((co) => (
+                <option key={co.id} value={co.code}>
+                  {co.code} — {co.name}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Assigned Camp *">
             <select
               required

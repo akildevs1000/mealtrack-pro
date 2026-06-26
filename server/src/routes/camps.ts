@@ -29,6 +29,7 @@ const upsertSchema = z.object({
   code: z.string().min(1),
   name: z.string().min(1),
   site: z.string().min(1),
+  companyCode: z.string().nullable().optional(),
   employees: z.number().int().nonnegative().optional(),
   online: z.boolean().optional(),
   schedule: z.object({
@@ -70,6 +71,7 @@ function toApi(c: any) {
     code: c.code,
     name: c.name,
     site: c.site,
+    companyCode: c.companyCode ?? null,
     employees: c.employees,
     online: c.online,
     schedule: {
@@ -85,6 +87,7 @@ function fromApi(b: z.infer<typeof upsertSchema>) {
     code: b.code,
     name: b.name,
     site: b.site,
+    companyCode: b.companyCode ?? null,
     employees: b.employees ?? 0,
     online: b.online ?? true,
     breakfastStart: b.schedule?.breakfast.start ?? "05:30",
