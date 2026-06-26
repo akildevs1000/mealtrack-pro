@@ -23,6 +23,8 @@ import {
   Pencil,
   ClipboardList,
   CheckCircle2,
+  Plus,
+  X,
 } from "lucide-react";
 import {
   Area,
@@ -579,9 +581,61 @@ function MealTotalCard({
 }
 
 // ─── Food Estimation Entry ───────────────────────────────────────────────
-// Company is the parent; Supplier / Project / Camp are siblings filtered by
-// the selected company. Records the current date with the headcounts.
+// A trigger bar with a "New Food Estimation" button that opens a modal dialog
+// styled like the Add New Camp dialog. Company is the parent; Supplier /
+// Project / Camp are siblings filtered by the selected company.
 function FoodEstimationEntry() {
+  const [open, setOpen] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+
+  const todayLabel = new Date().toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-card flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <div className="size-10 rounded-xl gradient-primary grid place-items-center text-primary-foreground shadow-glow">
+          <ClipboardList className="size-5" />
+        </div>
+        <div>
+          <h2 className="font-display text-lg font-bold tracking-tight">Food Estimation</h2>
+          <p className="text-xs text-muted-foreground">
+            Record estimated meal headcounts for a company, supplier, project &amp; camp.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        {justSaved && (
+          <span className="inline-flex items-center gap-1.5 text-sm text-success">
+            <CheckCircle2 className="size-4" /> Saved
+          </span>
+        )}
+        <div className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-sm">
+          <CalendarDays className="size-4 text-muted-foreground" />
+          <span className="font-medium">{todayLabel}</span>
+        </div>
+        <button
+          onClick={() => { setOpen(true); setJustSaved(false); }}
+          className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold shadow-glow hover:opacity-95"
+        >
+          <Plus className="size-4" /> New Food Estimation
+        </button>
+      </div>
+      {open && (
+        <FoodEstimationDialog
+          onClose={() => setOpen(false)}
+          onSaved={() => { setOpen(false); setJustSaved(true); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FoodEstimationDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { data: companies = [] } = useCompanies();
   const { data: projects = [] } = useProjects();
   const { data: camps = [] } = useCamps();
@@ -593,7 +647,6 @@ function FoodEstimationEntry() {
   const [projectCode, setProjectCode] = useState<string>("");
   const [campCode, setCampCode] = useState<string>("");
   const [meals, setMeals] = useState({ breakfast: 0, lunch: 0, dinner: 0 });
-  const [saved, setSaved] = useState(false);
 
   const now = new Date();
   const todayLabel = now.toLocaleDateString(undefined, {
@@ -623,12 +676,10 @@ function FoodEstimationEntry() {
     setSupplierId("");
     setProjectCode("");
     setCampCode("");
-    setSaved(false);
   }
 
   function setMeal(key: "breakfast" | "lunch" | "dinner", value: number) {
     setMeals((m) => ({ ...m, [key]: Math.max(0, Math.round(Number.isFinite(value) ? value : 0)) }));
-    setSaved(false);
   }
 
   async function submit(e: React.FormEvent) {
@@ -644,14 +695,13 @@ function FoodEstimationEntry() {
       lunch: meals.lunch,
       dinner: meals.dinner,
     });
-    setSaved(true);
-    setMeals({ breakfast: 0, lunch: 0, dinner: 0 });
+    onSaved();
   }
 
   const selectCls =
-    "w-full px-3 py-2.5 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed";
+    "w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed";
   const numCls =
-    "w-32 px-3 py-2 rounded-lg bg-secondary text-sm text-right tabular-nums border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30";
+    "w-32 px-3 py-2 rounded-lg bg-secondary text-sm text-right tabular-nums border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50";
 
   const mealRows = [
     { key: "breakfast" as const, label: "Breakfast", icon: <Coffee className="size-4" /> },
@@ -660,109 +710,120 @@ function FoodEstimationEntry() {
   ];
 
   return (
-    <form
-      onSubmit={submit}
-      className="rounded-2xl border border-border bg-card p-6 shadow-card space-y-5"
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4"
+      onClick={onClose}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <div className="flex items-center gap-3">
-          <div className="size-10 rounded-xl gradient-primary grid place-items-center text-primary-foreground shadow-glow">
-            <ClipboardList className="size-5" />
-          </div>
-          <div>
-            <h2 className="font-display text-lg font-bold tracking-tight">Food Estimation Entry</h2>
-            <p className="text-xs text-muted-foreground">
-              Estimate meal headcounts for a company, supplier, project &amp; camp.
-            </p>
-          </div>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-sm">
-          <CalendarDays className="size-4 text-muted-foreground" />
-          <span className="font-medium">{todayLabel}</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <label className="block">
-          <span className="text-xs font-medium text-muted-foreground mb-1.5 block">Company</span>
-          <select value={companyCode} onChange={(e) => onCompanyChange(e.target.value)} className={selectCls}>
-            <option value="">— Select Company —</option>
-            {companies.map((co) => (
-              <option key={co.id} value={co.code}>{co.code} — {co.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-muted-foreground mb-1.5 block">Supplier</span>
-          <select value={supplierId} onChange={(e) => { setSupplierId(e.target.value); setSaved(false); }} disabled={!companyCode} className={selectCls}>
-            <option value="">{companyCode ? "— Select Supplier —" : "Select a company first"}</option>
-            {companySuppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="block md:col-span-2">
-          <span className="text-xs font-medium text-muted-foreground mb-1.5 block">Project (filtered by company)</span>
-          <select value={projectCode} onChange={(e) => { setProjectCode(e.target.value); setSaved(false); }} disabled={!companyCode} className={selectCls}>
-            <option value="">{companyCode ? "— Select Project —" : "Select a company first"}</option>
-            {companyProjects.map((p) => (
-              <option key={p.id} value={p.code}>{p.code} — {p.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="block md:col-span-2">
-          <span className="text-xs font-medium text-muted-foreground mb-1.5 block">Camp Location (filtered by company)</span>
-          <select value={campCode} onChange={(e) => { setCampCode(e.target.value); setSaved(false); }} disabled={!companyCode} className={selectCls}>
-            <option value="">{companyCode ? "— Select Camp —" : "Select a company first"}</option>
-            {companyCamps.map((c) => (
-              <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto] bg-secondary/60 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <div>Meal Option</div>
-          <div>Estimated Headcount</div>
-        </div>
-        {mealRows.map((m) => (
-          <div key={m.key} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 border-t border-border">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <span className="text-muted-foreground">{m.icon}</span> {m.label}
+      <div
+        className="w-full max-w-lg rounded-2xl bg-card border border-border shadow-elegant max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-lg gradient-primary grid place-items-center text-primary-foreground">
+              <ClipboardList className="size-4" />
             </div>
-            <input
-              type="number"
-              min={0}
-              value={meals[m.key]}
-              onChange={(e) => setMeal(m.key, Number(e.target.value))}
-              disabled={!companyCode}
-              className={numCls}
-            />
+            <div>
+              <div className="font-semibold">New Food Estimation</div>
+              <div className="text-xs text-muted-foreground">Estimate meal headcounts · {todayLabel}</div>
+            </div>
           </div>
-        ))}
-        <div className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 border-t border-border bg-secondary/30">
-          <div className="text-sm font-semibold">Total</div>
-          <div className="w-32 text-right pr-3 text-sm font-bold tabular-nums">
-            {(meals.breakfast + meals.lunch + meals.dinner).toLocaleString()}
-          </div>
+          <button onClick={onClose} className="size-8 grid place-items-center rounded-lg hover:bg-secondary">
+            <X className="size-4" />
+          </button>
         </div>
-      </div>
 
-      <div className="flex items-center justify-end gap-3">
-        {saved && (
-          <span className="inline-flex items-center gap-1.5 text-sm text-success">
-            <CheckCircle2 className="size-4" /> Estimation saved
-          </span>
-        )}
-        <button
-          type="submit"
-          disabled={!companyCode || create.isPending}
-          className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold shadow-glow hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Save className="size-4" /> {create.isPending ? "Saving…" : "Save Estimation"}
-        </button>
+        <form onSubmit={submit} className="p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Company *">
+              <select value={companyCode} onChange={(e) => onCompanyChange(e.target.value)} className={selectCls}>
+                <option value="">— Select Company —</option>
+                {companies.map((co) => (
+                  <option key={co.id} value={co.code}>{co.code} — {co.name}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Supplier">
+              <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} disabled={!companyCode} className={selectCls}>
+                <option value="">{companyCode ? "— Select Supplier —" : "Select a company first"}</option>
+                {companySuppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="Project (filtered by company)">
+                <select value={projectCode} onChange={(e) => setProjectCode(e.target.value)} disabled={!companyCode} className={selectCls}>
+                  <option value="">{companyCode ? "— Select Project —" : "Select a company first"}</option>
+                  {companyProjects.map((p) => (
+                    <option key={p.id} value={p.code}>{p.code} — {p.name}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <div className="md:col-span-2">
+              <Field label="Camp Location (filtered by company)">
+                <select value={campCode} onChange={(e) => setCampCode(e.target.value)} disabled={!companyCode} className={selectCls}>
+                  <option value="">{companyCode ? "— Select Camp —" : "Select a company first"}</option>
+                  {companyCamps.map((c) => (
+                    <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto] bg-secondary/60 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <div>Meal Option</div>
+              <div>Estimated Headcount</div>
+            </div>
+            {mealRows.map((m) => (
+              <div key={m.key} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 border-t border-border">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <span className="text-muted-foreground">{m.icon}</span> {m.label}
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  value={meals[m.key]}
+                  onChange={(e) => setMeal(m.key, Number(e.target.value))}
+                  disabled={!companyCode}
+                  className={numCls}
+                />
+              </div>
+            ))}
+            <div className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 border-t border-border bg-secondary/30">
+              <div className="text-sm font-semibold">Total</div>
+              <div className="w-32 text-right pr-3 text-sm font-bold tabular-nums">
+                {(meals.breakfast + meals.lunch + meals.dinner).toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm hover:bg-secondary">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!companyCode || create.isPending}
+              className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="size-4" /> {create.isPending ? "Saving…" : "Create Estimation"}
+            </button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</span>
+      {children}
+    </label>
   );
 }
