@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Smartphone, Wifi, WifiOff, BatteryFull, BatteryLow, Plus, Search, Copy, Check, X, Cpu, Network, User, Calendar } from "lucide-react";
 import { useCampScope } from "@/lib/session";
-import { useCamps, useDevices, useCreateDevice, type Device } from "@/lib/hooks";
+import { useCamps, useCompanies, useDevices, useCreateDevice, type Device } from "@/lib/hooks";
 
 export const Route = createFileRoute("/devices")({
   component: DevicesPage,
@@ -21,11 +21,23 @@ const macRegex = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 function DevicesPage() {
   const scope = useCampScope();
   const { data: camps = [] } = useCamps();
+  const { data: companies = [] } = useCompanies();
   const { data: list = [] } = useDevices();
   const createDevice = useCreateDevice();
-  const visibleCamps = useMemo(() => (scope ? camps.filter((c) => scope.includes(c.code)) : camps), [scope, camps]);
   const [query, setQuery] = useState("");
   const [campFilter, setCampFilter] = useState<string>("all");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  // Camps are siblings of the Company, so a device's company is its camp's
+  // company. Build the set of camp codes for the selected company.
+  const companyCampCodes = useMemo(
+    () => new Set(camps.filter((c) => c.companyCode === companyFilter).map((c) => c.code)),
+    [camps, companyFilter],
+  );
+  const visibleCamps = useMemo(() => {
+    let cs = scope ? camps.filter((c) => scope.includes(c.code)) : camps;
+    if (companyFilter !== "all") cs = cs.filter((c) => c.companyCode === companyFilter);
+    return cs;
+  }, [scope, camps, companyFilter]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(() => initialForm(""));
   const [copied, setCopied] = useState<string | null>(null);
@@ -34,6 +46,7 @@ function DevicesPage() {
   const filtered = useMemo(() => {
     const scoped = scope ? list.filter((d) => scope.includes(d.camp)) : list;
     return scoped.filter((d) => {
+      if (companyFilter !== "all" && !companyCampCodes.has(d.camp)) return false;
       if (campFilter !== "all" && d.camp !== campFilter) return false;
       if (!query) return true;
       const q = query.toLowerCase();
@@ -44,7 +57,7 @@ function DevicesPage() {
         d.assignedTo.toLowerCase().includes(q)
       );
     });
-  }, [list, query, campFilter, scope]);
+  }, [list, query, campFilter, companyFilter, companyCampCodes, scope]);
 
   const stats = useMemo(() => ({
     total: list.length,
@@ -132,6 +145,14 @@ function DevicesPage() {
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
           />
         </div>
+        <select
+          value={companyFilter}
+          onChange={(e) => { setCompanyFilter(e.target.value); setCampFilter("all"); }}
+          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
+        >
+          <option value="all">All companies</option>
+          {companies.map((co) => <option key={co.id} value={co.code}>{co.code} — {co.name}</option>)}
+        </select>
         <select
           value={campFilter}
           onChange={(e) => setCampFilter(e.target.value)}

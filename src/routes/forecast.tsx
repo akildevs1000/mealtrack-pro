@@ -96,11 +96,17 @@ function defaultsFor(
 function Forecast() {
   const scope = useCampScope();
   const { data: campsData } = useCamps();
+  const { data: companiesData } = useCompanies();
+  const companies = useMemo(() => companiesData ?? [], [companiesData]);
   const camps = useMemo(() => campsData ?? [], [campsData]);
-  const visibleCamps = useMemo(
-    () => (scope ? camps.filter((c) => scope.includes(c.code)) : camps),
-    [scope, camps],
-  );
+  // Parent-company filter — camps are siblings, so picking a company narrows the
+  // camp selector to that company's camps.
+  const [company, setCompany] = useState<string>("all");
+  const visibleCamps = useMemo(() => {
+    let cs = scope ? camps.filter((c) => scope.includes(c.code)) : camps;
+    if (company !== "all") cs = cs.filter((c) => c.companyCode === company);
+    return cs;
+  }, [scope, camps, company]);
   const [selectedCamp, setSelectedCamp] = useState<string>("");
   useEffect(() => {
     if (visibleCamps.length && !visibleCamps.some((c) => c.code === selectedCamp)) {
@@ -251,6 +257,18 @@ function Forecast() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <select
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="all">All companies</option>
+            {companies.map((co) => (
+              <option key={co.id} value={co.code}>
+                {co.code} — {co.name}
+              </option>
+            ))}
+          </select>
           <select
             value={selectedCamp}
             onChange={(e) => setSelectedCamp(e.target.value)}

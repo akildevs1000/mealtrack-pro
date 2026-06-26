@@ -99,8 +99,10 @@ function Managers() {
   const updateMgr = useUpdateManager();
   const deleteMgr = useDeleteManager();
   const toggle = useToggleManagerStatus();
+  const { data: companies = [] } = useCompanies();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CampManager["status"]>("all");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [editing, setEditing] = useState<CampManager | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<CampManager | null>(null);
@@ -109,10 +111,11 @@ function Managers() {
     const q = query.toLowerCase();
     return list.filter((m) => {
       if (statusFilter !== "all" && m.status !== statusFilter) return false;
+      if (companyFilter !== "all" && m.companyCode !== companyFilter) return false;
       if (!q) return true;
       return [m.name, m.username, m.camp, m.email, m.phone].join(" ").toLowerCase().includes(q);
     });
-  }, [list, query, statusFilter]);
+  }, [list, query, statusFilter, companyFilter]);
 
   const active = list.filter((m) => m.status === "Active").length;
   const suspended = list.filter((m) => m.status === "Suspended").length;
@@ -202,6 +205,16 @@ function Managers() {
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
           />
         </div>
+        <select
+          value={companyFilter}
+          onChange={(e) => setCompanyFilter(e.target.value)}
+          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
+        >
+          <option value="all">All companies</option>
+          {companies.map((co) => (
+            <option key={co.id} value={co.code}>{co.code} — {co.name}</option>
+          ))}
+        </select>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as never)}
