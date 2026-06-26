@@ -16,6 +16,7 @@ export type AppUser = {
   email: string;
   role: Role;
   assignedCampCode?: string | null;
+  assignedCampCodes?: string[];
   status: "Active" | "Inactive";
 };
 
@@ -102,8 +103,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const currentUser = state.status === "authenticated" ? state.user : null;
     const perms = state.status === "authenticated" ? state.perms : emptyMatrix();
     const campScope =
-      currentUser?.role === "manager" && currentUser.assignedCampCode
-        ? [currentUser.assignedCampCode]
+      currentUser?.role === "manager"
+        ? currentUser.assignedCampCodes?.length
+          ? currentUser.assignedCampCodes
+          : currentUser.assignedCampCode
+            ? [currentUser.assignedCampCode]
+            : null
         : null;
 
     return {

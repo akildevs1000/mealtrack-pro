@@ -137,7 +137,7 @@ async function main() {
     email: `flow.${uniq}@example.com`,
     phone: "+971 50 000 0000",
     emiratesId: "784-0000-0000000-0",
-    campCode: campA,
+    campCodes: [campA],
     role: "CampManager",
     shift: "FullDay",
     joinDate: today(),

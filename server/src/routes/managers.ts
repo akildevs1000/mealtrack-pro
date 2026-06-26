@@ -12,8 +12,9 @@ router.get("/", async (req, res, next) => {
   try {
     const scope = campScopeOf(req);
     const rows = await prisma.campManager.findMany({
-      where: scope ? { campCode: { in: scope } } : undefined,
+      where: scope ? { camps: { some: { code: { in: scope } } } } : undefined,
       orderBy: { name: "asc" },
+      include: { camps: { select: { code: true } } },
     });
     res.json(rows.map(toApi));
   } catch (e) { next(e); }
@@ -33,7 +34,8 @@ const createSchema = z.object({
   email: z.string().email(),
   phone: z.string(),
   emiratesId: z.string(),
-  campCode: z.string(),
+  // One or more camps. campCodes[0] is treated as the primary camp.
+  campCodes: z.array(z.string()).min(1, "At least one camp is required"),
   companyCode: z.string().nullable().optional(),
   role: z.enum(["CampManager", "SeniorManager", "Supervisor"]),
   shift: z.enum(["Morning", "Evening", "FullDay"]),
@@ -51,6 +53,9 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
   try {
     const body = createSchema.parse(req.body);
     const status = body.status ?? "Active";
+    // Dedupe + keep order; first is the primary camp.
+    const campCodes = [...new Set(body.campCodes)];
+    const primaryCamp = campCodes[0];
     // No password supplied (supplier with no admin login) → generate a random
     // one so the account record is valid; it simply isn't shared with anyone.
     const passwordHash = await hashPassword(body.password ?? randomBytes(18).toString("base64url"));
@@ -75,7 +80,8 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
           email: body.email,
           phone: body.phone,
           emiratesId: body.emiratesId,
-          campCode: body.campCode,
+          campCode: primaryCamp,
+          camps: { connect: campCodes.map((code) => ({ code })) },
           companyCode: body.companyCode ?? null,
           role: body.role,
           shift: body.shift,
@@ -88,6 +94,7 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
           permDinner: body.permDinner ?? true,
           permReports: body.permReports ?? true,
         },
+        include: { camps: { select: { code: true } } },
       });
       await tx.user.create({
         data: {
@@ -97,7 +104,8 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
           passwordHash,
           role: "manager",
           status: status === "Active" ? "Active" : "Inactive",
-          assignedCampCode: body.campCode,
+          assignedCampCode: primaryCamp,
+          assignedCampCodes: campCodes,
         },
       });
       return m;
@@ -115,7 +123,7 @@ router.put("/:id", requireRole("admin", "operator"), async (req, res, next) => {
     const existing = await prisma.campManager.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Camp manager not found" });
 
-    const { pin, ...rest } = body as any;
+    const { pin, campCodes, ...rest } = body as any;
     const data: any = { ...rest };
     delete data.username; // username is the link key — don't allow it to change on edit
     if (body.joinDate) data.joinDate = new Date(body.joinDate);
@@ -123,14 +131,30 @@ router.put("/:id", requireRole("admin", "operator"), async (req, res, next) => {
     if (pin !== undefined) {
       data.pinHash = pin && pin.length > 0 ? await hashPin(pin) : null;
     }
+    // Resolve the camp set (if the caller sent one): primary = first, and
+    // replace the many-to-many membership wholesale.
+    const codes: string[] | undefined =
+      campCodes !== undefined ? [...new Set(campCodes as string[])] : undefined;
+    if (codes) {
+      if (codes.length === 0) return res.status(400).json({ error: "At least one camp is required" });
+      data.campCode = codes[0];
+      data.camps = { set: codes.map((code) => ({ code })) };
+    }
 
     const result = await prisma.$transaction(async (tx) => {
-      const m = await tx.campManager.update({ where: { id: req.params.id }, data });
+      const m = await tx.campManager.update({
+        where: { id: req.params.id },
+        data,
+        include: { camps: { select: { code: true } } },
+      });
       // Keep the linked User in sync.
       const userPatch: any = {};
       if (body.name !== undefined) userPatch.name = body.name;
       if (body.email !== undefined) userPatch.email = body.email;
-      if (body.campCode !== undefined) userPatch.assignedCampCode = body.campCode;
+      if (codes) {
+        userPatch.assignedCampCode = codes[0];
+        userPatch.assignedCampCodes = codes;
+      }
       if (body.status !== undefined) userPatch.status = body.status === "Active" ? "Active" : "Inactive";
       if (Object.keys(userPatch).length > 0) {
         await tx.user.updateMany({ where: { username: existing.username }, data: userPatch });
@@ -163,6 +187,9 @@ function toApi(m: any) {
     phone: m.phone,
     emiratesId: m.emiratesId,
     camp: m.campCode,
+    // Full assigned set (includes the primary). Falls back to [primary] when
+    // the relation wasn't included on the query.
+    camps: Array.isArray(m.camps) ? m.camps.map((c: any) => c.code) : [m.campCode],
     companyCode: m.companyCode ?? null,
     role: m.role === "CampManager" ? "Camp Manager" : m.role === "SeniorManager" ? "Senior Manager" : "Supervisor",
     shift: m.shift === "FullDay" ? "Full Day" : m.shift,

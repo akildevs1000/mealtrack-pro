@@ -210,9 +210,9 @@ async function main() {
     const { password, pin, ...rest } = m;
     await prisma.campManager.upsert({
       where: { username: m.username },
-      create: { ...rest, passwordHash, pinHash, role: m.role as any, shift: m.shift as any, status: m.status as any },
+      create: { ...rest, passwordHash, pinHash, role: m.role as any, shift: m.shift as any, status: m.status as any, camps: { connect: [{ code: m.campCode }] } },
       // Don't overwrite the PIN if admin has already set one (preserve admin changes on re-seed).
-      update: { ...rest, passwordHash, role: m.role as any, shift: m.shift as any, status: m.status as any, ...(pinHash ? { pinHash } : {}) },
+      update: { ...rest, passwordHash, role: m.role as any, shift: m.shift as any, status: m.status as any, ...(pinHash ? { pinHash } : {}), camps: { set: [{ code: m.campCode }] } },
     });
     await prisma.user.upsert({
       where: { username: m.username },
@@ -224,6 +224,7 @@ async function main() {
         role: "manager",
         status: m.status === "Active" ? "Active" : "Inactive",
         assignedCampCode: m.campCode,
+        assignedCampCodes: [m.campCode],
       },
       update: {
         name: m.name,
@@ -232,6 +233,7 @@ async function main() {
         role: "manager",
         status: m.status === "Active" ? "Active" : "Inactive",
         assignedCampCode: m.campCode,
+        assignedCampCodes: [m.campCode],
       },
     });
   }
@@ -249,8 +251,19 @@ async function main() {
   for (const u of appUsers) {
     await prisma.user.upsert({
       where: { username: u.username },
-      create: { ...u, passwordHash: defaultHash, status: "Active" },
-      update: { name: u.name, email: u.email, role: u.role, assignedCampCode: u.assignedCampCode },
+      create: {
+        ...u,
+        assignedCampCodes: u.assignedCampCode ? [u.assignedCampCode] : [],
+        passwordHash: defaultHash,
+        status: "Active",
+      },
+      update: {
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        assignedCampCode: u.assignedCampCode,
+        assignedCampCodes: u.assignedCampCode ? [u.assignedCampCode] : [],
+      },
     });
   }
   console.log(`[seed] app users: ${appUsers.length} (default password: ${DEFAULT_PASSWORD})`);

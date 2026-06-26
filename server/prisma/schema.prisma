@@ -79,7 +79,12 @@ model User {
   passwordHash     String
   role             Role
   status           UserStatus @default(Active)
+  // Primary assigned camp (first of assignedCampCodes). Kept for back-compat
+  // with readers that still expect a single code.
   assignedCampCode String?
+  // Full set of camps a manager is scoped to. campScopeOf() uses this so a
+  // supplier mapped to several camps sees all of them. Empty for non-managers.
+  assignedCampCodes String[] @default([])
   lastLoginAt      DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -116,7 +121,10 @@ model Camp {
 
   scans     Scan[]
   devices   Device[]
-  managers  CampManager[]
+  // Suppliers whose PRIMARY camp is this one (single-FK relation).
+  managers  CampManager[] @relation("ManagerPrimaryCamp")
+  // Suppliers assigned to this camp via the many-to-many set.
+  multiManagers CampManager[] @relation("ManagerCamps")
 
   // Parent company (siblings: Camp, Project, Supplier all hang off a Company).
   companyCode String?
@@ -276,8 +284,12 @@ model CampManager {
   email       String        @unique
   phone       String
   emiratesId  String
-  camp        Camp          @relation(fields: [campCode], references: [code])
+  // Primary camp (first selected). Drives the scanner default + legacy readers.
+  camp        Camp          @relation("ManagerPrimaryCamp", fields: [campCode], references: [code])
   campCode    String
+  // Full set of camps this supplier is assigned to (many-to-many). Always
+  // includes campCode. The implicit join table is `_ManagerCamps`.
+  camps       Camp[]        @relation("ManagerCamps")
   // Parent company (a Supplier belongs to a Company).
   companyCode String?
   companyRef  Company?      @relation(fields: [companyCode], references: [code])

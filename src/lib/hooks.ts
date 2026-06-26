@@ -119,7 +119,10 @@ export type Manager = {
   email: string;
   phone: string;
   emiratesId: string;
+  // Primary camp (first assigned).
   camp: string;
+  // Full set of assigned camps (includes `camp`).
+  camps: string[];
   companyCode: string | null;
   role: "Camp Manager" | "Senior Manager" | "Supervisor";
   shift: "Morning" | "Evening" | "Full Day";
@@ -436,7 +439,8 @@ export type ManagerInput = {
   email: string;
   phone: string;
   emiratesId: string;
-  campCode: string;
+  // One or more camps; campCodes[0] becomes the primary camp.
+  campCodes: string[];
   companyCode?: string | null;
   role: "Camp Manager" | "Senior Manager" | "Supervisor";
   shift: "Morning" | "Evening" | "Full Day";
@@ -455,7 +459,7 @@ function packManager(input: ManagerInput) {
     email: input.email,
     phone: input.phone,
     emiratesId: input.emiratesId,
-    campCode: input.campCode,
+    campCodes: input.campCodes,
     companyCode: input.companyCode ?? null,
     role: input.role === "Camp Manager" ? "CampManager"
         : input.role === "Senior Manager" ? "SeniorManager" : "Supervisor",

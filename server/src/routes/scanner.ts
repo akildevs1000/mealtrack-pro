@@ -59,6 +59,7 @@ router.post("/login", async (req, res, next) => {
       select: {
         id: true, username: true, name: true, campCode: true,
         status: true, pinHash: true, avatar: true,
+        camps: { select: { code: true } },
       },
     });
     if (!manager || !manager.pinHash) {
@@ -72,10 +73,16 @@ router.post("/login", async (req, res, next) => {
       return res.status(401).json({ error: "Invalid manager or PIN" });
     }
 
-    // Camp comes from the manager's assignment. If the device is bound to a
-    // different camp, surface a warning — but don't block login.
+    // Scans always belong to the camp the DEVICE is bound to — the device is
+    // the physical anchor, so this keeps per-camp reports/filters honest even
+    // for a supplier assigned to several camps. The supplier's camp set only
+    // drives the "wrong camp" warning; it never changes attribution.
+    const sessionCampCode = device.campCode;
+    const campSet = new Set([manager.campCode, ...manager.camps.map((c) => c.code)]);
+    const campMismatch = !campSet.has(device.campCode);
+
     const camp = await prisma.camp.findUnique({
-      where: { code: manager.campCode },
+      where: { code: sessionCampCode },
       select: {
         code: true, name: true, site: true,
         breakfastStart: true, breakfastEnd: true,
@@ -83,8 +90,6 @@ router.post("/login", async (req, res, next) => {
         dinnerStart: true, dinnerEnd: true,
       },
     });
-
-    const campMismatch = device.campCode !== manager.campCode;
 
     await prisma.campManager.update({
       where: { id: manager.id },
@@ -94,7 +99,7 @@ router.post("/login", async (req, res, next) => {
     const token = signScannerToken({
       sub: manager.id,
       username: manager.username,
-      campCode: manager.campCode,
+      campCode: sessionCampCode,
     });
 
     res.json({
@@ -103,7 +108,7 @@ router.post("/login", async (req, res, next) => {
         id: manager.id,
         username: manager.username,
         name: manager.name,
-        campCode: manager.campCode,
+        campCode: sessionCampCode,
         avatar: manager.avatar,
       },
       device,

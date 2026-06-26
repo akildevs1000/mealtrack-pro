@@ -33,6 +33,7 @@ router.post("/login", async (req, res, next) => {
         role: user.role,
         status: user.status,
         assignedCampCode: user.assignedCampCode,
+        assignedCampCodes: user.assignedCampCodes,
       },
     });
   } catch (err) {
@@ -46,7 +47,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
       where: { id: req.user!.id },
       select: {
         id: true, name: true, username: true, email: true,
-        role: true, status: true, assignedCampCode: true, lastLoginAt: true,
+        role: true, status: true, assignedCampCode: true, assignedCampCodes: true, lastLoginAt: true,
       },
     });
     if (!u) return res.status(404).json({ error: "User not found" });

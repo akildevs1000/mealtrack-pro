@@ -11,6 +11,7 @@ declare global {
         role: Role;
         username: string;
         assignedCampCode: string | null;
+        assignedCampCodes: string[];
       };
       scanner?: {
         managerId: string;
@@ -40,7 +41,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, role: true, username: true, status: true, assignedCampCode: true },
+      select: { id: true, role: true, username: true, status: true, assignedCampCode: true, assignedCampCodes: true },
     });
     if (!user) return res.status(401).json({ error: "User no longer exists" });
     if (user.status !== "Active") return res.status(403).json({ error: "User is not active" });
@@ -49,6 +50,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       role: user.role,
       username: user.username,
       assignedCampCode: user.assignedCampCode,
+      assignedCampCodes: user.assignedCampCodes,
     };
     next();
   } catch {
@@ -69,8 +71,15 @@ export function requireRole(...roles: Role[]) {
 // Returns the camp scope for the current request (null = unrestricted)
 export function campScopeOf(req: Request): string[] | null {
   if (!req.user) return null;
-  if (req.user.role === "manager" && req.user.assignedCampCode) {
-    return [req.user.assignedCampCode];
+  if (req.user.role === "manager") {
+    // Prefer the multi-camp set; fall back to the single primary for users
+    // created before the array column existed.
+    const codes = req.user.assignedCampCodes.length
+      ? req.user.assignedCampCodes
+      : req.user.assignedCampCode
+        ? [req.user.assignedCampCode]
+        : [];
+    if (codes.length) return codes;
   }
   return null;
 }

@@ -263,7 +263,7 @@ function DevicesPage() {
               <Field label="Assigned To (Supplier)">
                 <select value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} className={inputCls}>
                   <option value="">{form.camp ? "— Select supplier —" : "Select a camp first"}</option>
-                  {suppliers.filter((s) => s.camp === form.camp).map((s) => (
+                  {suppliers.filter((s) => (s.camps?.length ? s.camps : [s.camp]).includes(form.camp)).map((s) => (
                     <option key={s.id} value={s.name}>{s.name}</option>
                   ))}
                 </select>

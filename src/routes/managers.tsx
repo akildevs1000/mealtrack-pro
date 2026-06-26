@@ -43,7 +43,7 @@ type FormState = {
   email: string;
   phone: string;
   emiratesId: string;
-  camp: string;
+  camps: string[];
   companyCode: string | null;
   role: CampManager["role"];
   shift: CampManager["shift"];
@@ -76,7 +76,7 @@ const emptyForm: FormState = {
   email: "",
   phone: "",
   emiratesId: "",
-  camp: "",
+  camps: [],
   companyCode: null,
   role: "Camp Manager",
   shift: "Full Day",
@@ -113,7 +113,10 @@ function Managers() {
       if (statusFilter !== "all" && m.status !== statusFilter) return false;
       if (companyFilter !== "all" && m.companyCode !== companyFilter) return false;
       if (!q) return true;
-      return [m.name, m.username, m.camp, m.email, m.phone].join(" ").toLowerCase().includes(q);
+      return [m.name, m.username, ...(m.camps ?? [m.camp]), m.email, m.phone]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
     });
   }, [list, query, statusFilter, companyFilter]);
 
@@ -134,7 +137,7 @@ function Managers() {
       email: form.email,
       phone: form.phone,
       emiratesId: form.emiratesId,
-      campCode: form.camp,
+      campCodes: form.camps,
       companyCode: form.companyCode,
       role: form.role,
       shift: form.shift,
@@ -265,9 +268,16 @@ function Managers() {
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">@{m.username}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 text-xs rounded-md bg-primary/10 text-primary px-2 py-1 font-medium">
-                        <Building2 className="size-3" /> {m.camp}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {(m.camps?.length ? m.camps : [m.camp]).map((code) => (
+                          <span
+                            key={code}
+                            className="inline-flex items-center gap-1 text-xs rounded-md bg-primary/10 text-primary px-2 py-1 font-medium"
+                          >
+                            <Building2 className="size-3" /> {code}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs">
                       <div>{m.role === "Camp Manager" ? "Supplier" : m.role}</div>
@@ -440,7 +450,7 @@ function ManagerDialog({
           email: manager.email,
           phone: manager.phone,
           emiratesId: manager.emiratesId,
-          camp: manager.camp,
+          camps: manager.camps?.length ? manager.camps : [manager.camp],
           companyCode: manager.companyCode,
           role: manager.role,
           shift: manager.shift,
@@ -457,8 +467,8 @@ function ManagerDialog({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!form.name || !form.username || !form.camp) {
-      setError("Name, username and camp are required.");
+    if (!form.name || !form.username || form.camps.length === 0) {
+      setError("Name, username and at least one camp are required.");
       return;
     }
     if (form.pin && !/^\d{4}$/.test(form.pin)) {
@@ -589,20 +599,43 @@ function ManagerDialog({
               ))}
             </select>
           </Field>
-          <Field label="Assigned Camp *">
-            <select
-              required
-              value={form.camp}
-              onChange={(e) => setForm({ ...form, camp: e.target.value })}
-              className={inputCls}
-            >
-              <option value="">— Select camp —</option>
-              {camps.map((c) => (
-                <option key={c.id} value={c.code}>
-                  {c.code} — {c.name}
-                </option>
-              ))}
-            </select>
+          <Field label="Assigned Camps *">
+            <div className="rounded-lg bg-secondary border border-transparent max-h-44 overflow-y-auto divide-y divide-border/60">
+              {camps.length === 0 && (
+                <div className="px-3 py-2 text-xs text-muted-foreground">No camps available.</div>
+              )}
+              {camps.map((c) => {
+                const checked = form.camps.includes(c.code);
+                return (
+                  <label
+                    key={c.id}
+                    className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-secondary/60"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          // First selected stays first → it becomes the primary camp.
+                          camps: e.target.checked
+                            ? [...form.camps, c.code]
+                            : form.camps.filter((x) => x !== c.code),
+                        })
+                      }
+                      className="size-4 accent-primary"
+                    />
+                    <span className="font-mono text-xs">{c.code}</span>
+                    <span className="text-muted-foreground truncate">— {c.name}</span>
+                    {form.camps[0] === c.code && form.camps.length > 1 && (
+                      <span className="ml-auto text-[10px] uppercase tracking-wide text-primary">
+                        Primary
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
           </Field>
           <Field label="Status">
             <select
@@ -699,7 +732,8 @@ function ConfirmDialog({
             <div className="text-sm text-muted-foreground mt-1">
               This will permanently remove{" "}
               <span className="font-medium text-foreground">{manager.name}</span> (@
-              {manager.username}) and revoke their access to {manager.camp}.
+              {manager.username}) and revoke their access to{" "}
+              {(manager.camps?.length ? manager.camps : [manager.camp]).join(", ")}.
             </div>
           </div>
         </div>
