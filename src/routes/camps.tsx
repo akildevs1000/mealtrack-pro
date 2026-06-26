@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { defaultSchedule, type MealSchedule } from "@/lib/mock-data";
-import { Building2, Users, MapPin, Wifi, WifiOff, Plus, Pencil, Trash2, LayoutGrid, List, Search, X, AlertTriangle, Sunrise, Sun, Moon } from "lucide-react";
+import { Building2, Users, Wifi, WifiOff, Plus, Pencil, Trash2, LayoutGrid, List, Search, X, AlertTriangle, Sunrise, Sun, Moon } from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import { useCamps, useUpsertCamp, useDeleteCamp, useCompanies, type Camp } from "@/lib/hooks";
 
@@ -69,7 +69,7 @@ function CampsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search code, name, site…"
+            placeholder="Search code, name…"
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
           />
         </div>
@@ -104,7 +104,6 @@ function CampsPage() {
               </div>
               <div className="mt-4">
                 <div className="font-display text-lg font-semibold">{c.name}</div>
-                <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"><MapPin className="size-3" /> {c.site}</div>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <Stat label="Code" value={c.code} />
@@ -138,7 +137,6 @@ function CampsPage() {
                 <tr className="text-left">
                   <th className="px-4 py-3 font-medium">Camp</th>
                   <th className="px-4 py-3 font-medium">Code</th>
-                  <th className="px-4 py-3 font-medium">Site</th>
                   <th className="px-4 py-3 font-medium">Employees</th>
                   <th className="px-4 py-3 font-medium">Meal Times</th>
                   <th className="px-4 py-3 font-medium">Status</th>
@@ -157,7 +155,6 @@ function CampsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3"><span className="rounded-md bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">{c.code}</span></td>
-                    <td className="px-4 py-3 text-muted-foreground">{c.site}</td>
                     <td className="px-4 py-3 tabular-nums">{c.employees.toLocaleString()}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       <div className="flex items-center gap-1"><Sunrise className="size-3" /> {c.schedule.breakfast.start}–{c.schedule.breakfast.end}</div>
@@ -183,7 +180,7 @@ function CampsPage() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No camps match your search.</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No camps match your search.</td></tr>
                 )}
               </tbody>
             </table>
@@ -245,7 +242,7 @@ function CampDialog({ camp, existingCodes, onClose, onSave }: {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.code || !form.name || !form.site) { setError("Code, name and site are required."); return; }
+    if (!form.code || !form.name) { setError("Code and name are required."); return; }
     if (form.employees < 0) { setError("Employees must be 0 or more."); return; }
     const dupe = existingCodes.some((c) => c.toLowerCase() === form.code.toLowerCase() && c !== camp?.code);
     if (dupe) { setError("A camp with this code already exists."); return; }
@@ -303,11 +300,6 @@ function CampDialog({ camp, existingCodes, onClose, onSave }: {
           <div className="md:col-span-2">
             <Field label="Camp Name *">
               <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Al Reem Camp" className={inputCls} />
-            </Field>
-          </div>
-          <div className="md:col-span-2">
-            <Field label="Project / Site *">
-              <input required value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} placeholder="Reem Tower Project" className={inputCls} />
             </Field>
           </div>
           <div className="md:col-span-2">

@@ -28,7 +28,9 @@ router.get("/:code", async (req, res, next) => {
 const upsertSchema = z.object({
   code: z.string().min(1),
   name: z.string().min(1),
-  site: z.string().min(1),
+  // Project / Site is now modelled as a sibling Project entity, so the camp's
+  // free-text site is optional (kept for backwards compatibility / existing rows).
+  site: z.string().optional(),
   companyCode: z.string().nullable().optional(),
   employees: z.number().int().nonnegative().optional(),
   online: z.boolean().optional(),
@@ -86,7 +88,7 @@ function fromApi(b: z.infer<typeof upsertSchema>) {
   return {
     code: b.code,
     name: b.name,
-    site: b.site,
+    site: b.site ?? "",
     companyCode: b.companyCode ?? null,
     employees: b.employees ?? 0,
     online: b.online ?? true,
