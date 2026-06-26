@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Smartphone, Wifi, WifiOff, BatteryFull, BatteryLow, Plus, Search, Copy, Check, X, Cpu, Network, User, Calendar } from "lucide-react";
+import { Smartphone, Wifi, WifiOff, BatteryFull, BatteryLow, Plus, Search, Copy, Check, X, Cpu, User, Calendar } from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import { useCamps, useCompanies, useDevices, useManagers, useCreateDevice, type Device } from "@/lib/hooks";
 
@@ -172,9 +172,8 @@ function DevicesPage() {
               <tr className="text-left">
                 <th className="px-4 py-3 font-medium">Device</th>
                 <th className="px-4 py-3 font-medium">MAC Address</th>
-                <th className="px-4 py-3 font-medium">Serial / Model</th>
+                <th className="px-4 py-3 font-medium">Model</th>
                 <th className="px-4 py-3 font-medium">Camp</th>
-                <th className="px-4 py-3 font-medium">Network</th>
                 <th className="px-4 py-3 font-medium">Battery</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Last Sync</th>
@@ -207,15 +206,10 @@ function DevicesPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-mono text-xs">{d.serial}</div>
-                    <div className="text-xs text-muted-foreground">{d.model} • {d.androidVersion}</div>
+                    <div className="text-xs">{d.model} • {d.androidVersion}</div>
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex rounded-md bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">{d.camp}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 text-xs"><Network className="size-3 text-muted-foreground" /> {d.ipAddress}</div>
-                    <div className="text-xs text-muted-foreground">{d.appVersion}</div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -245,7 +239,7 @@ function DevicesPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground text-sm">No devices match these filters.</td>
+                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">No devices match these filters.</td>
                 </tr>
               )}
             </tbody>
