@@ -108,6 +108,7 @@ function Managers() {
   const [editing, setEditing] = useState<CampManager | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<CampManager | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -121,6 +122,10 @@ function Managers() {
         .includes(q);
     });
   }, [list, query, statusFilter, companyFilter]);
+
+  // Master/detail: keep a selection, falling back to the first visible row so
+  // the detail panel is never empty when suppliers exist.
+  const selected = filtered.find((m) => m.id === selectedId) ?? filtered[0] ?? null;
 
   const active = list.filter((m) => m.status === "Active").length;
   const suspended = list.filter((m) => m.status === "Suspended").length;
@@ -202,173 +207,111 @@ function Managers() {
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[240px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, username, camp, email…"
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
-          />
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 items-start">
+        {/* LEFT — supplier list (master) */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col lg:max-h-[calc(100vh-15rem)]">
+          <div className="p-3 border-b border-border space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search suppliers…"
+                className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
+              />
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+                className="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-secondary text-xs border border-transparent focus:border-ring focus:outline-none"
+              >
+                <option value="all">All companies</option>
+                {companies.map((co) => (
+                  <option key={co.id} value={co.code}>
+                    {co.code}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as never)}
+                className="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-secondary text-xs border border-transparent focus:border-ring focus:outline-none"
+              >
+                <option value="all">All statuses</option>
+                <option value="Active">Active</option>
+                <option value="Suspended">Suspended</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
+          </div>
+          <div className="overflow-y-auto divide-y divide-border/60 flex-1">
+            {filtered.map((m) => {
+              const isSel = selected?.id === m.id;
+              const dot =
+                m.status === "Active"
+                  ? "bg-success"
+                  : m.status === "Suspended"
+                    ? "bg-amber-500"
+                    : "bg-destructive";
+              const campCount = (m.camps?.length ? m.camps : [m.camp]).length;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedId(m.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                    isSel
+                      ? "bg-sidebar-accent/60 border-l-2 border-primary"
+                      : "border-l-2 border-transparent hover:bg-secondary/40"
+                  }`}
+                >
+                  <div className="relative shrink-0">
+                    <div className="size-9 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold text-xs">
+                      {m.avatar}
+                    </div>
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-card ${dot}`}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate text-sm">{m.name}</div>
+                    <div className="text-xs text-muted-foreground truncate font-mono">
+                      @{m.username}
+                    </div>
+                  </div>
+                  <span className="shrink-0 inline-flex items-center gap-1 text-[10px] rounded-full bg-primary/10 text-primary px-2 py-0.5 font-medium">
+                    <Building2 className="size-3" />
+                    {campCount}
+                  </span>
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div className="px-3 py-12 text-center text-muted-foreground text-sm">
+                No suppliers match.
+              </div>
+            )}
+          </div>
         </div>
-        <select
-          value={companyFilter}
-          onChange={(e) => setCompanyFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
-        >
-          <option value="all">All companies</option>
-          {companies.map((co) => (
-            <option key={co.id} value={co.code}>{co.code} — {co.name}</option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as never)}
-          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
-        >
-          <option value="all">All statuses</option>
-          <option value="Active">Active</option>
-          <option value="Suspended">Suspended</option>
-          <option value="Expired">Expired</option>
-        </select>
-      </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary/60 text-muted-foreground text-xs">
-              <tr className="text-left">
-                <th className="px-4 py-3 font-medium">Manager</th>
-                <th className="px-4 py-3 font-medium">Username</th>
-                <th className="px-4 py-3 font-medium">Camp</th>
-                <th className="px-4 py-3 font-medium">Role / Shift</th>
-                <th className="px-4 py-3 font-medium">Contact</th>
-                <th className="px-4 py-3 font-medium">Mobile PIN</th>
-                <th className="px-4 py-3 font-medium">Expires</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((m) => {
-                const d = daysUntil(m.expiryDate);
-                return (
-                  <tr key={m.id} className="border-t border-border hover:bg-secondary/30">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold text-xs">
-                          {m.avatar}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{m.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {m.emiratesId}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">@{m.username}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(m.camps?.length ? m.camps : [m.camp]).map((code) => (
-                          <span
-                            key={code}
-                            className="inline-flex items-center gap-1 text-xs rounded-md bg-primary/10 text-primary px-2 py-1 font-medium"
-                          >
-                            <Building2 className="size-3" /> {code}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      <div>{m.role === "Camp Manager" ? "Supplier" : m.role}</div>
-                      <div className="text-muted-foreground">{m.shift}</div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Mail className="size-3" />
-                        {m.email}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Phone className="size-3" />
-                        {m.phone}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {m.hasPin ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border bg-success/10 text-success border-success/20">
-                          <Smartphone className="size-3" /> Set
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border bg-muted text-muted-foreground border-border">
-                          <Smartphone className="size-3" /> Not set
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      <div className="tabular-nums">{m.expiryDate}</div>
-                      <div
-                        className={
-                          d < 0
-                            ? "text-destructive"
-                            : d <= 30
-                              ? "text-amber-500"
-                              : "text-muted-foreground"
-                        }
-                      >
-                        {d < 0 ? `${Math.abs(d)}d ago` : `in ${d}d`}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${statusTone(m.status)}`}
-                      >
-                        {m.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => toggleStatus(m.id)}
-                          disabled={m.status === "Expired"}
-                          title={m.status === "Active" ? "Set Inactive" : "Set Active"}
-                          className={`size-8 grid place-items-center rounded-lg disabled:opacity-30 disabled:cursor-not-allowed ${m.status === "Active" ? "hover:bg-amber-500/10 text-amber-500" : "hover:bg-success/10 text-success"}`}
-                        >
-                          {m.status === "Active" ? (
-                            <PowerOff className="size-4" />
-                          ) : (
-                            <Power className="size-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setEditing(m)}
-                          title="Edit"
-                          className="size-8 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
-                        >
-                          <Pencil className="size-4" />
-                        </button>
-                        <button
-                          onClick={() => setConfirmDelete(m)}
-                          title="Delete"
-                          className="size-8 grid place-items-center rounded-lg hover:bg-destructive/10 text-destructive"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
-                    No managers match.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        {/* RIGHT — selected supplier (detail) */}
+        <div className="rounded-xl border border-border bg-card min-h-[420px]">
+          {selected ? (
+            <SupplierDetail
+              m={selected}
+              onEdit={() => setEditing(selected)}
+              onToggle={() => toggleStatus(selected.id)}
+              onDelete={() => setConfirmDelete(selected)}
+            />
+          ) : (
+            <div className="h-full min-h-[420px] grid place-items-center text-center p-8">
+              <div className="text-muted-foreground">
+                <Shield className="size-10 mx-auto mb-3 opacity-40" />
+                <div className="font-medium">No supplier selected</div>
+                <div className="text-sm mt-1">Pick a supplier from the list to see details.</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -704,6 +647,8 @@ function MultiCampSelect({
   const toggle = (code: string) =>
     onChange(value.includes(code) ? value.filter((c) => c !== code) : [...value, code]);
 
+  const allSelected = camps.length > 0 && camps.every((c) => value.includes(c.code));
+
   // Preserve selection order so value[0] stays the primary camp.
   const selected = value
     .map((code) => camps.find((c) => c.code === code))
@@ -752,6 +697,27 @@ function MultiCampSelect({
           {camps.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">No camps available.</div>
           )}
+          {camps.length > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                // Select all preserves current order (so value[0] stays primary);
+                // a second click clears everything.
+                allSelected
+                  ? onChange([])
+                  : onChange([
+                      ...value,
+                      ...camps.filter((c) => !value.includes(c.code)).map((c) => c.code),
+                    ])
+              }
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-primary hover:bg-secondary border-b border-border/60 sticky top-0 bg-card"
+            >
+              <span>{allSelected ? "Clear all" : "Select all"}</span>
+              <span className="text-muted-foreground">
+                {value.length}/{camps.length}
+              </span>
+            </button>
+          )}
           {camps.map((c) => {
             const checked = value.includes(c.code);
             return (
@@ -775,6 +741,182 @@ function MultiCampSelect({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// Detail panel for the selected supplier (right side of the master/detail).
+function SupplierDetail({
+  m,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  m: CampManager;
+  onEdit: () => void;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  const d = daysUntil(m.expiryDate);
+  const allCamps = m.camps?.length ? m.camps : [m.camp];
+  return (
+    <div className="flex flex-col">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 p-5 border-b border-border">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="size-14 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold shrink-0">
+            {m.avatar}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-lg font-display font-bold truncate">{m.name}</h2>
+              <span
+                className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${statusTone(m.status)}`}
+              >
+                {m.status}
+              </span>
+            </div>
+            <div className="text-sm text-muted-foreground font-mono">@{m.username}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{m.emiratesId}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={onToggle}
+            disabled={m.status === "Expired"}
+            title={m.status === "Active" ? "Set Inactive" : "Set Active"}
+            className={`size-9 grid place-items-center rounded-lg disabled:opacity-30 disabled:cursor-not-allowed ${m.status === "Active" ? "hover:bg-amber-500/10 text-amber-500" : "hover:bg-success/10 text-success"}`}
+          >
+            {m.status === "Active" ? <PowerOff className="size-4" /> : <Power className="size-4" />}
+          </button>
+          <button
+            onClick={onEdit}
+            title="Edit"
+            className="size-9 grid place-items-center rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
+          >
+            <Pencil className="size-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            title="Delete"
+            className="size-9 grid place-items-center rounded-lg hover:bg-destructive/10 text-destructive"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-5 grid sm:grid-cols-2 gap-4">
+        <DetailCard icon={<Building2 className="size-4" />} title="Assigned Camps" className="sm:col-span-2">
+          <div className="flex flex-wrap gap-1.5">
+            {allCamps.map((code, i) => (
+              <span
+                key={code}
+                className="inline-flex items-center gap-1.5 text-xs rounded-md bg-primary/10 text-primary px-2 py-1 font-medium"
+              >
+                <span className="font-mono">{code}</span>
+                {i === 0 && allCamps.length > 1 && (
+                  <span className="text-[9px] uppercase tracking-wide opacity-70">primary</span>
+                )}
+              </span>
+            ))}
+          </div>
+        </DetailCard>
+
+        <DetailCard icon={<Shield className="size-4" />} title="Role & Shift">
+          <div className="font-medium">{m.role === "Camp Manager" ? "Supplier" : m.role}</div>
+          <div className="text-sm text-muted-foreground">{m.shift}</div>
+        </DetailCard>
+
+        <DetailCard icon={<Building2 className="size-4" />} title="Company">
+          <div className="font-medium">{m.companyCode ?? "—"}</div>
+        </DetailCard>
+
+        <DetailCard icon={<Mail className="size-4" />} title="Contact">
+          <div className="flex items-center gap-1.5 text-sm truncate">
+            <Mail className="size-3.5 text-muted-foreground shrink-0" />
+            <span className="truncate">{m.email || "—"}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm mt-1">
+            <Phone className="size-3.5 text-muted-foreground shrink-0" />
+            {m.phone || "—"}
+          </div>
+        </DetailCard>
+
+        <DetailCard icon={<Smartphone className="size-4" />} title="Scanner Access">
+          <div className="flex items-center gap-2 text-sm">
+            <Smartphone className="size-3.5 text-muted-foreground" />
+            Mobile PIN:
+            {m.hasPin ? (
+              <span className="text-success font-medium">Set</span>
+            ) : (
+              <span className="text-muted-foreground">Not set</span>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(
+              [
+                ["Breakfast", m.permissions.breakfast],
+                ["Lunch", m.permissions.lunch],
+                ["Dinner", m.permissions.dinner],
+                ["Reports", m.permissions.reports],
+              ] as const
+            ).map(([label, on]) => (
+              <span
+                key={label}
+                className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                  on
+                    ? "bg-success/10 text-success border-success/20"
+                    : "bg-muted text-muted-foreground border-border"
+                }`}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        </DetailCard>
+
+        <DetailCard icon={<Clock className="size-4" />} title="Access Period">
+          <div className="text-sm">
+            <span className="text-muted-foreground">Joined</span>{" "}
+            <span className="tabular-nums">{m.joinDate}</span>
+          </div>
+          <div className="text-sm mt-1">
+            <span className="text-muted-foreground">Expires</span>{" "}
+            <span className="tabular-nums">{m.expiryDate}</span>{" "}
+            <span
+              className={
+                d < 0 ? "text-destructive" : d <= 30 ? "text-amber-500" : "text-muted-foreground"
+              }
+            >
+              ({d < 0 ? `${Math.abs(d)}d ago` : `in ${d}d`})
+            </span>
+          </div>
+        </DetailCard>
+      </div>
+    </div>
+  );
+}
+
+function DetailCard({
+  icon,
+  title,
+  className = "",
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`rounded-lg border border-border bg-secondary/30 p-4 ${className}`}>
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
+        <span className="text-primary">{icon}</span>
+        {title}
+      </div>
+      {children}
     </div>
   );
 }
