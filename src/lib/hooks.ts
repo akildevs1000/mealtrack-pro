@@ -665,7 +665,7 @@ export function useReportBySupplier(p: { from: string; to: string; companyCode?:
   });
 }
 
-export type ByLocationRow = { date: string } & MealTriple;
+export type ByLocationRow = { date: string; location: string; locationName: string } & MealTriple;
 export function useReportByLocation(p: { from: string; to: string; companyCode?: string; campCode?: string }) {
   return useQuery({
     queryKey: ["reports", "by-location", p],

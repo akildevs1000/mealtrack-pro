@@ -110,7 +110,10 @@ function ReportsPage() {
     }
     if (tab === "location") {
       const rows = byLocation.data?.rows ?? [];
-      return [["Date", "Breakfast", "Lunch", "Dinner"], ...rows.map((r) => [r.date, r.breakfast, r.lunch, r.dinner])];
+      return [
+        ["Date", "Location", "Breakfast", "Lunch", "Dinner"],
+        ...rows.map((r) => [r.date, `${r.location} — ${r.locationName}`, r.breakfast, r.lunch, r.dinner]),
+      ];
     }
     if (tab === "comparison") {
       const rows = comparison.data?.rows ?? [];
@@ -163,7 +166,7 @@ function ReportsPage() {
       const rows = byLocation.data?.rows ?? [];
       const sum = (k: "breakfast" | "lunch" | "dinner") => rows.reduce((a, r) => a + (r[k] || 0), 0);
       return [
-        { label: "Days", value: String(rows.length) },
+        { label: "Days", value: String(new Set(rows.map((r) => r.date)).size) },
         { label: "Breakfast", value: String(sum("breakfast")) },
         { label: "Lunch", value: String(sum("lunch")) },
         { label: "Dinner", value: String(sum("dinner")) },
@@ -400,10 +403,11 @@ function ReportsPage() {
 
     // Centre the numeric columns (header + value) per report.
     const numCols: Record<string, number[]> = {
-      daily: [], supplier: [2, 3, 4, 5], location: [1, 2, 3], comparison: [4, 5, 6, 7], duplicate: [],
+      daily: [], supplier: [2, 3, 4, 5], location: [2, 3, 4], comparison: [4, 5, 6, 7], duplicate: [],
     };
+    const centerSet = new Set(numCols[tab] ?? []);
     const columnStyles: Record<number, any> = {};
-    (numCols[tab] ?? []).forEach((i) => (columnStyles[i] = { halign: "center" }));
+    centerSet.forEach((i) => (columnStyles[i] = { halign: "center" }));
 
     drawHeader();
     drawCards();
@@ -425,6 +429,9 @@ function ReportsPage() {
       alternateRowStyles: { fillColor: slate50 },
       columnStyles,
       didParseCell: (d: any) => {
+        // Force centre on numeric columns for BOTH header and body (columnStyles
+        // alone wasn't reliably centring the navy header text).
+        if (centerSet.has(d.column.index)) d.cell.styles.halign = "center";
         if (d.section !== "body") return;
         // Duplicate report — colour the Status column by severity.
         if (tab === "duplicate" && d.column.index === 3) {
@@ -712,21 +719,26 @@ function LocationTable({ rows, loading }: { rows: import("@/lib/hooks").ByLocati
         <thead className="bg-secondary/60 text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className={thL}>Date</th>
+            <th className={thL}>Location</th>
             <th className={thR}>Breakfast</th>
             <th className={thR}>Lunch</th>
             <th className={thR}>Dinner</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.date} className="border-t border-border hover:bg-secondary/30">
+          {rows.map((r, i) => (
+            <tr key={`${r.date}-${r.location}-${i}`} className="border-t border-border hover:bg-secondary/30">
               <td className={`${tdL} whitespace-nowrap`}>{fmtDate(r.date)}</td>
+              <td className={tdL}>
+                <span className="rounded-md bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">{r.location}</span>
+                <span className="text-muted-foreground text-xs ml-2">{r.locationName}</span>
+              </td>
               <td className={tdR}>{r.breakfast}</td>
               <td className={tdR}>{r.lunch}</td>
               <td className={tdR}>{r.dinner}</td>
             </tr>
           ))}
-          {rows.length === 0 && <Empty cols={4} msg={loading ? "Loading…" : "No meals in this range."} />}
+          {rows.length === 0 && <Empty cols={5} msg={loading ? "Loading…" : "No meals in this range."} />}
         </tbody>
       </table>
     </div>

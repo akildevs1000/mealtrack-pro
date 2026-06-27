@@ -489,20 +489,24 @@ router.get("/by-location", async (req, res, next) => {
       req.query.campCode as string,
       req.query.companyCode as string,
     );
+    const sites = await listReportSites(codes);
+    const nameByCode = new Map(sites.map((s) => [s.code, s.name]));
     const scans = await prisma.scan.findMany({
       where: { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) },
-      select: { time: true, meal: true },
+      select: { time: true, meal: true, campCode: true },
     });
-    const byDate = new Map<string, { breakfast: number; lunch: number; dinner: number }>();
+    // One row per (day × location) so the report shows which site each total is for.
+    const byKey = new Map<string, { date: string; location: string } & ReturnType<typeof emptyMeals>>();
     for (const s of scans) {
       const day = s.time.toISOString().slice(0, 10);
-      const cell = byDate.get(day) ?? emptyMeals();
+      const key = `${day}|${s.campCode}`;
+      const cell = byKey.get(key) ?? { date: day, location: s.campCode, ...emptyMeals() };
       addMeal(cell, s.meal);
-      byDate.set(day, cell);
+      byKey.set(key, cell);
     }
-    const rows = [...byDate.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, v]) => ({ date, ...v }));
+    const rows = [...byKey.values()]
+      .sort((a, b) => a.date.localeCompare(b.date) || a.location.localeCompare(b.location))
+      .map((r) => ({ ...r, locationName: nameByCode.get(r.location) ?? r.location }));
     res.json({ rows });
   } catch (e) {
     next(e);
