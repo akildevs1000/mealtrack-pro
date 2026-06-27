@@ -256,8 +256,11 @@ model Scan {
 model Device {
   id             String   @id @default(cuid())
   name           String   @unique
-  camp           Camp     @relation(fields: [campCode], references: [code])
-  campCode       String
+  // A device is tied to either a camp OR a project (the register dialog merges
+  // them into one "Location" picker). Both are nullable so either can be set.
+  camp           Camp?    @relation(fields: [campCode], references: [code])
+  campCode       String?
+  projectCode    String?
   battery        Int      @default(100)
   online         Boolean  @default(true)
   lastSync       DateTime @default(now())

@@ -98,7 +98,8 @@ export type MealRecord = {
 export type Device = {
   id: string;
   name: string;
-  camp: string;
+  camp: string | null;
+  projectCode: string | null;
   battery: number;
   online: boolean;
   lastSync: string;
@@ -395,7 +396,8 @@ export function useDevices() {
 
 export type DeviceInput = {
   name: string;
-  campCode: string;
+  campCode: string | null;
+  projectCode: string | null;
   battery: number;
   online: boolean;
   macAddress: string;

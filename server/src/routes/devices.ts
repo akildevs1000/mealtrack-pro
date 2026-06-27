@@ -27,7 +27,9 @@ router.get("/:id", async (req, res, next) => {
 
 const upsertSchema = z.object({
   name: z.string(),
-  campCode: z.string(),
+  // A device is tied to either a camp or a project — both optional.
+  campCode: z.string().optional().nullable(),
+  projectCode: z.string().optional().nullable(),
   battery: z.number().int().min(0).max(100),
   online: z.boolean(),
   macAddress: z.string(),
@@ -49,7 +51,8 @@ function buildDeviceData(body: z.infer<typeof upsertSchema>) {
       : `SCN-${body.macAddress.replace(/[^0-9A-Za-z]/g, "").toUpperCase()}`;
   return {
     name: body.name,
-    campCode: body.campCode,
+    campCode: body.campCode ?? null,
+    projectCode: body.projectCode ?? null,
     battery: body.battery,
     online: body.online,
     macAddress: body.macAddress,
@@ -96,6 +99,7 @@ function toApi(d: any) {
     id: d.id,
     name: d.name,
     camp: d.campCode,
+    projectCode: d.projectCode,
     battery: d.battery,
     online: d.online,
     lastSync: relativeTime(d.lastSync),

@@ -52,6 +52,15 @@ router.post("/login", async (req, res, next) => {
         message: "Ask an admin to register this device in the web app first.",
       });
     }
+    // Scanner sessions are anchored to a camp. A device bound to a project
+    // (no camp) can't drive eligibility / meal-window checks.
+    if (!device.campCode) {
+      return res.status(403).json({
+        error: "Device not bound to a camp",
+        reason: "device_no_camp",
+        message: "This device is registered to a project, not a camp. Bind it to a camp to use it as a scanner.",
+      });
+    }
 
     // 2) Credentials.
     const manager = await prisma.campManager.findUnique({
@@ -223,10 +232,12 @@ router.get("/device/:mac", async (req, res, next) => {
       select: { id: true, name: true, campCode: true, model: true, serial: true },
     });
     if (!device) return res.status(404).json({ error: "Device not registered" });
-    const camp = await prisma.camp.findUnique({
-      where: { code: device.campCode },
-      select: { code: true, name: true, site: true },
-    });
+    const camp = device.campCode
+      ? await prisma.camp.findUnique({
+          where: { code: device.campCode },
+          select: { code: true, name: true, site: true },
+        })
+      : null;
     res.json({ device, camp });
   } catch (e) { next(e); }
 });
