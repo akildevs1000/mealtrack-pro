@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Smartphone, Wifi, WifiOff, BatteryLow, Plus, Search, Copy, Check, X, Cpu, User, Calendar } from "lucide-react";
+import { Smartphone, Wifi, WifiOff, BatteryLow, Plus, Search, Copy, Check, X, Cpu, Calendar } from "lucide-react";
 import { useCampScope } from "@/lib/session";
-import { useCamps, useCompanies, useDevices, useManagers, useProjects, useCreateDevice, type Device } from "@/lib/hooks";
+import { useCamps, useCompanies, useDevices, useProjects, useCreateDevice, type Device } from "@/lib/hooks";
 
 export const Route = createFileRoute("/devices")({
   component: DevicesPage,
@@ -23,7 +23,6 @@ function DevicesPage() {
   const { data: camps = [] } = useCamps();
   const { data: companies = [] } = useCompanies();
   const { data: projects = [] } = useProjects();
-  const { data: suppliers = [] } = useManagers();
   const { data: list = [] } = useDevices();
   const createDevice = useCreateDevice();
   const [query, setQuery] = useState("");
@@ -61,8 +60,7 @@ function DevicesPage() {
       return (
         d.name.toLowerCase().includes(q) ||
         d.macAddress.toLowerCase().includes(q) ||
-        d.serial.toLowerCase().includes(q) ||
-        d.assignedTo.toLowerCase().includes(q)
+        d.serial.toLowerCase().includes(q)
       );
     });
   }, [list, query, campFilter, companyFilter, companyCampCodes, scope]);
@@ -115,17 +113,6 @@ function DevicesPage() {
     }
   }
 
-  // Derived from the merged location picker. Suppliers filter by the chosen
-  // camp; when a project is picked there's no camp, so we fall back to all
-  // suppliers (a project isn't camp-scoped).
-  const selectedCampCode = location.startsWith("c:") ? location.slice(2) : "";
-  const isProjectPicked = location.startsWith("p:");
-  const supplierOptions = selectedCampCode
-    ? suppliers.filter((s) => (s.camps?.length ? s.camps : [s.camp]).includes(selectedCampCode))
-    : isProjectPicked
-      ? suppliers
-      : [];
-
   async function copy(value: string) {
     await navigator.clipboard.writeText(value);
     setCopied(value);
@@ -169,7 +156,7 @@ function DevicesPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, MAC, serial, owner…"
+            placeholder="Search name, MAC, serial…"
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
           />
         </div>
@@ -214,9 +201,7 @@ function DevicesPage() {
                       </div>
                       <div>
                         <div className="font-medium">{d.name}</div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                          <User className="size-3" /> {d.assignedTo}
-                        </div>
+                        <div className="text-xs text-muted-foreground font-mono">{d.serial}</div>
                       </div>
                     </div>
                   </td>
@@ -231,7 +216,7 @@ function DevicesPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-xs">{d.model} • {d.androidVersion}</div>
+                    <div className="text-xs">{d.model}</div>
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex rounded-md bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">{d.camp ?? d.projectCode ?? "—"}</span>
@@ -277,7 +262,7 @@ function DevicesPage() {
               <Field label="Project / Camp Location *">
                 <select
                   value={location}
-                  onChange={(e) => { setLocation(e.target.value); setForm({ ...form, assignedTo: "" }); }}
+                  onChange={(e) => setLocation(e.target.value)}
                   className={inputCls}
                 >
                   <option value="">— Select Project or Camp —</option>
@@ -295,19 +280,6 @@ function DevicesPage() {
               </Field>
               <Field label="Model">
                 <input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} className={inputCls} />
-              </Field>
-              <Field label="Android Version">
-                <select value={form.androidVersion} onChange={(e) => setForm({ ...form, androidVersion: e.target.value })} className={inputCls}>
-                  {["Android 7", "Android 8", "Android 9", "Android 10", "Android 11", "Android 12", "Android 13", "Android 14", "Android 15"].map((v) => <option key={v}>{v}</option>)}
-                </select>
-              </Field>
-              <Field label="Assigned To (Supplier)">
-                <select value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} className={inputCls}>
-                  <option value="">{location ? "— Select supplier —" : "Select a location first"}</option>
-                  {supplierOptions.map((s) => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
               </Field>
               <Field label="Registered On">
                 <input type="date" value={form.registeredOn} onChange={(e) => setForm({ ...form, registeredOn: e.target.value })} className={inputCls} />
