@@ -208,7 +208,7 @@ function ReportsPage() {
     const doc = new jsPDF({ orientation: landscape ? "landscape" : "portrait", unit: "pt", format: "a4" });
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
-    const margin = 40;
+    const margin = 26;
     // NB: jsPDF's built-in Helvetica is WinAnsi — it can't render "→" (prints
     // garbage), so use an en dash for the range separator.
     const rangeLabel = tab === "daily" ? fmtDate(date) : `${fmtDate(from)} – ${fmtDate(to)}`;
