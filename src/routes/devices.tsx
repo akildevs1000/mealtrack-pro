@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Smartphone, Wifi, WifiOff, BatteryLow, Plus, Search, Copy, Check, X, Cpu, Calendar } from "lucide-react";
+import { Smartphone, Plus, Search, Copy, Check, X, Cpu, Calendar } from "lucide-react";
 import { useCampScope } from "@/lib/session";
 import { useCamps, useCompanies, useDevices, useProjects, useCreateDevice, type Device } from "@/lib/hooks";
 
@@ -64,13 +64,6 @@ function DevicesPage() {
       );
     });
   }, [list, query, campFilter, companyFilter, companyCampCodes, scope]);
-
-  const stats = useMemo(() => ({
-    total: list.length,
-    online: list.filter((d) => d.online).length,
-    offline: list.filter((d) => !d.online).length,
-    lowBattery: list.filter((d) => d.battery < 20).length,
-  }), [list]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -139,14 +132,6 @@ function DevicesPage() {
         >
           <Plus className="size-4" /> Register Device
         </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<Smartphone className="size-4" />} label="Total Devices" value={stats.total} tone="primary" />
-        <StatCard icon={<Wifi className="size-4" />} label="Online" value={stats.online} tone="success" />
-        <StatCard icon={<WifiOff className="size-4" />} label="Offline" value={stats.offline} tone="muted" />
-        <StatCard icon={<BatteryLow className="size-4" />} label="Low Battery" value={stats.lowBattery} tone="warning" />
       </div>
 
       {/* Filters */}
@@ -314,20 +299,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function StatCard({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: "primary" | "success" | "muted" | "warning" }) {
-  const toneCls = {
-    primary: "bg-primary/10 text-primary",
-    success: "bg-success/10 text-success",
-    muted: "bg-muted text-muted-foreground",
-    warning: "bg-warning/10 text-warning",
-  }[tone];
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
-      <div className={`size-10 rounded-lg grid place-items-center ${toneCls}`}>{icon}</div>
-      <div>
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="text-2xl font-bold tabular-nums">{value}</div>
-      </div>
-    </div>
-  );
-}
