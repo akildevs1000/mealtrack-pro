@@ -655,8 +655,8 @@ export function useReportDailyDistribution(p: { date: string; companyCode?: stri
 
 type MealTriple = { breakfast: number; lunch: number; dinner: number };
 export type BySupplierData = {
-  camps: { code: string; name: string }[];
-  rows: { date: string; perCamp: Record<string, MealTriple>; totals: MealTriple; avgPerDay: number }[];
+  suppliers: { id: string; name: string }[];
+  rows: { date: string; perSupplier: Record<string, MealTriple>; totals: MealTriple; avgPerDay: number }[];
 };
 export function useReportBySupplier(p: { from: string; to: string; companyCode?: string; campCode?: string; supplierId?: string }) {
   return useQuery({

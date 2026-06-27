@@ -101,11 +101,10 @@ function ReportsPage() {
     if (tab === "supplier") {
       const d = bySupplier.data;
       if (!d) return [];
-      const nm = new Map(d.camps.map((c) => [c.code, c.name]));
       const rows = supplierStackedRows(d);
       return [
-        ["Date", "Distribution Point", "Breakfast", "Lunch", "Dinner", "Total"],
-        ...rows.map((r) => [r.date, `${r.code} — ${nm.get(r.code) ?? ""}`, r.breakfast, r.lunch, r.dinner, r.total]),
+        ["Date", "Supplier", "Breakfast", "Lunch", "Dinner", "Total"],
+        ...rows.map((r) => [r.date, r.supplier, r.breakfast, r.lunch, r.dinner, r.total]),
       ];
     }
     if (tab === "location") {
@@ -668,14 +667,19 @@ function DailyTable({ rows, loading }: { rows: import("@/lib/hooks").DailyDistRo
 
 // ── Report 2 (stacked: one row per Date × distribution point) ─────────────
 function supplierStackedRows(d: import("@/lib/hooks").BySupplierData) {
+  const nameById = new Map(d.suppliers.map((s) => [s.id, s.name]));
   return d.rows.flatMap((r) =>
-    Object.entries(r.perCamp)
-      .map(([code, cell]) => ({ date: r.date, code, ...cell, total: cell.breakfast + cell.lunch + cell.dinner }))
+    Object.entries(r.perSupplier)
+      .map(([id, cell]) => ({
+        date: r.date,
+        supplier: nameById.get(id) ?? "—",
+        ...cell,
+        total: cell.breakfast + cell.lunch + cell.dinner,
+      }))
       .filter((x) => x.total > 0),
   );
 }
 function SupplierStacked({ data, loading }: { data: import("@/lib/hooks").BySupplierData | undefined; loading: boolean }) {
-  const campName = new Map((data?.camps ?? []).map((c) => [c.code, c.name]));
   const rows = data ? supplierStackedRows(data) : [];
   return (
     <div className="overflow-x-auto">
@@ -683,7 +687,7 @@ function SupplierStacked({ data, loading }: { data: import("@/lib/hooks").BySupp
         <thead className="bg-secondary/60 text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className={thL}>Date</th>
-            <th className={thL}>Distribution Point</th>
+            <th className={thL}>Supplier</th>
             <th className={thR}>Breakfast</th>
             <th className={thR}>Lunch</th>
             <th className={thR}>Dinner</th>
@@ -692,12 +696,9 @@ function SupplierStacked({ data, loading }: { data: import("@/lib/hooks").BySupp
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={`${r.date}-${r.code}-${i}`} className="border-t border-border hover:bg-secondary/30">
+            <tr key={`${r.date}-${r.supplier}-${i}`} className="border-t border-border hover:bg-secondary/30">
               <td className={`${tdL} whitespace-nowrap`}>{fmtDate(r.date)}</td>
-              <td className={tdL}>
-                <span className="rounded-md bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">{r.code}</span>
-                <span className="text-muted-foreground text-xs ml-2">{campName.get(r.code)}</span>
-              </td>
+              <td className={tdL}>{r.supplier}</td>
               <td className={tdR}>{r.breakfast}</td>
               <td className={tdR}>{r.lunch}</td>
               <td className={tdR}>{r.dinner}</td>

@@ -441,39 +441,52 @@ router.get("/by-supplier", async (req, res, next) => {
       req.query.campCode as string,
       req.query.companyCode as string,
     );
-    const camps = await listReportSites(codes);
     const supplierId = req.query.supplierId as string | undefined;
     const scanWhere: any = { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) };
     if (supplierId && supplierId !== "all") scanWhere.managerId = supplierId;
     const scans = await prisma.scan.findMany({
       where: scanWhere,
-      select: { time: true, campCode: true, meal: true },
+      select: { time: true, managerId: true, meal: true },
     });
+    // Group meals by supplier (the scanning manager). Scans with no manager fall
+    // under a synthetic "unassigned" bucket so totals still add up.
+    const UNASSIGNED = "unassigned";
+    const supplierIds = [...new Set(scans.map((s) => s.managerId ?? UNASSIGNED))];
+    const managers = await prisma.campManager.findMany({
+      where: { id: { in: supplierIds.filter((id) => id !== UNASSIGNED) } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(managers.map((m) => [m.id, m.name]));
+    const suppliers = supplierIds
+      .map((id) => ({ id, name: id === UNASSIGNED ? "—" : nameById.get(id) ?? "—" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     const byDate = new Map<string, Map<string, { breakfast: number; lunch: number; dinner: number }>>();
     for (const s of scans) {
       const day = s.time.toISOString().slice(0, 10);
+      const sid = s.managerId ?? UNASSIGNED;
       const m = byDate.get(day) ?? new Map();
-      const cell = m.get(s.campCode) ?? emptyMeals();
+      const cell = m.get(sid) ?? emptyMeals();
       addMeal(cell, s.meal);
-      m.set(s.campCode, cell);
+      m.set(sid, cell);
       byDate.set(day, m);
     }
     const rows = [...byDate.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, m]) => {
-        const perCamp: Record<string, { breakfast: number; lunch: number; dinner: number }> = {};
+        const perSupplier: Record<string, { breakfast: number; lunch: number; dinner: number }> = {};
         const totals = emptyMeals();
-        for (const c of camps) {
-          const cell = m.get(c.code) ?? emptyMeals();
-          perCamp[c.code] = cell;
+        for (const sup of suppliers) {
+          const cell = m.get(sup.id) ?? emptyMeals();
+          perSupplier[sup.id] = cell;
           totals.breakfast += cell.breakfast;
           totals.lunch += cell.lunch;
           totals.dinner += cell.dinner;
         }
         const grand = totals.breakfast + totals.lunch + totals.dinner;
-        return { date, perCamp, totals, avgPerDay: Math.round(grand / 3) };
+        return { date, perSupplier, totals, avgPerDay: Math.round(grand / 3) };
       });
-    res.json({ camps: camps.map((c) => ({ code: c.code, name: c.name })), rows });
+    res.json({ suppliers, rows });
   } catch (e) {
     next(e);
   }
