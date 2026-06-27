@@ -176,7 +176,6 @@ function ReportsPage() {
       const today = rows.reduce((a, r) => a + (r.requestedToday || 0), 0);
       const yest = rows.reduce((a, r) => a + (r.requestedYesterday || 0), 0);
       return [
-        { label: "Line Items", value: String(rows.length) },
         { label: "Requested Today", value: String(today) },
         { label: "Req. Yesterday", value: String(yest) },
         { label: "Net Variance", value: `${today - yest > 0 ? "+" : ""}${today - yest}` },
