@@ -209,7 +209,9 @@ function ReportsPage() {
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 40;
-    const rangeLabel = tab === "daily" ? fmtDate(date) : `${fmtDate(from)} → ${fmtDate(to)}`;
+    // NB: jsPDF's built-in Helvetica is WinAnsi — it can't render "→" (prints
+    // garbage), so use an en dash for the range separator.
+    const rangeLabel = tab === "daily" ? fmtDate(date) : `${fmtDate(from)} – ${fmtDate(to)}`;
     const subtitle = campLabel ? `${rangeLabel}  •  ${campLabel}` : rangeLabel;
     const generated = new Date().toLocaleString(undefined, {
       day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
@@ -260,28 +262,30 @@ function ReportsPage() {
       doc.text(companyLabel, chipX + 6 + 22 + 8, chipY + 18);
     };
 
-    // ── KPI cards (page 1 only) ──
+    // ── KPI cards (page 1 only) — content centred so wide cards don't look empty ──
     const cardsTop = 92;
-    const cardsH = 56;
+    const cardsH = 54;
     const drawCards = () => {
       const n = summaryCards.length;
       if (!n) return;
-      const gap = 10;
+      const gap = 12;
       const contentW = pageW - margin * 2;
       const cardW = (contentW - gap * (n - 1)) / n;
       summaryCards.forEach((c, i) => {
         const x = margin + i * (cardW + gap);
+        const cx = x + cardW / 2;
+        doc.setFillColor(...slate50);
         doc.setDrawColor(...slate200);
         doc.setLineWidth(0.8);
-        doc.roundedRect(x, cardsTop, cardW, cardsH, 6, 6, "S");
-        doc.setFont("helvetica", "normal");
+        doc.roundedRect(x, cardsTop, cardW, cardsH, 7, 7, "FD");
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(7);
         doc.setTextColor(...slate500);
-        doc.text(c.label.toUpperCase(), x + 12, cardsTop + 20);
+        doc.text(c.label.toUpperCase(), cx, cardsTop + 19, { align: "center" });
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
+        doc.setFontSize(18);
         doc.setTextColor(...slate900);
-        doc.text(c.value, x + 12, cardsTop + 44);
+        doc.text(c.value, cx, cardsTop + 41, { align: "center" });
       });
     };
 
@@ -305,12 +309,12 @@ function ReportsPage() {
       startY: cardsTop + cardsH + 18,
       margin: { top: 92, bottom: 40, left: margin, right: margin },
       styles: {
-        font: "helvetica", fontSize: 8.5, textColor: [51, 65, 85],
-        cellPadding: { top: 7, right: 6, bottom: 7, left: 6 }, overflow: "linebreak", valign: "middle",
+        font: "helvetica", fontSize: 9, textColor: [51, 65, 85],
+        cellPadding: { top: 10, right: 8, bottom: 10, left: 8 }, overflow: "linebreak", valign: "middle",
       },
       headStyles: {
-        fillColor: slate50, textColor: slate500, fontStyle: "bold", fontSize: 7.5,
-        cellPadding: { top: 8, right: 6, bottom: 8, left: 6 },
+        fillColor: slate50, textColor: slate500, fontStyle: "bold", fontSize: 8,
+        cellPadding: { top: 9, right: 8, bottom: 9, left: 8 },
       },
       columnStyles,
       didParseCell: (d: any) => {
