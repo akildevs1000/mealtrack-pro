@@ -31,6 +31,18 @@ function parseTo(s: unknown): Date {
 function dayCount(from: Date, to: Date) {
   return Math.max(1, Math.round((to.getTime() - from.getTime()) / 86400000));
 }
+// Every calendar day (UTC, inclusive) in [from, to] as YYYY-MM-DD — used to
+// zero-fill date-aggregated reports so the full selected range is shown.
+function eachDayIso(from: Date, to: Date): string[] {
+  const out: string[] = [];
+  const d = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+  const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+  while (d <= end) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
 function campFilter(req: any, codeParam?: string): { where: any; codes: string[] | null } {
   const scope = campScopeOf(req);
   const code = typeof codeParam === "string" && codeParam !== "all" ? codeParam : undefined;
@@ -471,21 +483,21 @@ router.get("/by-supplier", async (req, res, next) => {
       m.set(sid, cell);
       byDate.set(day, m);
     }
-    const rows = [...byDate.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, m]) => {
-        const perSupplier: Record<string, { breakfast: number; lunch: number; dinner: number }> = {};
-        const totals = emptyMeals();
-        for (const sup of suppliers) {
-          const cell = m.get(sup.id) ?? emptyMeals();
-          perSupplier[sup.id] = cell;
-          totals.breakfast += cell.breakfast;
-          totals.lunch += cell.lunch;
-          totals.dinner += cell.dinner;
-        }
-        const grand = totals.breakfast + totals.lunch + totals.dinner;
-        return { date, perSupplier, totals, avgPerDay: Math.round(grand / 3) };
-      });
+    // Zero-fill every date in the range so the full selected range is shown.
+    const rows = eachDayIso(from, to).map((date) => {
+      const m = byDate.get(date) ?? new Map();
+      const perSupplier: Record<string, { breakfast: number; lunch: number; dinner: number }> = {};
+      const totals = emptyMeals();
+      for (const sup of suppliers) {
+        const cell = m.get(sup.id) ?? emptyMeals();
+        perSupplier[sup.id] = cell;
+        totals.breakfast += cell.breakfast;
+        totals.lunch += cell.lunch;
+        totals.dinner += cell.dinner;
+      }
+      const grand = totals.breakfast + totals.lunch + totals.dinner;
+      return { date, perSupplier, totals, avgPerDay: Math.round(grand / 3) };
+    });
     res.json({ suppliers, rows });
   } catch (e) {
     next(e);
@@ -508,18 +520,26 @@ router.get("/by-location", async (req, res, next) => {
       where: { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) },
       select: { time: true, meal: true, campCode: true },
     });
-    // One row per (day × location) so the report shows which site each total is for.
-    const byKey = new Map<string, { date: string; location: string } & ReturnType<typeof emptyMeals>>();
+    // One row per (day × location). Zero-fill every date in the range for each
+    // location that has data, so the full selected range is shown (0 on gaps).
+    const byKey = new Map<string, ReturnType<typeof emptyMeals>>();
     for (const s of scans) {
       const day = s.time.toISOString().slice(0, 10);
       const key = `${day}|${s.campCode}`;
-      const cell = byKey.get(key) ?? { date: day, location: s.campCode, ...emptyMeals() };
+      const cell = byKey.get(key) ?? emptyMeals();
       addMeal(cell, s.meal);
       byKey.set(key, cell);
     }
-    const rows = [...byKey.values()]
-      .sort((a, b) => a.date.localeCompare(b.date) || a.location.localeCompare(b.location))
-      .map((r) => ({ ...r, locationName: nameByCode.get(r.location) ?? r.location }));
+    const locations = [...new Set(scans.map((s) => s.campCode))].sort();
+    const days = eachDayIso(from, to);
+    const rows = days.flatMap((day) =>
+      locations.map((loc) => ({
+        date: day,
+        location: loc,
+        locationName: nameByCode.get(loc) ?? loc,
+        ...(byKey.get(`${day}|${loc}`) ?? emptyMeals()),
+      })),
+    );
     res.json({ rows });
   } catch (e) {
     next(e);
@@ -566,13 +586,31 @@ router.get("/request-comparison", async (req, res, next) => {
         meta.set(key, { date: d, supplierId: sup, campCode: camp, meal });
       }
     }
+    // Zero-fill: for every (supplier, site, meal) group seen, emit a row for each
+    // date in the range (requested 0 where there's no estimation) so the report
+    // shows the full selected range, not just dates that have data.
+    const groups = new Map<string, { sup: string; camp: string; meal: string }>();
+    for (const m of meta.values()) groups.set(`${m.supplierId}|${m.campCode}|${m.meal}`, { sup: m.supplierId, camp: m.campCode, meal: m.meal });
+    for (const g of groups.values()) {
+      for (const d of eachDayIso(from, to)) {
+        const key = k(d, g.sup, g.camp, g.meal);
+        if (!requested.has(key)) requested.set(key, 0);
+        meta.set(key, { date: d, supplierId: g.sup, campCode: g.camp, meal: g.meal });
+      }
+    }
     const prevDay = (iso: string) => {
       const d = new Date(`${iso}T00:00:00.000Z`);
       d.setUTCDate(d.getUTCDate() - 1);
       return d.toISOString().slice(0, 10);
     };
+    const mealOrder: Record<string, number> = { Breakfast: 0, Lunch: 1, Dinner: 2 };
     const rows = [...meta.entries()]
-      .sort((a, b) => a[1].date.localeCompare(b[1].date))
+      .sort(
+        (a, b) =>
+          a[1].date.localeCompare(b[1].date) ||
+          a[1].campCode.localeCompare(b[1].campCode) ||
+          (mealOrder[a[1].meal] ?? 9) - (mealOrder[b[1].meal] ?? 9),
+      )
       .map(([key, m]) => {
         const today = requested.get(key) ?? 0;
         const yKey = k(prevDay(m.date), m.supplierId, m.campCode, m.meal);

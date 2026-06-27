@@ -627,15 +627,15 @@ function DailyTable({ rows, loading }: { rows: import("@/lib/hooks").DailyDistRo
 // ── Report 2 (stacked: one row per Date × distribution point) ─────────────
 function supplierStackedRows(d: import("@/lib/hooks").BySupplierData) {
   const nameById = new Map(d.suppliers.map((s) => [s.id, s.name]));
+  // No total>0 filter: the backend zero-fills every date in the range so the
+  // full date series is shown (0 where the supplier served nothing).
   return d.rows.flatMap((r) =>
-    Object.entries(r.perSupplier)
-      .map(([id, cell]) => ({
-        date: r.date,
-        supplier: nameById.get(id) ?? "—",
-        ...cell,
-        total: cell.breakfast + cell.lunch + cell.dinner,
-      }))
-      .filter((x) => x.total > 0),
+    Object.entries(r.perSupplier).map(([id, cell]) => ({
+      date: r.date,
+      supplier: nameById.get(id) ?? "—",
+      ...cell,
+      total: cell.breakfast + cell.lunch + cell.dinner,
+    })),
   );
 }
 function SupplierStacked({ data, loading }: { data: import("@/lib/hooks").BySupplierData | undefined; loading: boolean }) {
