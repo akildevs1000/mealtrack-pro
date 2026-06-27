@@ -55,6 +55,12 @@ export type Project = {
   manager: string;
   employees: number;
   active: boolean;
+  // Meal windows — a project is a physical scanning site like a camp.
+  schedule: {
+    breakfast: { start: string; end: string };
+    lunch: { start: string; end: string };
+    dinner: { start: string; end: string };
+  };
 };
 
 export type FoodEstimation = {

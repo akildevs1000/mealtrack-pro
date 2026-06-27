@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth } from "../middleware/auth.js";
 import { dubaiDateKey, dubaiDayOfWeek, dubaiHour, dubaiStartOfToday } from "../lib/time.js";
+import { listReportSites, companySiteCodes } from "../lib/sites.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -29,19 +30,19 @@ router.get("/", async (req, res, next) => {
         ? req.query.companyCode
         : null;
     if (companyCode) {
-      const companyCamps = await prisma.camp.findMany({
-        where: { companyCode },
-        select: { code: true },
-      });
-      const companyCodes = companyCamps.map((c) => c.code);
+      // A company's sites are its camps AND projects (both can host scans).
+      const companyCodes = await companySiteCodes(companyCode);
       filterCodes = filterCodes ? filterCodes.filter((c) => companyCodes.includes(c)) : companyCodes;
     }
-    const campsWhere = filterCodes ? { code: { in: filterCodes } } : undefined;
     const scanFilter = filterCodes ? { campCode: { in: filterCodes } } : {};
 
     const [camps, devices, todayScans] = await Promise.all([
-      prisma.camp.findMany({ where: campsWhere, orderBy: { code: "asc" } }),
-      prisma.device.findMany({ where: filterCodes ? { campCode: { in: filterCodes } } : undefined }),
+      listReportSites(filterCodes),
+      prisma.device.findMany({
+        where: filterCodes
+          ? { OR: [{ campCode: { in: filterCodes } }, { projectCode: { in: filterCodes } }] }
+          : undefined,
+      }),
       prisma.scan.findMany({
         where: {
           time: { gte: dubaiStartOfToday() },

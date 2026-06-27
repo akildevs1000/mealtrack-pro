@@ -4,6 +4,7 @@ import { Client as FtpClient } from "basic-ftp";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth } from "../middleware/auth.js";
 import { cmsEmployeeToReportRow } from "../lib/report-data.js";
+import { listReportSites } from "../lib/sites.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -56,7 +57,17 @@ async function scopeForReports(
   if (!companyCode) return base;
   const combined = base.where ? { AND: [base.where, { companyCode }] } : { companyCode };
   const camps = await prisma.camp.findMany({ where: combined, select: { code: true } });
-  return { where: combined, codes: camps.map((c) => c.code) };
+  let codes = camps.map((c) => c.code);
+  // Unscoped callers (admin/operator) also see the company's PROJECT sites.
+  // Camp-scoped managers stay camp-only (projects aren't camp-scoped).
+  if (base.codes === null) {
+    const projects = await (prisma as any).project.findMany({
+      where: { companyCode },
+      select: { code: true },
+    });
+    codes = [...codes, ...projects.map((p: any) => p.code)];
+  }
+  return { where: combined, codes };
 }
 // Build the Scan campCode filter from the *resolved* scope codes only. Do NOT
 // trust the raw ?campCode= param here — campFilter() already validated it against
@@ -92,12 +103,12 @@ router.get("/consumption", async (req, res, next) => {
   try {
     const from = parseFrom(req.query.from);
     const to = parseTo(req.query.to);
-    const { where: campWhere, codes } = await scopeForReports(
+    const { codes } = await scopeForReports(
       req,
       req.query.campCode as string,
       req.query.companyCode as string,
     );
-    const camps = await prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } });
+    const camps = await listReportSites(codes);
 
     const groups = await prisma.scan.groupBy({
       by: ["campCode", "meal"],
@@ -199,14 +210,14 @@ router.get("/camps", async (req, res, next) => {
   try {
     const from = parseFrom(req.query.from);
     const to = parseTo(req.query.to);
-    const { where: campWhere, codes } = await scopeForReports(
+    const { codes } = await scopeForReports(
       req,
       req.query.campCode as string,
       req.query.companyCode as string,
     );
 
     const [camps, scanGroups, devices] = await Promise.all([
-      prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } }),
+      listReportSites(codes),
       prisma.scan.groupBy({
         by: ["campCode", "status"],
         where: {
@@ -216,7 +227,7 @@ router.get("/camps", async (req, res, next) => {
         _count: { _all: true },
       }),
       prisma.device.findMany({
-        where: codes ? { campCode: { in: codes } } : undefined,
+        where: codes ? { OR: [{ campCode: { in: codes } }, { projectCode: { in: codes } }] } : undefined,
       }),
     ]);
 
@@ -228,7 +239,7 @@ router.get("/camps", async (req, res, next) => {
         scanGroups.find((g) => g.campCode === c.code && g.status === "AlreadyServed")?._count
           ._all ?? 0;
       const estimated = Math.round(c.employees * days * 0.85);
-      const dev = devices.filter((d) => d.campCode === c.code);
+      const dev = devices.filter((d) => d.campCode === c.code || d.projectCode === c.code);
       return {
         code: c.code,
         name: c.name,
@@ -261,12 +272,12 @@ router.get("/wastage", async (req, res, next) => {
   try {
     const from = parseFrom(req.query.from);
     const to = parseTo(req.query.to);
-    const { where: campWhere, codes } = await scopeForReports(
+    const { codes } = await scopeForReports(
       req,
       req.query.campCode as string,
       req.query.companyCode as string,
     );
-    const camps = await prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } });
+    const camps = await listReportSites(codes);
 
     const served = await prisma.scan.groupBy({
       by: ["campCode"],
@@ -425,12 +436,12 @@ router.get("/by-supplier", async (req, res, next) => {
   try {
     const from = parseFrom(req.query.from);
     const to = parseTo(req.query.to);
-    const { where: campWhere, codes } = await scopeForReports(
+    const { codes } = await scopeForReports(
       req,
       req.query.campCode as string,
       req.query.companyCode as string,
     );
-    const camps = await prisma.camp.findMany({ where: campWhere, orderBy: { code: "asc" } });
+    const camps = await listReportSites(codes);
     const supplierId = req.query.supplierId as string | undefined;
     const scanWhere: any = { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) };
     if (supplierId && supplierId !== "all") scanWhere.managerId = supplierId;

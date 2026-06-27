@@ -17,7 +17,12 @@ export type WebJwtPayload = {
 export type ScannerJwtPayload = {
   sub: string;          // campManager.id
   username: string;
+  // The site this scanner is anchored to (from the device binding): a Camp.code
+  // or a Project.code. `companyCode` scopes meal eligibility to the parent
+  // company. Older tokens may carry only `campCode` (back-compat).
   campCode: string;
+  siteType?: "camp" | "project";
+  companyCode?: string | null;
   kind: "scanner";
 };
 

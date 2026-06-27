@@ -5,6 +5,7 @@
 
 import { prisma } from "./prisma.js";
 import type { ReportData as FlatReportData } from "./report-files.js";
+import { listReportSites } from "./sites.js";
 
 // Local alias kept for callers that already use this name.
 export type ReportData = FlatReportData;
@@ -77,7 +78,7 @@ export async function fetchReportData(
   const subtitle = `Period: ${fmtDate(from)} â†’ ${fmtDate(to)}`;
 
   if (type === "consumption") {
-    const camps = await prisma.camp.findMany({ orderBy: { code: "asc" } });
+    const camps = await listReportSites();
     const groups = await prisma.scan.groupBy({
       by: ["campCode", "meal"],
       where: { time: { gte: from, lte: to }, status: "Eligible" },
@@ -113,7 +114,7 @@ export async function fetchReportData(
 
   if (type === "camp") {
     const [camps, scanGroups, devices] = await Promise.all([
-      prisma.camp.findMany({ orderBy: { code: "asc" } }),
+      listReportSites(),
       prisma.scan.groupBy({
         by: ["campCode", "status"],
         where: { time: { gte: from, lte: to } },
@@ -129,7 +130,7 @@ export async function fetchReportData(
         scanGroups.find((g) => g.campCode === c.code && g.status === "AlreadyServed")?._count
           ._all ?? 0;
       const estimated = Math.round(c.employees * days * 0.85);
-      const dev = devices.filter((d) => d.campCode === c.code);
+      const dev = devices.filter((d) => d.campCode === c.code || d.projectCode === c.code);
       const coverage = estimated > 0 ? Math.round((served / estimated) * 100) : 0;
       return [
         c.code,
@@ -164,7 +165,7 @@ export async function fetchReportData(
   }
 
   if (type === "wastage") {
-    const camps = await prisma.camp.findMany({ orderBy: { code: "asc" } });
+    const camps = await listReportSites();
     const served = await prisma.scan.groupBy({
       by: ["campCode"],
       where: { time: { gte: from, lte: to }, status: "Eligible" },

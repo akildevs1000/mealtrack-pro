@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { FolderKanban, Users, Plus, Pencil, Trash2, LayoutGrid, List, Search, X, AlertTriangle, MapPin, Building2, User } from "lucide-react";
+import { FolderKanban, Users, Plus, Pencil, Trash2, LayoutGrid, List, Search, X, AlertTriangle, MapPin, Building2, User, Sunrise, Sun, Moon } from "lucide-react";
 import { useProjects, useUpsertProject, useDeleteProject, useCompanies, type Project } from "@/lib/hooks";
+import { defaultSchedule, type MealSchedule } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/projects")({
   component: ProjectsPage,
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/projects")({
 type View = "card" | "list";
 type FormState = Omit<Project, "id">;
 
-const emptyForm: FormState = { code: "", name: "", location: "", company: "", companyCode: null, manager: "", employees: 0, active: true };
+const emptyForm: FormState = { code: "", name: "", location: "", company: "", companyCode: null, manager: "", employees: 0, active: true, schedule: defaultSchedule };
 
 function ProjectsPage() {
   const { data: list = [] } = useProjects();
@@ -245,9 +246,13 @@ function ProjectDialog({ project, existingCodes, onClose, onSave }: {
 }) {
   const { data: companies = [] } = useCompanies();
   const [form, setForm] = useState<FormState>(project
-    ? { code: project.code, name: project.name, location: project.location, company: project.company, companyCode: project.companyCode, manager: project.manager, employees: project.employees, active: project.active }
+    ? { code: project.code, name: project.name, location: project.location, company: project.company, companyCode: project.companyCode, manager: project.manager, employees: project.employees, active: project.active, schedule: project.schedule ?? defaultSchedule }
     : emptyForm);
   const [error, setError] = useState<string | null>(null);
+
+  function setMeal(meal: keyof MealSchedule, key: "start" | "end", value: string) {
+    setForm((f) => ({ ...f, schedule: { ...f.schedule, [meal]: { ...f.schedule[meal], [key]: value } } }));
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -315,6 +320,24 @@ function ProjectDialog({ project, existingCodes, onClose, onSave }: {
             <Field label="Number of Workers">
               <input type="number" min={0} value={form.employees} onChange={(e) => setForm({ ...form, employees: Number(e.target.value) })} className={inputCls} />
             </Field>
+          </div>
+
+          <div className="md:col-span-2">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Meal Time Periods</div>
+            <div className="space-y-2">
+              {([
+                { key: "breakfast" as const, label: "Breakfast", icon: <Sunrise className="size-3.5" /> },
+                { key: "lunch" as const, label: "Lunch", icon: <Sun className="size-3.5" /> },
+                { key: "dinner" as const, label: "Dinner", icon: <Moon className="size-3.5" /> },
+              ]).map(({ key, label, icon }) => (
+                <div key={key} className="grid grid-cols-[110px_1fr_auto_1fr] items-center gap-2 rounded-lg bg-secondary/40 border border-border/60 px-3 py-2">
+                  <div className="flex items-center gap-1.5 text-sm font-medium">{icon} {label}</div>
+                  <input type="time" value={form.schedule[key].start} onChange={(e) => setMeal(key, "start", e.target.value)} className={inputCls} />
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <input type="time" value={form.schedule[key].end} onChange={(e) => setMeal(key, "end", e.target.value)} className={inputCls} />
+                </div>
+              ))}
+            </div>
           </div>
 
           {error && <div className="md:col-span-2 rounded-lg bg-destructive/10 text-destructive text-sm px-3 py-2">{error}</div>}

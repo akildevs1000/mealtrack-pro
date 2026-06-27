@@ -34,6 +34,11 @@ const upsertSchema = z.object({
   manager: z.string().optional(),
   employees: z.number().int().nonnegative().optional(),
   active: z.boolean().optional(),
+  schedule: z.object({
+    breakfast: z.object({ start: z.string(), end: z.string() }),
+    lunch: z.object({ start: z.string(), end: z.string() }),
+    dinner: z.object({ start: z.string(), end: z.string() }),
+  }).optional(),
 });
 
 router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
@@ -73,6 +78,11 @@ function toApi(c: any) {
     manager: c.manager,
     employees: c.employees,
     active: c.active,
+    schedule: {
+      breakfast: { start: c.breakfastStart, end: c.breakfastEnd },
+      lunch: { start: c.lunchStart, end: c.lunchEnd },
+      dinner: { start: c.dinnerStart, end: c.dinnerEnd },
+    },
   };
 }
 
@@ -86,6 +96,12 @@ function fromApi(b: z.infer<typeof upsertSchema>) {
     manager: b.manager ?? "",
     employees: b.employees ?? 0,
     active: b.active ?? true,
+    breakfastStart: b.schedule?.breakfast.start ?? "05:30",
+    breakfastEnd: b.schedule?.breakfast.end ?? "08:30",
+    lunchStart: b.schedule?.lunch.start ?? "11:30",
+    lunchEnd: b.schedule?.lunch.end ?? "14:00",
+    dinnerStart: b.schedule?.dinner.start ?? "18:30",
+    dinnerEnd: b.schedule?.dinner.end ?? "21:30",
   };
 }
 

@@ -119,7 +119,6 @@ model Camp {
   dinnerStart    String @default("18:30")
   dinnerEnd      String @default("21:30")
 
-  scans     Scan[]
   devices   Device[]
   // Suppliers whose PRIMARY camp is this one (single-FK relation).
   managers  CampManager[] @relation("ManagerPrimaryCamp")
@@ -165,6 +164,14 @@ model Project {
   manager   String   @default("") // project manager / contact
   employees Int      @default(0)
   active    Boolean  @default(true)
+
+  // Meal windows (HH:mm), same as Camp — a project is a physical scanning site.
+  breakfastStart String @default("05:30")
+  breakfastEnd   String @default("08:30")
+  lunchStart     String @default("11:30")
+  lunchEnd       String @default("14:00")
+  dinnerStart    String @default("18:30")
+  dinnerEnd      String @default("21:30")
 
   companyCode String?
   companyRef  Company? @relation(fields: [companyCode], references: [code])
@@ -238,7 +245,8 @@ model Scan {
   time      DateTime     @default(now())
   name      String       // labour name at time of scan
   labourId  String
-  camp      Camp         @relation(fields: [campCode], references: [code])
+  // Site code where the scan happened — a Camp.code OR a Project.code. Kept as a
+  // plain string (no FK) so a project site can be recorded the same way a camp is.
   campCode  String
   meal      MealKind
   status    ScanStatus

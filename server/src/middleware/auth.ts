@@ -17,7 +17,10 @@ declare global {
         managerId: string;
         username: string;
         name: string;
+        // Site the scan is attributed to (camp OR project code), from the token.
         campCode: string;
+        siteType: "camp" | "project";
+        companyCode: string | null;
       };
     }
   }
@@ -105,11 +108,16 @@ export async function requireScannerAuth(req: Request, res: Response, next: Next
     if (manager.status !== "Active") {
       return res.status(403).json({ error: "Manager account is not active" });
     }
+    // Site + company come from the TOKEN (set at login from the device's
+    // binding), NOT the manager's primary camp — so a supplier scanning at a
+    // device anchored elsewhere is attributed to that device's site.
     req.scanner = {
       managerId: manager.id,
       username: manager.username,
       name: manager.name,
-      campCode: manager.campCode,
+      campCode: payload.campCode,
+      siteType: payload.siteType ?? "camp",
+      companyCode: payload.companyCode ?? null,
     };
     next();
   } catch {

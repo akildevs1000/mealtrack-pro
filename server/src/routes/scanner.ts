@@ -9,6 +9,50 @@ import { photoUrl } from "../lib/employee-photos.js";
 
 const router = Router();
 
+// A scanning site is a Camp OR a Project (both physical sites with meal windows).
+// resolveSite() unifies them into one camp-shaped object the scanner flow uses.
+type SiteInfo = {
+  code: string;
+  name: string;
+  site: string; // camp.site or project.location
+  companyCode: string | null;
+  siteType: "camp" | "project";
+  breakfastStart: string; breakfastEnd: string;
+  lunchStart: string; lunchEnd: string;
+  dinnerStart: string; dinnerEnd: string;
+};
+
+async function resolveSite(siteCode: string | null | undefined): Promise<SiteInfo | null> {
+  if (!siteCode) return null;
+  const windowSel = {
+    breakfastStart: true, breakfastEnd: true,
+    lunchStart: true, lunchEnd: true,
+    dinnerStart: true, dinnerEnd: true,
+  };
+  const camp = await prisma.camp.findUnique({
+    where: { code: siteCode },
+    select: { code: true, name: true, site: true, companyCode: true, ...windowSel },
+  });
+  if (camp) return { ...camp, companyCode: camp.companyCode ?? null, siteType: "camp" };
+  const project = await (prisma as any).project.findUnique({
+    where: { code: siteCode },
+    select: { code: true, name: true, location: true, companyCode: true, ...windowSel },
+  });
+  if (project) {
+    return {
+      code: project.code,
+      name: project.name,
+      site: project.location,
+      companyCode: project.companyCode ?? null,
+      siteType: "project",
+      breakfastStart: project.breakfastStart, breakfastEnd: project.breakfastEnd,
+      lunchStart: project.lunchStart, lunchEnd: project.lunchEnd,
+      dinnerStart: project.dinnerStart, dinnerEnd: project.dinnerEnd,
+    };
+  }
+  return null;
+}
+
 // ---------- PUBLIC: list managers the scanner can log in as ----------
 // Mobile clients call this before login to render a picker.
 router.get("/managers", async (_req, res, next) => {
@@ -43,7 +87,7 @@ router.post("/login", async (req, res, next) => {
     //    operators understand the problem isn't their credentials.
     const device = await prisma.device.findFirst({
       where: { macAddress: { equals: deviceMac, mode: "insensitive" } },
-      select: { id: true, name: true, campCode: true, model: true, serial: true },
+      select: { id: true, name: true, campCode: true, projectCode: true, model: true, serial: true },
     });
     if (!device) {
       return res.status(403).json({
@@ -52,13 +96,15 @@ router.post("/login", async (req, res, next) => {
         message: "Ask an admin to register this device in the web app first.",
       });
     }
-    // Scanner sessions are anchored to a camp. A device bound to a project
-    // (no camp) can't drive eligibility / meal-window checks.
-    if (!device.campCode) {
+    // The device is anchored to a site — a camp OR a project. Resolve it now so
+    // we have the meal windows + parent company for this session.
+    const siteCode = device.campCode ?? device.projectCode;
+    const site = await resolveSite(siteCode);
+    if (!site) {
       return res.status(403).json({
-        error: "Device not bound to a camp",
-        reason: "device_no_camp",
-        message: "This device is registered to a project, not a camp. Bind it to a camp to use it as a scanner.",
+        error: "Device not bound to a site",
+        reason: "device_no_site",
+        message: "This device isn't bound to a camp or project. Ask an admin to set its location.",
       });
     }
 
@@ -82,23 +128,23 @@ router.post("/login", async (req, res, next) => {
       return res.status(401).json({ error: "Invalid manager or PIN" });
     }
 
-    // Scans always belong to the camp the DEVICE is bound to — the device is
-    // the physical anchor, so this keeps per-camp reports/filters honest even
-    // for a supplier assigned to several camps. The supplier's camp set only
-    // drives the "wrong camp" warning; it never changes attribution.
-    const sessionCampCode = device.campCode;
+    // Scans always belong to the SITE the DEVICE is bound to — the device is the
+    // physical anchor, so reports stay honest even for a supplier assigned
+    // elsewhere. For a camp site, warn if it's outside the supplier's camp set
+    // (cosmetic only). Project sites never raise the warning.
+    const sessionCampCode = site.code;
     const campSet = new Set([manager.campCode, ...manager.camps.map((c) => c.code)]);
-    const campMismatch = !campSet.has(device.campCode);
+    const campMismatch = site.siteType === "camp" ? !campSet.has(site.code) : false;
 
-    const camp = await prisma.camp.findUnique({
-      where: { code: sessionCampCode },
-      select: {
-        code: true, name: true, site: true,
-        breakfastStart: true, breakfastEnd: true,
-        lunchStart: true, lunchEnd: true,
-        dinnerStart: true, dinnerEnd: true,
-      },
-    });
+    // Camp-shaped site object the scanner app renders (name + meal windows).
+    const camp = {
+      code: site.code,
+      name: site.name,
+      site: site.site,
+      breakfastStart: site.breakfastStart, breakfastEnd: site.breakfastEnd,
+      lunchStart: site.lunchStart, lunchEnd: site.lunchEnd,
+      dinnerStart: site.dinnerStart, dinnerEnd: site.dinnerEnd,
+    };
 
     await prisma.campManager.update({
       where: { id: manager.id },
@@ -109,6 +155,8 @@ router.post("/login", async (req, res, next) => {
       sub: manager.id,
       username: manager.username,
       campCode: sessionCampCode,
+      siteType: site.siteType,
+      companyCode: site.companyCode,
     });
 
     res.json({
@@ -203,20 +251,12 @@ router.get("/logs", requireScannerAuth, async (req, res, next) => {
 // mobile client uses to highlight the active meal.
 router.get("/meal-rules", requireScannerAuth, async (req, res, next) => {
   try {
-    const campCode = req.scanner!.campCode;
-    const camp = await prisma.camp.findUnique({
-      where: { code: campCode },
-      select: {
-        breakfastStart: true, breakfastEnd: true,
-        lunchStart: true, lunchEnd: true,
-        dinnerStart: true, dinnerEnd: true,
-      },
-    });
-    if (!camp) return res.json([]);
+    const site = await resolveSite(req.scanner!.campCode);
+    if (!site) return res.json([]);
     res.json([
-      { name: "Breakfast", start_time: camp.breakfastStart, end_time: camp.breakfastEnd },
-      { name: "Lunch", start_time: camp.lunchStart, end_time: camp.lunchEnd },
-      { name: "Dinner", start_time: camp.dinnerStart, end_time: camp.dinnerEnd },
+      { name: "Breakfast", start_time: site.breakfastStart, end_time: site.breakfastEnd },
+      { name: "Lunch", start_time: site.lunchStart, end_time: site.lunchEnd },
+      { name: "Dinner", start_time: site.dinnerStart, end_time: site.dinnerEnd },
     ]);
   } catch (e) { next(e); }
 });
@@ -229,14 +269,12 @@ router.get("/device/:mac", async (req, res, next) => {
     const mac = req.params.mac;
     const device = await prisma.device.findFirst({
       where: { macAddress: { equals: mac, mode: "insensitive" } },
-      select: { id: true, name: true, campCode: true, model: true, serial: true },
+      select: { id: true, name: true, campCode: true, projectCode: true, model: true, serial: true },
     });
     if (!device) return res.status(404).json({ error: "Device not registered" });
-    const camp = device.campCode
-      ? await prisma.camp.findUnique({
-          where: { code: device.campCode },
-          select: { code: true, name: true, site: true },
-        })
+    const site = await resolveSite(device.campCode ?? device.projectCode);
+    const camp = site
+      ? { code: site.code, name: site.name, site: site.site }
       : null;
     res.json({ device, camp });
   } catch (e) { next(e); }
@@ -256,9 +294,10 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
     const { code, meal: forcedMeal } = scanSchema.parse(req.body);
 
     const campCode = req.scanner!.campCode;
-    const camp = await prisma.camp.findUnique({ where: { code: campCode } });
-    if (!camp) {
-      return res.status(400).json({ status: "error", reason: "camp_missing" });
+    const companyCode = req.scanner!.companyCode;
+    const site = await resolveSite(campCode);
+    if (!site) {
+      return res.status(400).json({ status: "error", reason: "site_missing" });
     }
 
     // Resolve the employee up front so even denied results (outside meal
@@ -269,7 +308,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
 
     const now = new Date();
     const hhmm = dubaiHHMM(now);
-    const meal = forcedMeal ?? mealForTime(hhmm, camp);
+    const meal = forcedMeal ?? mealForTime(hhmm, site);
     if (!meal) {
       const scan = await prisma.scan.create({
         data: {
@@ -298,6 +337,25 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
         },
       });
       return res.json({ status: "not_eligible", reason: "unknown_employee", scan: toScanApi(scan) });
+    }
+
+    // Company scope: a worker may take a meal at ANY camp/project of their parent
+    // company, but not at another company's site. CmsEmployee.company holds the
+    // company code (e.g. "INNOVOBLD"), matched against the site's companyCode.
+    if (companyCode && employee.company !== companyCode) {
+      const scan = await prisma.scan.create({
+        data: {
+          name: employee.name, labourId: employee.laborCode, campCode, meal,
+          status: "WrongCamp",
+          managerId: req.scanner!.managerId,
+        },
+      });
+      return res.json({
+        status: "wrong_camp",
+        reason: "wrong_company",
+        employee: toEmployeeApi(employee, req),
+        scan: toScanApi(scan),
+      });
     }
 
     if (employee.mealsEligibility !== "Y" || employee.status !== "Active") {
