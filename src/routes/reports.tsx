@@ -5,6 +5,7 @@ import { useCampScope } from "@/lib/session";
 import {
   useCompanies,
   useCamps,
+  useProjects,
   useManagers,
   useReportDailyDistribution,
   useReportBySupplier,
@@ -43,6 +44,7 @@ function ReportsPage() {
   const scope = useCampScope();
   const { data: companies = [] } = useCompanies();
   const { data: campsAll = [] } = useCamps();
+  const { data: projectsAll = [] } = useProjects();
   const { data: allSuppliers = [] } = useManagers();
 
   const [tab, setTab] = useState<TabId>("daily");
@@ -63,6 +65,13 @@ function ReportsPage() {
     if (companyParam) cs = cs.filter((c) => c.companyCode === company);
     return cs;
   }, [campsAll, scope, company, companyParam]);
+  // Projects are scanning sites too — their code lives in Scan.campCode, so the
+  // report `campCode` filter accepts a project code directly (no scope filter,
+  // mirroring the Devices picker).
+  const projects = useMemo(
+    () => (companyParam ? projectsAll.filter((p) => p.companyCode === company) : projectsAll),
+    [projectsAll, company, companyParam],
+  );
   const suppliers = useMemo(
     () => (companyParam ? allSuppliers.filter((s) => s.companyCode === company) : allSuppliers),
     [allSuppliers, company, companyParam],
@@ -291,12 +300,23 @@ function ReportsPage() {
           </>
         )}
         {showCamp && (
-          <Labeled label={tab === "location" ? "Location (Camp)" : "Camp"}>
+          <Labeled label={tab === "location" ? "Location" : "Camp / Project"}>
             <select value={camp} onChange={(e) => setCamp(e.target.value)} className={inputCls}>
-              <option value="all">All camps</option>
-              {camps.map((c) => (
-                <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
-              ))}
+              <option value="all">All locations</option>
+              {projects.length > 0 && (
+                <optgroup label="Projects">
+                  {projects.map((p) => (
+                    <option key={`p-${p.id}`} value={p.code}>{p.code} — {p.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {camps.length > 0 && (
+                <optgroup label="Camp Locations">
+                  {camps.map((c) => (
+                    <option key={`c-${c.id}`} value={c.code}>{c.code} — {c.name}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </Labeled>
         )}
