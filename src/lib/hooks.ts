@@ -425,6 +425,15 @@ export function useCreateDevice() {
   });
 }
 
+export function useUpdateDevice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: DeviceInput }) =>
+      api<Device>(`/devices/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["devices"] }),
+  });
+}
+
 export function useDeleteDevice() {
   const qc = useQueryClient();
   return useMutation({
