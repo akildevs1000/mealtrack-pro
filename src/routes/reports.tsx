@@ -235,52 +235,18 @@ function ReportsPage() {
     const violet: RGB = [124, 58, 237];
     const blue: RGB = [37, 99, 235];
 
-    // Card theme + icon by metric label.
-    type IconKind = "people" | "sun" | "dome" | "moon" | "bars";
-    const themeFor = (label: string): { color: RGB; tint: RGB; icon: IconKind } => {
+    // Card theme (tint + value colour) by metric label.
+    const themeFor = (label: string): { color: RGB; tint: RGB } => {
       const l = label.toLowerCase();
-      if (l.includes("employee")) return { color: blue, tint: [239, 246, 255], icon: "people" };
-      if (l.includes("breakfast")) return { color: green, tint: [240, 253, 244], icon: "sun" };
-      if (l.includes("lunch")) return { color: amber, tint: [255, 251, 235], icon: "dome" };
-      if (l.includes("dinner")) return { color: violet, tint: [245, 243, 255], icon: "moon" };
-      if (l.includes("not eligible")) return { color: red, tint: [254, 242, 242], icon: "bars" };
-      if (l.includes("duplicate")) return { color: amber, tint: [255, 251, 235], icon: "bars" };
-      return { color: indigo, tint: [238, 242, 255], icon: "bars" };
+      if (l.includes("employee")) return { color: blue, tint: [239, 246, 255] };
+      if (l.includes("breakfast")) return { color: green, tint: [240, 253, 244] };
+      if (l.includes("lunch")) return { color: amber, tint: [255, 251, 235] };
+      if (l.includes("dinner")) return { color: violet, tint: [245, 243, 255] };
+      if (l.includes("not eligible")) return { color: red, tint: [254, 242, 242] };
+      if (l.includes("duplicate")) return { color: amber, tint: [255, 251, 235] };
+      return { color: indigo, tint: [238, 242, 255] };
     };
 
-    // ── Vector icon helpers (no font glyphs — drawn with primitives) ──
-    const glyph = (kind: IconKind, cx: number, cy: number, bg: RGB) => {
-      doc.setFillColor(...white);
-      doc.setDrawColor(...white);
-      if (kind === "people") {
-        doc.circle(cx - 3.2, cy - 2.4, 2.1, "F");
-        doc.circle(cx + 3.2, cy - 2.4, 2.1, "F");
-        doc.roundedRect(cx - 5.6, cy + 0.6, 4.8, 4.4, 1.6, 1.6, "F");
-        doc.roundedRect(cx + 0.8, cy + 0.6, 4.8, 4.4, 1.6, 1.6, "F");
-      } else if (kind === "sun") {
-        doc.circle(cx, cy, 2.6, "F");
-        doc.setLineWidth(1.1);
-        for (let i = 0; i < 8; i++) {
-          const a = (Math.PI / 4) * i;
-          doc.line(cx + Math.cos(a) * 4.2, cy + Math.sin(a) * 4.2, cx + Math.cos(a) * 6, cy + Math.sin(a) * 6);
-        }
-      } else if (kind === "dome") {
-        doc.circle(cx, cy + 1, 4.3, "F");
-        doc.setFillColor(...bg);
-        doc.rect(cx - 6, cy + 1, 12, 6, "F"); // cut to a half-dome
-        doc.setFillColor(...white);
-        doc.roundedRect(cx - 6, cy + 1.2, 12, 1.8, 0.9, 0.9, "F"); // base
-        doc.circle(cx, cy - 3.4, 0.9, "F"); // knob
-      } else if (kind === "moon") {
-        doc.circle(cx, cy, 4.4, "F");
-        doc.setFillColor(...bg);
-        doc.circle(cx + 2.5, cy - 1.2, 3.6, "F"); // carve crescent
-      } else {
-        doc.roundedRect(cx - 4.5, cy + 1.6, 9, 1.7, 0.8, 0.8, "F");
-        doc.roundedRect(cx - 4.5, cy - 1.1, 6.5, 1.7, 0.8, 0.8, "F");
-        doc.roundedRect(cx - 4.5, cy - 3.8, 4, 1.7, 0.8, 0.8, "F");
-      }
-    };
     // Brand logo: utensils on a navy disc.
     const drawLogo = (cx: number, cy: number, r: number) => {
       doc.setFillColor(...navy);
@@ -362,9 +328,9 @@ function ReportsPage() {
       doc.text(companyLabel, chipX + 7 + 22 + 8, chipY + 19);
     };
 
-    // ── KPI cards (page 1 only) — icon disc, label, big coloured value ──
-    const cardsTop = 84;
-    const cardsH = 88;
+    // ── KPI cards (page 1 only) — label + big coloured value (no icons) ──
+    const cardsTop = 86;
+    const cardsH = 58;
     const drawCards = () => {
       const n = summaryCards.length;
       if (!n) return;
@@ -379,20 +345,14 @@ function ReportsPage() {
         doc.setDrawColor(...slate200);
         doc.setLineWidth(0.8);
         doc.roundedRect(x, cardsTop, cardW, cardsH, 8, 8, "FD");
-        // icon disc
-        doc.setFillColor(...t.color);
-        doc.circle(cx, cardsTop + 23, 13, "F");
-        glyph(t.icon, cx, cardsTop + 23, t.color);
-        // label
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(...slate500);
-        doc.text(c.label.toUpperCase(), cx, cardsTop + 52, { align: "center" });
-        // value
+        doc.text(c.label.toUpperCase(), cx, cardsTop + 23, { align: "center" });
         doc.setFont("helvetica", "bold");
         doc.setFontSize(20);
         doc.setTextColor(...t.color);
-        doc.text(c.value, cx, cardsTop + 75, { align: "center" });
+        doc.text(c.value, cx, cardsTop + 45, { align: "center" });
       });
     };
 
