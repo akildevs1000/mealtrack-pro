@@ -1,7 +1,10 @@
 // Demo data for the Integrated Reports Suite so the reports aren't empty.
-// Inserts recent scans (last 6 days incl. today) linked to real CmsEmployee
-// labour codes — so the Daily Transaction report shows company + name — plus a
-// week of food estimations so Request Comparison has day-over-day variance.
+// Inserts recent scans (last 12 days incl. today) linked to real CmsEmployee
+// labour codes — so the Daily Transaction report shows company + name — split
+// across the company's camp AND project site (so Reports-by-Supplier shows
+// multiple distribution points and project filtering has data), plus a sprinkle
+// of exception statuses for the Duplicate/Eligibility report, and ~2 weeks of
+// food estimations so Request Comparison has day-over-day variance.
 //
 // Idempotent: clears its own recent demo rows before re-inserting.
 // Run: npx tsx scripts/seed-reports-demo.ts
@@ -10,6 +13,7 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const COMPANY = "INNOVOBLD";
+const DAYS = 12;
 
 function atUTC(daysAgo: number, hour: number, minute = 0): Date {
   const d = new Date();
@@ -32,12 +36,14 @@ async function main() {
     console.log(`[demo] missing base data (camp/employees) for ${COMPANY} — nothing seeded`);
     return;
   }
-  const campCode = camp.code;
+  const primary = camp.code;
+  const secondary = project?.code ?? null; // project site (e.g. PRJ-01) if present
+  const sites = secondary ? [primary, secondary] : [primary];
   const labourCodes = emps.map((e) => e.laborCode);
 
-  // --- Recent scans (last 6 days incl. today), linked to CMS employees ---
+  // --- Recent scans (last DAYS days incl. today), linked to CMS employees ---
   await prisma.scan.deleteMany({
-    where: { campCode, time: { gte: atUTC(7, 0) }, labourId: { in: labourCodes } },
+    where: { campCode: { in: sites }, time: { gte: atUTC(DAYS + 1, 0) }, labourId: { in: labourCodes } },
   });
   const meals: { meal: "Breakfast" | "Lunch" | "Dinner"; hour: number }[] = [
     { meal: "Breakfast", hour: 6 },
@@ -45,50 +51,62 @@ async function main() {
     { meal: "Dinner", hour: 19 },
   ];
   const scanData: any[] = [];
-  for (let off = 5; off >= 0; off--) {
-    for (const { meal, hour } of meals) {
+  for (let off = DAYS - 1; off >= 0; off--) {
+    meals.forEach(({ meal, hour }, mi) => {
       emps.forEach((e, idx) => {
         if ((idx + off) % 7 === 0) return; // ~85% attendance
+        // ~30% of workers eat at the project site, the rest at the camp.
+        const site = secondary && idx % 10 < 3 ? secondary : primary;
+        // Mostly Eligible, with a realistic sprinkle of exceptions.
         let status = "Eligible";
-        if (idx % 13 === 0) status = "AlreadyServed"; // duplicate scan
-        else if (e.mealsEligibility === "N" || e.status === "InActive") status = "NotEligible";
+        if (e.mealsEligibility === "N" || e.status === "InActive") status = "NotEligible";
+        else if ((idx + mi) % 17 === 0) status = "AlreadyServed"; // duplicate scan
+        else if ((idx + off) % 23 === 0) status = "Expired"; // expired labour card
+        else if ((idx + off + mi) % 29 === 0) status = "WrongCamp"; // scanned at wrong site
         scanData.push({
-          time: atUTC(off, hour, idx % 50),
+          time: atUTC(off, hour, (idx * 7 + mi * 3) % 50),
           name: e.name,
           labourId: e.laborCode,
-          campCode,
+          campCode: site,
           meal,
           status,
           managerId: supplier?.id ?? null,
         });
       });
-    }
+    });
   }
   await prisma.scan.createMany({ data: scanData });
 
-  // --- Food estimations (last 7 days) for day-over-day comparison ---
+  // --- Food estimations (last DAYS days incl. today) for day-over-day comparison ---
+  // One row per day per site so Request Comparison shows variance per site.
   let estCount = 0;
-  if (supplier && project) {
+  if (supplier) {
     await prisma.foodEstimation.deleteMany({ where: { companyCode: COMPANY, supplierId: supplier.id } });
     const est: any[] = [];
-    for (let off = 7; off >= 1; off--) {
-      const b = 460 + ((off * 11) % 70);
-      est.push({
-        date: new Date(`${isoDay(off)}T08:00:00.000Z`),
-        companyCode: COMPANY,
-        supplierId: supplier.id,
-        projectCode: project.code,
-        campCode,
-        breakfast: b,
-        lunch: b + 40,
-        dinner: b - 25,
-      });
+    for (let off = DAYS - 1; off >= 0; off--) {
+      for (const site of sites) {
+        const base = site === primary ? 480 : 150;
+        const b = base + ((off * 13) % 60) - 20; // gentle day-to-day swing
+        est.push({
+          date: new Date(`${isoDay(off)}T08:00:00.000Z`),
+          companyCode: COMPANY,
+          supplierId: supplier.id,
+          projectCode: site === secondary ? site : null,
+          campCode: site,
+          breakfast: b,
+          lunch: b + 35,
+          dinner: b - 20,
+        });
+      }
     }
     await prisma.foodEstimation.createMany({ data: est });
     estCount = est.length;
   }
 
-  console.log(`[demo] seeded ${scanData.length} recent scans + ${estCount} estimations for ${COMPANY} (camp ${campCode})`);
+  console.log(
+    `[demo] seeded ${scanData.length} scans across ${sites.join(", ")} + ${estCount} estimations ` +
+      `for ${COMPANY} over ${DAYS} days (${isoDay(DAYS - 1)} → ${isoDay(0)})`,
+  );
 }
 
 main()
