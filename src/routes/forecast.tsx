@@ -576,8 +576,10 @@ function FoodEstimationDialog({ onClose, onSaved }: { onClose: () => void; onSav
 
   const [companyCode, setCompanyCode] = useState<string>("");
   const [supplierId, setSupplierId] = useState<string>("");
-  const [projectCode, setProjectCode] = useState<string>("");
-  const [campCode, setCampCode] = useState<string>("");
+  // Single "Location" selector that merges projects + camps. Value is prefixed
+  // `p:<code>` (project) or `c:<code>` (camp) so we can route it to the right
+  // field on submit. Both remain optional — picking nothing is allowed.
+  const [location, setLocation] = useState<string>("");
   const [meals, setMeals] = useState({ breakfast: 0, lunch: 0, dinner: 0 });
 
   const now = new Date();
@@ -606,8 +608,7 @@ function FoodEstimationDialog({ onClose, onSaved }: { onClose: () => void; onSav
     setCompanyCode(code);
     // Reset siblings — they depend on the company.
     setSupplierId("");
-    setProjectCode("");
-    setCampCode("");
+    setLocation("");
   }
 
   function setMeal(key: "breakfast" | "lunch" | "dinner", value: number) {
@@ -617,12 +618,14 @@ function FoodEstimationDialog({ onClose, onSaved }: { onClose: () => void; onSav
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!companyCode) return;
+    const projectCode = location.startsWith("p:") ? location.slice(2) : null;
+    const campCode = location.startsWith("c:") ? location.slice(2) : null;
     await create.mutateAsync({
       date: now.toISOString(),
       companyCode,
       supplierId: supplierId || null,
-      projectCode: projectCode || null,
-      campCode: campCode || null,
+      projectCode,
+      campCode,
       breakfast: meals.breakfast,
       lunch: meals.lunch,
       dinner: meals.dinner,
@@ -684,22 +687,23 @@ function FoodEstimationDialog({ onClose, onSaved }: { onClose: () => void; onSav
               </select>
             </Field>
             <div className="md:col-span-2">
-              <Field label="Project (filtered by company)">
-                <select value={projectCode} onChange={(e) => setProjectCode(e.target.value)} disabled={!companyCode} className={selectCls}>
-                  <option value="">{companyCode ? "— Select Project —" : "Select a company first"}</option>
-                  {companyProjects.map((p) => (
-                    <option key={p.id} value={p.code}>{p.code} — {p.name}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <div className="md:col-span-2">
-              <Field label="Camp Location (filtered by company)">
-                <select value={campCode} onChange={(e) => setCampCode(e.target.value)} disabled={!companyCode} className={selectCls}>
-                  <option value="">{companyCode ? "— Select Camp —" : "Select a company first"}</option>
-                  {companyCamps.map((c) => (
-                    <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
-                  ))}
+              <Field label="Project / Camp Location (optional)">
+                <select value={location} onChange={(e) => setLocation(e.target.value)} disabled={!companyCode} className={selectCls}>
+                  <option value="">{companyCode ? "— Select Project or Camp —" : "Select a company first"}</option>
+                  {companyProjects.length > 0 && (
+                    <optgroup label="Projects">
+                      {companyProjects.map((p) => (
+                        <option key={`p-${p.id}`} value={`p:${p.code}`}>{p.code} — {p.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {companyCamps.length > 0 && (
+                    <optgroup label="Camp Locations">
+                      {companyCamps.map((c) => (
+                        <option key={`c-${c.id}`} value={`c:${c.code}`}>{c.code} — {c.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </Field>
             </div>
