@@ -56,17 +56,17 @@ async function scopeForReports(
     typeof companyCodeParam === "string" && companyCodeParam !== "all" ? companyCodeParam : undefined;
   if (!companyCode) return base;
   const combined = base.where ? { AND: [base.where, { companyCode }] } : { companyCode };
-  const camps = await prisma.camp.findMany({ where: combined, select: { code: true } });
-  let codes = camps.map((c) => c.code);
-  // Unscoped callers (admin/operator) also see the company's PROJECT sites.
-  // Camp-scoped managers stay camp-only (projects aren't camp-scoped).
-  if (base.codes === null) {
-    const projects = await (prisma as any).project.findMany({
-      where: { companyCode },
-      select: { code: true },
-    });
-    codes = [...codes, ...projects.map((p: any) => p.code)];
-  }
+  // Resolve the same code filter against BOTH camps and projects — a project is a
+  // scanning site too (its code lives in Scan.campCode). Querying both with the
+  // same `combined` filter means an explicit ?campCode=<project> resolves to that
+  // project, and unscoped callers (base.where = undefined → match all) get every
+  // camp + project under the company. Camp-scoped managers stay camp-only for free:
+  // their scope codes are camp codes, so the project query matches nothing.
+  const [camps, projects] = await Promise.all([
+    prisma.camp.findMany({ where: combined, select: { code: true } }),
+    (prisma as any).project.findMany({ where: combined, select: { code: true } }),
+  ]);
+  const codes = [...camps.map((c) => c.code), ...projects.map((p: any) => p.code)];
   return { where: combined, codes };
 }
 // Build the Scan campCode filter from the *resolved* scope codes only. Do NOT
