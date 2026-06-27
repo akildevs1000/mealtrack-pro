@@ -4,7 +4,20 @@ import { Building2, Users, Utensils, Target, AlertTriangle, Smartphone, Trending
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 import { useCampScope } from "@/lib/session";
-import { useOverview, useCamps, useCompanies, useScans } from "@/lib/hooks";
+import { useOverview, useCamps, useCompanies, useScans, type Scan } from "@/lib/hooks";
+
+// Human-readable reason for a non-eligible scan result, mirroring the messages
+// the scanner produces. Derived from the stored status + meal (the Scan record
+// doesn't persist the exact reason code).
+function scanReason(status: Scan["status"], meal: Scan["meal"]): string {
+  switch (status) {
+    case "Already Served": return `Already scanned for ${meal.toLowerCase()}`;
+    case "Not Eligible": return "Not eligible — meal plan / HR record";
+    case "Wrong Camp": return "Worker is from another company";
+    case "Expired": return "Outside the meal window";
+    default: return ""; // Eligible — no reason needed
+  }
+}
 
 const MEAL_COLORS: Record<string, string> = {
   Breakfast: "var(--chart-3)",
@@ -313,6 +326,7 @@ function Overview() {
                 s.status === "Eligible" ? "bg-success/10 text-success"
                 : s.status === "Already Served" ? "bg-warning/10 text-warning"
                 : "bg-destructive/10 text-destructive";
+              const reason = scanReason(s.status, s.meal);
               return (
                 <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary">
                   <div className="size-9 rounded-full gradient-primary grid place-items-center text-primary-foreground text-xs font-bold">
@@ -321,6 +335,7 @@ function Overview() {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{s.name}</div>
                     <div className="text-xs text-muted-foreground">{s.labourId} · {s.camp} · {s.time}</div>
+                    {reason && <div className="text-xs text-muted-foreground/80 italic truncate">{reason}</div>}
                   </div>
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${tone}`}>{s.status}</span>
                 </div>
