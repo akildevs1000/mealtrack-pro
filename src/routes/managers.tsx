@@ -240,14 +240,7 @@ function Managers() {
         </select>
       </div>
 
-      <div
-        className={
-          viewingLive
-            ? "grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-4 items-start"
-            : ""
-        }
-      >
-      <div className="rounded-xl border border-border bg-card overflow-hidden min-w-0">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border bg-secondary/30">
           Tip: double-click a row to view the full supplier profile.
         </div>
@@ -394,7 +387,7 @@ function Managers() {
       </div>
 
       {viewingLive && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden xl:sticky xl:top-4">
+        <div className="fixed inset-y-0 right-0 z-40 w-full max-w-md bg-card border-l border-border shadow-elegant overflow-y-auto">
           <SupplierDetail
             m={viewingLive}
             onEdit={() => setEditing(viewingLive)}
@@ -404,7 +397,6 @@ function Managers() {
           />
         </div>
       )}
-      </div>
 
       {(creating || editing) && (
         <ManagerDialog
@@ -855,14 +847,14 @@ function SupplierDetail({
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 p-5 border-b border-border">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="size-14 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold shrink-0">
+      <div className="flex items-start justify-between gap-3 p-5 border-b border-border sticky top-0 bg-card z-10">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="size-12 rounded-full gradient-accent grid place-items-center text-primary-foreground font-semibold shrink-0">
             {m.avatar}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-display font-bold truncate">{m.name}</h2>
+              <h2 className="text-lg font-display font-bold leading-tight">{m.name}</h2>
               <span
                 className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${statusTone(m.status)}`}
               >
