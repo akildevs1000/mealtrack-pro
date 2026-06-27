@@ -131,6 +131,63 @@ function ReportsPage() {
   }, [tab, daily.data, bySupplier.data, byLocation.data, comparison.data, duplicate.data]);
 
   const companyLabel = company === "all" ? "All companies" : companies.find((c) => c.code === company)?.name ?? company;
+  const campLabel =
+    camp === "all"
+      ? null
+      : [...projects, ...camps].find((s) => s.code === camp)?.name ?? camp;
+
+  // Headline KPI cards rendered at the top of the styled PDF, per report.
+  const summaryCards = useMemo<{ label: string; value: string }[]>(() => {
+    if (tab === "daily") {
+      const rows = daily.data?.rows ?? [];
+      const cnt = (k: "breakfast" | "lunch" | "dinner") => rows.filter((r) => r[k]).length;
+      return [
+        { label: "Employees", value: String(rows.length) },
+        { label: "Breakfast", value: String(cnt("breakfast")) },
+        { label: "Lunch", value: String(cnt("lunch")) },
+        { label: "Dinner", value: String(cnt("dinner")) },
+      ];
+    }
+    if (tab === "supplier") {
+      const rows = bySupplier.data ? supplierStackedRows(bySupplier.data) : [];
+      const sum = (k: "breakfast" | "lunch" | "dinner" | "total") =>
+        rows.reduce((a, r) => a + (r[k] || 0), 0);
+      return [
+        { label: "Breakfast", value: String(sum("breakfast")) },
+        { label: "Lunch", value: String(sum("lunch")) },
+        { label: "Dinner", value: String(sum("dinner")) },
+        { label: "Total Meals", value: String(sum("total")) },
+      ];
+    }
+    if (tab === "location") {
+      const rows = byLocation.data?.rows ?? [];
+      const sum = (k: "breakfast" | "lunch" | "dinner") => rows.reduce((a, r) => a + (r[k] || 0), 0);
+      return [
+        { label: "Days", value: String(rows.length) },
+        { label: "Breakfast", value: String(sum("breakfast")) },
+        { label: "Lunch", value: String(sum("lunch")) },
+        { label: "Dinner", value: String(sum("dinner")) },
+      ];
+    }
+    if (tab === "comparison") {
+      const rows = comparison.data?.rows ?? [];
+      const today = rows.reduce((a, r) => a + (r.requestedToday || 0), 0);
+      const yest = rows.reduce((a, r) => a + (r.requestedYesterday || 0), 0);
+      return [
+        { label: "Line Items", value: String(rows.length) },
+        { label: "Requested Today", value: String(today) },
+        { label: "Req. Yesterday", value: String(yest) },
+        { label: "Net Variance", value: `${today - yest > 0 ? "+" : ""}${today - yest}` },
+      ];
+    }
+    const rows = duplicate.data?.rows ?? [];
+    const dup = rows.filter((r) => r.severity === "duplicate").length;
+    return [
+      { label: "Exceptions", value: String(rows.length) },
+      { label: "Duplicates", value: String(dup) },
+      { label: "Not Eligible", value: String(rows.length - dup) },
+    ];
+  }, [tab, daily.data, bySupplier.data, byLocation.data, comparison.data, duplicate.data]);
 
   function exportExcel() {
     if (exportMatrix.length === 0) return;
@@ -151,60 +208,151 @@ function ReportsPage() {
     const doc = new jsPDF({ orientation: landscape ? "landscape" : "portrait", unit: "pt", format: "a4" });
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
-    const margin = 36;
-    const headerH = 56;
+    const margin = 40;
     const rangeLabel = tab === "daily" ? fmtDate(date) : `${fmtDate(from)} → ${fmtDate(to)}`;
+    const subtitle = campLabel ? `${rangeLabel}  •  ${campLabel}` : rangeLabel;
     const generated = new Date().toLocaleString(undefined, {
       day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
     });
+    const initials = (companyLabel.match(/\b[A-Za-z]/g) || []).slice(0, 2).join("").toUpperCase() || "CO";
+
+    // Palette (slate / indigo / status)
+    const slate900: [number, number, number] = [15, 23, 42];
+    const slate500: [number, number, number] = [100, 116, 139];
+    const slate400: [number, number, number] = [148, 163, 184];
+    const slate200: [number, number, number] = [226, 232, 240];
+    const slate100: [number, number, number] = [241, 245, 249];
+    const slate50: [number, number, number] = [248, 250, 252];
+    const indigo: [number, number, number] = [79, 70, 229];
+    const green: [number, number, number] = [22, 163, 74];
+    const red: [number, number, number] = [220, 38, 38];
+    const amber: [number, number, number] = [217, 119, 6];
+
+    // ── Top header (title, subtitle, company chip) — repeats on every page ──
+    const drawHeader = () => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.setTextColor(...slate900);
+      doc.text(meta.title.toUpperCase(), margin, 56);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...slate500);
+      doc.text(subtitle, margin, 71);
+
+      // Company chip, right-aligned: [II] Company Name
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      const labelW = doc.getTextWidth(companyLabel);
+      const chipH = 28;
+      const chipW = 6 + 22 + 8 + labelW + 12;
+      const chipX = pageW - margin - chipW;
+      const chipY = 38;
+      doc.setDrawColor(...slate200);
+      doc.setLineWidth(0.8);
+      doc.roundedRect(chipX, chipY, chipW, chipH, 6, 6, "S");
+      doc.setFillColor(238, 242, 255);
+      doc.roundedRect(chipX + 6, chipY + 3, 22, 22, 4, 4, "F");
+      doc.setTextColor(...indigo);
+      doc.setFontSize(8);
+      doc.text(initials, chipX + 6 + 11, chipY + 17, { align: "center" });
+      doc.setTextColor(...slate900);
+      doc.setFontSize(9);
+      doc.text(companyLabel, chipX + 6 + 22 + 8, chipY + 18);
+    };
+
+    // ── KPI cards (page 1 only) ──
+    const cardsTop = 92;
+    const cardsH = 56;
+    const drawCards = () => {
+      const n = summaryCards.length;
+      if (!n) return;
+      const gap = 10;
+      const contentW = pageW - margin * 2;
+      const cardW = (contentW - gap * (n - 1)) / n;
+      summaryCards.forEach((c, i) => {
+        const x = margin + i * (cardW + gap);
+        doc.setDrawColor(...slate200);
+        doc.setLineWidth(0.8);
+        doc.roundedRect(x, cardsTop, cardW, cardsH, 6, 6, "S");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(...slate500);
+        doc.text(c.label.toUpperCase(), x + 12, cardsTop + 20);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor(...slate900);
+        doc.text(c.value, x + 12, cardsTop + 44);
+      });
+    };
 
     const head = [exportMatrix[0].map(String)];
     const body = exportMatrix.slice(1).map((r) => r.map((c) => String(c)));
 
+    // Right-align the numeric columns per report.
+    const rightCols: Record<string, number[]> = {
+      daily: [], supplier: [2, 3, 4, 5], location: [1, 2, 3], comparison: [4, 5, 6, 7], duplicate: [],
+    };
+    const columnStyles: Record<number, any> = {};
+    (rightCols[tab] ?? []).forEach((i) => (columnStyles[i] = { halign: "right" }));
+
+    drawHeader();
+    drawCards();
+
     autoTable(doc, {
       head,
       body,
-      margin: { top: headerH + 16, bottom: 34, left: margin, right: margin },
-      styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
-      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [244, 247, 252] },
+      theme: "plain",
+      startY: cardsTop + cardsH + 18,
+      margin: { top: 92, bottom: 40, left: margin, right: margin },
+      styles: {
+        font: "helvetica", fontSize: 8.5, textColor: [51, 65, 85],
+        cellPadding: { top: 7, right: 6, bottom: 7, left: 6 }, overflow: "linebreak", valign: "middle",
+      },
+      headStyles: {
+        fillColor: slate50, textColor: slate500, fontStyle: "bold", fontSize: 7.5,
+        cellPadding: { top: 8, right: 6, bottom: 8, left: 6 },
+      },
+      columnStyles,
       didParseCell: (d: any) => {
-        // Report 5 — colour rows by Status (Duplicate = amber, else red).
-        if (tab === "duplicate" && d.section === "body") {
-          const status = String(body[d.row.index]?.[3] ?? "").toLowerCase();
-          d.cell.styles.fillColor = status.includes("duplicate") ? [254, 243, 199] : [254, 226, 226];
+        if (d.section !== "body") return;
+        // Duplicate report — colour the Status column by severity.
+        if (tab === "duplicate" && d.column.index === 3) {
+          const s = String(d.cell.raw).toLowerCase();
+          d.cell.styles.textColor = s.includes("duplicate") ? amber : red;
+          d.cell.styles.fontStyle = "bold";
+        }
+        // Comparison report — colour Variance / % Change by sign.
+        if (tab === "comparison" && (d.column.index === 6 || d.column.index === 7)) {
+          const v = parseFloat(String(d.cell.raw));
+          if (!Number.isNaN(v) && v !== 0) d.cell.styles.textColor = v > 0 ? green : red;
         }
       },
-      didDrawPage: () => {
-        // ── Header band (repeats on every page) ──
-        doc.setFillColor(15, 23, 42);
-        doc.rect(0, 0, pageW, headerH, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.text("MyMeals", margin, 24);
+      didDrawCell: (d: any) => {
+        // Thin horizontal separators only (no vertical grid lines).
+        const x2 = d.cell.x + d.cell.width;
+        const yB = d.cell.y + d.cell.height;
+        if (d.section === "head") {
+          doc.setDrawColor(...slate200);
+          doc.setLineWidth(0.9);
+          doc.line(d.cell.x, yB, x2, yB);
+        } else if (d.section === "body") {
+          doc.setDrawColor(...slate100);
+          doc.setLineWidth(0.6);
+          doc.line(d.cell.x, yB, x2, yB);
+        }
+      },
+      didDrawPage: (d: any) => {
+        // Header repeats on every page; cards only on the first.
+        if (d.pageNumber > 1) drawHeader();
+        // ── Footer ──
+        doc.setDrawColor(...slate200);
+        doc.setLineWidth(0.6);
+        doc.line(margin, pageH - 30, pageW - margin, pageH - 30);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
-        doc.setTextColor(148, 163, 184);
-        doc.text("Integrated Reports Suite", margin, 38);
-        // Report title + meta, right-aligned
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11.5);
-        doc.setTextColor(255, 255, 255);
-        doc.text(`${meta.n}. ${meta.title}`, pageW - margin, 24, { align: "right" });
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`${companyLabel}   ·   ${rangeLabel}`, pageW - margin, 38, { align: "right" });
-
-        // ── Footer (repeats on every page) ──
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.5);
-        doc.line(margin, pageH - 24, pageW - margin, pageH - 24);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7.5);
-        doc.setTextColor(120, 120, 120);
-        doc.text(`Generated ${generated}`, margin, pageH - 12);
+        doc.setTextColor(...slate400);
+        doc.text(`Generated on: ${generated}`, margin, pageH - 17);
+        doc.text("CONFIDENTIAL REPORT  ·  MYMEALS", pageW / 2, pageH - 17, { align: "center" });
       },
     });
 
@@ -214,8 +362,8 @@ function ReportsPage() {
       doc.setPage(i);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
-      doc.setTextColor(120, 120, 120);
-      doc.text(`Page ${i} of ${total}`, pageW - margin, pageH - 12, { align: "right" });
+      doc.setTextColor(...slate400);
+      doc.text(`PAGE ${i} OF ${total}`, pageW - margin, pageH - 17, { align: "right" });
     }
 
     const range = tab === "daily" ? date : `${from}_to_${to}`;
