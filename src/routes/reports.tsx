@@ -212,59 +212,158 @@ function ReportsPage() {
     // NB: jsPDF's built-in Helvetica is WinAnsi — it can't render "→" (prints
     // garbage), so use an en dash for the range separator.
     const rangeLabel = tab === "daily" ? fmtDate(date) : `${fmtDate(from)} – ${fmtDate(to)}`;
-    const subtitle = campLabel ? `${rangeLabel}  •  ${campLabel}` : rangeLabel;
     const generated = new Date().toLocaleString(undefined, {
       day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
     });
     const initials = (companyLabel.match(/\b[A-Za-z]/g) || []).slice(0, 2).join("").toUpperCase() || "CO";
 
-    // Palette (slate / indigo / status)
-    const slate900: [number, number, number] = [15, 23, 42];
-    const slate500: [number, number, number] = [100, 116, 139];
-    const slate400: [number, number, number] = [148, 163, 184];
-    const slate200: [number, number, number] = [226, 232, 240];
-    const slate100: [number, number, number] = [241, 245, 249];
-    const slate50: [number, number, number] = [248, 250, 252];
-    const indigo: [number, number, number] = [79, 70, 229];
-    const green: [number, number, number] = [22, 163, 74];
-    const red: [number, number, number] = [220, 38, 38];
-    const amber: [number, number, number] = [217, 119, 6];
+    // Palette
+    type RGB = [number, number, number];
+    const navy: RGB = [30, 58, 138];
+    const slate900: RGB = [15, 23, 42];
+    const slate500: RGB = [100, 116, 139];
+    const slate400: RGB = [148, 163, 184];
+    const slate200: RGB = [226, 232, 240];
+    const slate100: RGB = [241, 245, 249];
+    const slate50: RGB = [248, 250, 252];
+    const white: RGB = [255, 255, 255];
+    const indigo: RGB = [79, 70, 229];
+    const green: RGB = [22, 163, 74];
+    const red: RGB = [220, 38, 38];
+    const amber: RGB = [217, 119, 6];
+    const violet: RGB = [124, 58, 237];
+    const blue: RGB = [37, 99, 235];
 
-    // ── Top header (title, subtitle, company chip) — repeats on every page ──
+    // Card theme + icon by metric label.
+    type IconKind = "people" | "sun" | "dome" | "moon" | "bars";
+    const themeFor = (label: string): { color: RGB; tint: RGB; icon: IconKind } => {
+      const l = label.toLowerCase();
+      if (l.includes("employee")) return { color: blue, tint: [239, 246, 255], icon: "people" };
+      if (l.includes("breakfast")) return { color: green, tint: [240, 253, 244], icon: "sun" };
+      if (l.includes("lunch")) return { color: amber, tint: [255, 251, 235], icon: "dome" };
+      if (l.includes("dinner")) return { color: violet, tint: [245, 243, 255], icon: "moon" };
+      if (l.includes("not eligible")) return { color: red, tint: [254, 242, 242], icon: "bars" };
+      if (l.includes("duplicate")) return { color: amber, tint: [255, 251, 235], icon: "bars" };
+      return { color: indigo, tint: [238, 242, 255], icon: "bars" };
+    };
+
+    // ── Vector icon helpers (no font glyphs — drawn with primitives) ──
+    const glyph = (kind: IconKind, cx: number, cy: number, bg: RGB) => {
+      doc.setFillColor(...white);
+      doc.setDrawColor(...white);
+      if (kind === "people") {
+        doc.circle(cx - 3.2, cy - 2.4, 2.1, "F");
+        doc.circle(cx + 3.2, cy - 2.4, 2.1, "F");
+        doc.roundedRect(cx - 5.6, cy + 0.6, 4.8, 4.4, 1.6, 1.6, "F");
+        doc.roundedRect(cx + 0.8, cy + 0.6, 4.8, 4.4, 1.6, 1.6, "F");
+      } else if (kind === "sun") {
+        doc.circle(cx, cy, 2.6, "F");
+        doc.setLineWidth(1.1);
+        for (let i = 0; i < 8; i++) {
+          const a = (Math.PI / 4) * i;
+          doc.line(cx + Math.cos(a) * 4.2, cy + Math.sin(a) * 4.2, cx + Math.cos(a) * 6, cy + Math.sin(a) * 6);
+        }
+      } else if (kind === "dome") {
+        doc.circle(cx, cy + 1, 4.3, "F");
+        doc.setFillColor(...bg);
+        doc.rect(cx - 6, cy + 1, 12, 6, "F"); // cut to a half-dome
+        doc.setFillColor(...white);
+        doc.roundedRect(cx - 6, cy + 1.2, 12, 1.8, 0.9, 0.9, "F"); // base
+        doc.circle(cx, cy - 3.4, 0.9, "F"); // knob
+      } else if (kind === "moon") {
+        doc.circle(cx, cy, 4.4, "F");
+        doc.setFillColor(...bg);
+        doc.circle(cx + 2.5, cy - 1.2, 3.6, "F"); // carve crescent
+      } else {
+        doc.roundedRect(cx - 4.5, cy + 1.6, 9, 1.7, 0.8, 0.8, "F");
+        doc.roundedRect(cx - 4.5, cy - 1.1, 6.5, 1.7, 0.8, 0.8, "F");
+        doc.roundedRect(cx - 4.5, cy - 3.8, 4, 1.7, 0.8, 0.8, "F");
+      }
+    };
+    // Brand logo: utensils on a navy disc.
+    const drawLogo = (cx: number, cy: number, r: number) => {
+      doc.setFillColor(...navy);
+      doc.circle(cx, cy, r, "F");
+      doc.setDrawColor(...white);
+      doc.setFillColor(...white);
+      doc.setLineWidth(1.1);
+      const fx = cx - 3.6;
+      doc.line(fx, cy - 5, fx, cy + 5); // fork handle
+      doc.line(fx - 2, cy - 5, fx - 2, cy - 1.5);
+      doc.line(fx + 2, cy - 5, fx + 2, cy - 1.5);
+      doc.line(fx - 2, cy - 1.5, fx + 2, cy - 1.5);
+      doc.ellipse(cx + 3.8, cy - 2.4, 1.7, 2.7, "F"); // spoon bowl
+      doc.line(cx + 3.8, cy - 0.2, cx + 3.8, cy + 5); // spoon handle
+    };
+    // Tiny inline icons for the subtitle.
+    const miniCal = (x: number, y: number) => {
+      doc.setDrawColor(...slate400);
+      doc.setLineWidth(0.7);
+      doc.roundedRect(x, y, 7, 6.5, 1, 1, "S");
+      doc.line(x, y + 2.2, x + 7, y + 2.2);
+      doc.line(x + 2, y - 1, x + 2, y + 0.6);
+      doc.line(x + 5, y - 1, x + 5, y + 0.6);
+    };
+    const miniBuilding = (x: number, y: number) => {
+      doc.setDrawColor(...slate400);
+      doc.setFillColor(...slate400);
+      doc.setLineWidth(0.7);
+      doc.roundedRect(x, y - 1, 7, 8, 0.6, 0.6, "S");
+      doc.rect(x + 1.4, y + 0.8, 1.2, 1.2, "F");
+      doc.rect(x + 4.2, y + 0.8, 1.2, 1.2, "F");
+      doc.rect(x + 1.4, y + 3.4, 1.2, 1.2, "F");
+      doc.rect(x + 4.2, y + 3.4, 1.2, 1.2, "F");
+    };
+
+    const siteLabel = campLabel ?? "All locations";
+
+    // ── Top header (logo, title, subtitle, company chip) — repeats per page ──
     const drawHeader = () => {
+      // Logo badge + title
+      drawLogo(margin + 15, 50, 15);
+      const titleX = margin + 38;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(15);
-      doc.setTextColor(...slate900);
-      doc.text(meta.title.toUpperCase(), margin, 56);
+      doc.setFontSize(17);
+      doc.setTextColor(...navy);
+      doc.text(meta.title.toUpperCase(), titleX, 47);
+
+      // Subtitle: [cal] date   [bldg] site
+      const sy = 62;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
       doc.setTextColor(...slate500);
-      doc.text(subtitle, margin, 71);
+      miniCal(titleX, sy - 6);
+      doc.text(rangeLabel, titleX + 11, sy);
+      let nx = titleX + 11 + doc.getTextWidth(rangeLabel) + 12;
+      miniBuilding(nx, sy - 6);
+      doc.text(siteLabel, nx + 11, sy);
 
       // Company chip, right-aligned: [II] Company Name
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       const labelW = doc.getTextWidth(companyLabel);
-      const chipH = 28;
-      const chipW = 6 + 22 + 8 + labelW + 12;
+      const chipH = 30;
+      const chipW = 7 + 22 + 8 + labelW + 12;
       const chipX = pageW - margin - chipW;
-      const chipY = 38;
+      const chipY = 35;
+      doc.setFillColor(...slate50);
       doc.setDrawColor(...slate200);
       doc.setLineWidth(0.8);
-      doc.roundedRect(chipX, chipY, chipW, chipH, 6, 6, "S");
-      doc.setFillColor(238, 242, 255);
-      doc.roundedRect(chipX + 6, chipY + 3, 22, 22, 4, 4, "F");
+      doc.roundedRect(chipX, chipY, chipW, chipH, 7, 7, "FD");
+      doc.setFillColor(...white);
+      doc.setDrawColor(...slate200);
+      doc.roundedRect(chipX + 7, chipY + 4, 22, 22, 4, 4, "FD");
       doc.setTextColor(...indigo);
       doc.setFontSize(8);
-      doc.text(initials, chipX + 6 + 11, chipY + 17, { align: "center" });
+      doc.text(initials, chipX + 7 + 11, chipY + 18, { align: "center" });
       doc.setTextColor(...slate900);
       doc.setFontSize(9);
-      doc.text(companyLabel, chipX + 6 + 22 + 8, chipY + 18);
+      doc.text(companyLabel, chipX + 7 + 22 + 8, chipY + 19);
     };
 
-    // ── KPI cards (page 1 only) — content centred so wide cards don't look empty ──
-    const cardsTop = 92;
-    const cardsH = 54;
+    // ── KPI cards (page 1 only) — icon disc, label, big coloured value ──
+    const cardsTop = 84;
+    const cardsH = 88;
     const drawCards = () => {
       const n = summaryCards.length;
       if (!n) return;
@@ -274,18 +373,25 @@ function ReportsPage() {
       summaryCards.forEach((c, i) => {
         const x = margin + i * (cardW + gap);
         const cx = x + cardW / 2;
-        doc.setFillColor(...slate50);
+        const t = themeFor(c.label);
+        doc.setFillColor(...t.tint);
         doc.setDrawColor(...slate200);
         doc.setLineWidth(0.8);
-        doc.roundedRect(x, cardsTop, cardW, cardsH, 7, 7, "FD");
+        doc.roundedRect(x, cardsTop, cardW, cardsH, 8, 8, "FD");
+        // icon disc
+        doc.setFillColor(...t.color);
+        doc.circle(cx, cardsTop + 23, 13, "F");
+        glyph(t.icon, cx, cardsTop + 23, t.color);
+        // label
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
+        doc.setFontSize(8);
         doc.setTextColor(...slate500);
-        doc.text(c.label.toUpperCase(), cx, cardsTop + 19, { align: "center" });
+        doc.text(c.label.toUpperCase(), cx, cardsTop + 52, { align: "center" });
+        // value
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.setTextColor(...slate900);
-        doc.text(c.value, cx, cardsTop + 41, { align: "center" });
+        doc.setFontSize(20);
+        doc.setTextColor(...t.color);
+        doc.text(c.value, cx, cardsTop + 75, { align: "center" });
       });
     };
 
@@ -313,9 +419,10 @@ function ReportsPage() {
         cellPadding: { top: 10, right: 8, bottom: 10, left: 8 }, overflow: "linebreak", valign: "middle",
       },
       headStyles: {
-        fillColor: slate50, textColor: slate500, fontStyle: "bold", fontSize: 8,
+        fillColor: navy, textColor: white, fontStyle: "bold", fontSize: 8,
         cellPadding: { top: 9, right: 8, bottom: 9, left: 8 },
       },
+      alternateRowStyles: { fillColor: slate50 },
       columnStyles,
       didParseCell: (d: any) => {
         if (d.section !== "body") return;
@@ -332,31 +439,32 @@ function ReportsPage() {
         }
       },
       didDrawCell: (d: any) => {
-        // Thin horizontal separators only (no vertical grid lines).
+        // Thin horizontal separators between body rows (no vertical grid lines).
+        if (d.section !== "body") return;
         const x2 = d.cell.x + d.cell.width;
         const yB = d.cell.y + d.cell.height;
-        if (d.section === "head") {
-          doc.setDrawColor(...slate200);
-          doc.setLineWidth(0.9);
-          doc.line(d.cell.x, yB, x2, yB);
-        } else if (d.section === "body") {
-          doc.setDrawColor(...slate100);
-          doc.setLineWidth(0.6);
-          doc.line(d.cell.x, yB, x2, yB);
-        }
+        doc.setDrawColor(...slate100);
+        doc.setLineWidth(0.6);
+        doc.line(d.cell.x, yB, x2, yB);
       },
       didDrawPage: (d: any) => {
         // Header repeats on every page; cards only on the first.
         if (d.pageNumber > 1) drawHeader();
         // ── Footer ──
-        doc.setDrawColor(...slate200);
-        doc.setLineWidth(0.6);
+        doc.setDrawColor(...blue);
+        doc.setLineWidth(0.8);
         doc.line(margin, pageH - 30, pageW - margin, pageH - 30);
+        // small doc icon
+        doc.setDrawColor(...slate400);
+        doc.setLineWidth(0.7);
+        doc.roundedRect(margin, pageH - 24, 8, 9, 1, 1, "S");
+        doc.line(margin + 2, pageH - 21, margin + 6, pageH - 21);
+        doc.line(margin + 2, pageH - 19, margin + 6, pageH - 19);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(...slate400);
-        doc.text(`Generated on: ${generated}`, margin, pageH - 17);
-        doc.text("CONFIDENTIAL REPORT  ·  MYMEALS", pageW / 2, pageH - 17, { align: "center" });
+        doc.text(`Generated on: ${generated}`, margin + 13, pageH - 17);
+        doc.text("CONFIDENTIAL REPORT  •  MYMEALS", pageW / 2, pageH - 17, { align: "center" });
       },
     });
 
