@@ -140,25 +140,25 @@ function ReportsPage() {
     const meta = TABS.find((t) => t.id === tab)!;
     const landscape = exportMatrix[0].length > 6;
     const doc = new jsPDF({ orientation: landscape ? "landscape" : "portrait", unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 36;
+    const headerH = 56;
     const rangeLabel = tab === "daily" ? fmtDate(date) : `${fmtDate(from)} → ${fmtDate(to)}`;
-
-    doc.setFontSize(15);
-    doc.setTextColor(20);
-    doc.text(`${meta.n}. ${meta.title}`, 40, 40);
-    doc.setFontSize(9);
-    doc.setTextColor(120);
-    doc.text(`Company: ${companyLabel}     Period: ${rangeLabel}`, 40, 57);
-    doc.text(`MyMeals — Integrated Reports Suite`, 40, 70);
+    const generated = new Date().toLocaleString(undefined, {
+      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+    });
 
     const head = [exportMatrix[0].map(String)];
     const body = exportMatrix.slice(1).map((r) => r.map((c) => String(c)));
+
     autoTable(doc, {
       head,
       body,
-      startY: 84,
+      margin: { top: headerH + 16, bottom: 34, left: margin, right: margin },
       styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
-      headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
+      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [244, 247, 252] },
       didParseCell: (d: any) => {
         // Report 5 — colour rows by Status (Duplicate = amber, else red).
         if (tab === "duplicate" && d.section === "body") {
@@ -166,7 +166,49 @@ function ReportsPage() {
           d.cell.styles.fillColor = status.includes("duplicate") ? [254, 243, 199] : [254, 226, 226];
         }
       },
+      didDrawPage: () => {
+        // ── Header band (repeats on every page) ──
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, pageW, headerH, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.text("MyMeals", margin, 24);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text("Integrated Reports Suite", margin, 38);
+        // Report title + meta, right-aligned
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`${meta.n}. ${meta.title}`, pageW - margin, 24, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`${companyLabel}   ·   ${rangeLabel}`, pageW - margin, 38, { align: "right" });
+
+        // ── Footer (repeats on every page) ──
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.5);
+        doc.line(margin, pageH - 24, pageW - margin, pageH - 24);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`Generated ${generated}`, margin, pageH - 12);
+      },
     });
+
+    // Page "X of Y" — written after all pages exist.
+    const total = doc.getNumberOfPages();
+    for (let i = 1; i <= total; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 120, 120);
+      doc.text(`Page ${i} of ${total}`, pageW - margin, pageH - 12, { align: "right" });
+    }
+
     const range = tab === "daily" ? date : `${from}_to_${to}`;
     doc.save(`${meta.title.replace(/\s+/g, "_")}_${range}.pdf`);
   }
