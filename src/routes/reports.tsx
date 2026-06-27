@@ -292,12 +292,12 @@ function ReportsPage() {
     const head = [exportMatrix[0].map(String)];
     const body = exportMatrix.slice(1).map((r) => r.map((c) => String(c)));
 
-    // Right-align the numeric columns per report.
-    const rightCols: Record<string, number[]> = {
+    // Centre the numeric columns (header + value) per report.
+    const numCols: Record<string, number[]> = {
       daily: [], supplier: [2, 3, 4, 5], location: [1, 2, 3], comparison: [4, 5, 6, 7], duplicate: [],
     };
     const columnStyles: Record<number, any> = {};
-    (rightCols[tab] ?? []).forEach((i) => (columnStyles[i] = { halign: "right" }));
+    (numCols[tab] ?? []).forEach((i) => (columnStyles[i] = { halign: "center" }));
 
     drawHeader();
     drawCards();
