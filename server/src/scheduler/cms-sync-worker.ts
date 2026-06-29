@@ -29,6 +29,7 @@ async function tick() {
     console.log(
       `[cms-sync] ${r.ok ? "OK" : "FAIL"} — fetched=${r.fetched} created=${r.created} ` +
         `updated=${r.updated} skipped=${r.skipped} stale=${r.stale} campsCreated=${r.campsCreated} ` +
+        `companiesCreated=${r.companiesCreated} ` +
         `in ${r.durationMs}ms` +
         (r.error ? ` — ${r.error}` : ""),
     );

@@ -23,6 +23,7 @@ export interface SyncSummary {
   skipped: number;
   stale: number; // present locally but absent from the CMS pull
   campsCreated: number; // Camp records auto-created from new roster camp codes
+  companiesCreated: number; // Company records auto-created from new roster company codes
   error?: string;
 }
 
@@ -50,6 +51,7 @@ export async function runCmsSync(): Promise<SyncSummary> {
   let skipped = 0;
   let stale = 0;
   let campsCreated = 0;
+  let companiesCreated = 0;
   let error: string | undefined;
   let ok = false;
 
@@ -90,26 +92,54 @@ export async function runCmsSync(): Promise<SyncSummary> {
 
     stale = existing.filter((e) => !seenIds.has(e.laborId)).length;
 
-    // Ensure a Camp record exists for every camp in the roster, so meal
-    // windows / scanner gating can be configured without hand-creating camps.
-    // New camps get the schema's default meal windows; existing camps only
-    // have their headcount refreshed — admin-tuned names, windows, and
-    // online state are never overwritten.
+    // Tally per-camp and per-company headcounts from the roster, plus the
+    // company each camp belongs to. The roster gives a single company string
+    // (e.g. "INNOVOBLD") which we use as both the Company code and name.
     const byCamp = new Map<string, { name: string; count: number }>();
+    const byCompany = new Map<string, number>(); // companyCode -> headcount
+    const campCompany = new Map<string, string>(); // campCode -> companyCode
     for (const r of rows) {
+      const companyCode = r.company?.trim();
+      if (companyCode) byCompany.set(companyCode, (byCompany.get(companyCode) ?? 0) + 1);
       if (!r.campCode) continue;
       const c = byCamp.get(r.campCode);
       if (c) c.count++;
       else byCamp.set(r.campCode, { name: r.campName || r.campCode, count: 1 });
+      // Last-writer-wins: if a camp ever spans companies, the final row decides.
+      if (companyCode) campCompany.set(r.campCode, companyCode);
     }
+
+    // Ensure a Company record exists for every distinct company in the roster.
+    // Must run BEFORE camps, since Camp.companyCode is an FK into Company.code.
+    // Existing companies only have their headcount refreshed — admin-tuned
+    // name/contact/email/phone are never overwritten.
+    const existingCompanies = new Set(
+      (await prisma.company.findMany({ select: { code: true } })).map((c) => c.code),
+    );
+    for (const [code, count] of byCompany) {
+      await prisma.company.upsert({
+        where: { code },
+        create: { code, name: code, employees: count },
+        update: { employees: count },
+      });
+      if (!existingCompanies.has(code)) companiesCreated++;
+    }
+
+    // Ensure a Camp record exists for every camp in the roster, so meal
+    // windows / scanner gating can be configured without hand-creating camps.
+    // New camps get the schema's default meal windows; existing camps only
+    // have their headcount refreshed — admin-tuned names, windows, and
+    // online state are never overwritten. The company link is (re)applied on
+    // every run so the Company → Camp hierarchy stays in sync with CMS.
     const existingCamps = new Set(
       (await prisma.camp.findMany({ select: { code: true } })).map((c) => c.code),
     );
     for (const [code, c] of byCamp) {
+      const companyCode = campCompany.get(code) ?? null;
       await prisma.camp.upsert({
         where: { code },
-        create: { code, name: c.name, site: c.name, employees: c.count },
-        update: { employees: c.count },
+        create: { code, name: c.name, site: c.name, employees: c.count, companyCode },
+        update: { employees: c.count, companyCode },
       });
       if (!existingCamps.has(code)) campsCreated++;
     }
@@ -133,6 +163,7 @@ export async function runCmsSync(): Promise<SyncSummary> {
     skipped,
     stale,
     campsCreated,
+    companiesCreated,
     error,
   };
   return lastRun;

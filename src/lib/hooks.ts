@@ -881,6 +881,7 @@ export type CmsSyncSummary = {
   stale: number;
   staleDeactivated?: number;
   campsCreated?: number;
+  companiesCreated?: number;
   error?: string;
 };
 

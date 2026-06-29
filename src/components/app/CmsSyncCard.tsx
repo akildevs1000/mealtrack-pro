@@ -56,7 +56,10 @@ export function CmsSyncCard() {
                 ? `${last.fetched} fetched · ${last.created} new · ${last.updated} updated` +
                   (last.skipped ? ` · ${last.skipped} skipped` : "") +
                   (last.stale ? ` · ${last.stale} stale` : "") +
-                  (last.campsCreated ? ` · ${last.campsCreated} camps created` : "")
+                  (last.campsCreated ? ` · ${last.campsCreated} camps created` : "") +
+                  (last.companiesCreated
+                    ? ` · ${last.companiesCreated} companies created`
+                    : "")
                 : (last.error ?? "failed")}
             </span>
           </>
