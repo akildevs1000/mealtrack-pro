@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import {
-  Search, Users, Building2, BadgeCheck, BadgeAlert, Briefcase, Calendar,
+  Search, Users, Building2, Building, BadgeCheck, BadgeAlert, Briefcase, Calendar,
   IdCard, Coffee, UtensilsCrossed, Moon, Check, X,
   Upload, AlertTriangle, Loader2, Printer, User as UserIcon,
   LayoutGrid, List, Eye, Pencil, Save, ImagePlus, Trash2,
@@ -227,6 +227,10 @@ function EmployeesPage() {
                       {e.campCode} — {e.campName.trim()}
                     </span>
                   </div>
+                  <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1 truncate">
+                    <Building className="size-3 shrink-0" />
+                    <span className="truncate" title={e.company}>{e.company || "—"}</span>
+                  </div>
                   <div className="mt-3 pt-3 border-t border-border/60">
                     <MealsEligibilityPill emp={e} />
                   </div>
@@ -251,6 +255,7 @@ function EmployeesPage() {
                     <th className="px-4 py-2.5 font-medium">Employee</th>
                     <th className="px-4 py-2.5 font-medium">Labour Code</th>
                     <th className="px-4 py-2.5 font-medium">Designation</th>
+                    <th className="px-4 py-2.5 font-medium">Company</th>
                     <th className="px-4 py-2.5 font-medium">Camp</th>
                     <th className="px-4 py-2.5 font-medium">Status</th>
                     <th className="px-4 py-2.5 font-medium text-center">Meals</th>
@@ -278,6 +283,12 @@ function EmployeesPage() {
                         </td>
                         <td className="px-4 py-2.5 font-mono text-xs">{e.laborCode}</td>
                         <td className="px-4 py-2.5 text-muted-foreground">{e.designation || "—"}</td>
+                        <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <Building className="size-3.5 shrink-0" />
+                            <span className="truncate" title={e.company}>{e.company || "—"}</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
                             <Building2 className="size-3.5 shrink-0" />
