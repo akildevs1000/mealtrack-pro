@@ -89,9 +89,15 @@ async function main() {
 
   // --- Food estimations (last DAYS days incl. today) for day-over-day comparison ---
   // One row per day per site so Request Comparison shows variance per site.
+  // FoodEstimation.companyCode is an FK to Company.code — resolve a Company that
+  // actually exists (the supplier's, else any) so the insert doesn't violate it.
+  const company =
+    (supplier?.companyCode
+      ? await prisma.company.findUnique({ where: { code: supplier.companyCode } })
+      : null) ?? (await prisma.company.findFirst());
   let estCount = 0;
-  if (supplier) {
-    await prisma.foodEstimation.deleteMany({ where: { companyCode: COMPANY, supplierId: supplier.id } });
+  if (supplier && company) {
+    await prisma.foodEstimation.deleteMany({ where: { supplierId: supplier.id } });
     const est: any[] = [];
     for (let off = DAYS - 1; off >= 0; off--) {
       for (const site of sites) {
@@ -99,7 +105,7 @@ async function main() {
         const b = base + ((off * 13) % 60) - 20; // gentle day-to-day swing
         est.push({
           date: new Date(`${isoDay(off)}T08:00:00.000Z`),
-          companyCode: COMPANY,
+          companyCode: company.code,
           supplierId: supplier.id,
           projectCode: site === secondary ? site : null,
           campCode: site,
@@ -111,6 +117,8 @@ async function main() {
     }
     await prisma.foodEstimation.createMany({ data: est });
     estCount = est.length;
+  } else if (!company) {
+    console.log("[demo] no Company row found — skipped food estimations (Request Comparison)");
   }
 
   console.log(
