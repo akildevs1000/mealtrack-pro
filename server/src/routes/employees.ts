@@ -37,18 +37,24 @@ router.get("/photo/:file", (req, res, next) => {
 
 router.use(requireAuth);
 
-// List CMS employees (the labour roster)
+// List CMS employees (the labour roster), paginated. The roster runs to tens
+// of thousands of rows, so this is page/pageSize-windowed and all filters are
+// applied server-side; the client never holds the full list. Returns
+// `{ rows, total, page, pageSize }` (total = count matching the filters, for
+// the pager).
 router.get("/", async (req, res, next) => {
   try {
     const scope = campScopeOf(req);
     const q = (req.query.q as string | undefined)?.trim().toLowerCase();
     const status = req.query.status as string | undefined;
     const campCode = req.query.campCode as string | undefined;
+    const company = req.query.company as string | undefined;
 
     const where: any = {};
     if (scope) where.campCode = { in: scope };
     if (campCode && campCode !== "all") where.campCode = campCode;
     if (status && status !== "all") where.status = status;
+    if (company && company !== "all") where.company = company;
     if (q) {
       where.OR = [
         { name: { contains: q, mode: "insensitive" } },
@@ -58,15 +64,59 @@ router.get("/", async (req, res, next) => {
       ];
     }
 
-    const rows = await prisma.cmsEmployee.findMany({
-      where,
-      orderBy: { laborCode: "asc" },
-    });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
+
+    const [total, rows] = await prisma.$transaction([
+      prisma.cmsEmployee.count({ where }),
+      prisma.cmsEmployee.findMany({
+        where,
+        orderBy: { laborCode: "asc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
     // Flag photo-bearing rows from a single directory read so the client can
     // skip loading <img> (and the 404 fallback) for the many photo-less,
     // Oracle-synced employees.
     const withPhoto = photoCodeSet();
-    res.json(rows.map((r) => toApi(r, withPhoto.has(r.laborCode))));
+    res.json({
+      rows: rows.map((r) => toApi(r, withPhoto.has(r.laborCode))),
+      total,
+      page,
+      pageSize,
+    });
+  } catch (e) { next(e); }
+});
+
+// Roster facets for the Employees page: status counts (for the stat cards) and
+// the distinct camp codes (for the camp filter) — both over the whole scoped
+// roster, independent of the active filters, so the list can be paginated
+// without the client holding every row. Defined BEFORE `/:laborId` so "meta"
+// isn't swallowed by the numeric-id route.
+router.get("/meta", async (req, res, next) => {
+  try {
+    const scope = campScopeOf(req);
+    const where: any = {};
+    if (scope) where.campCode = { in: scope };
+
+    const [total, active, inactive, leave, campRows] = await prisma.$transaction([
+      prisma.cmsEmployee.count({ where }),
+      prisma.cmsEmployee.count({ where: { ...where, status: "Active" } as any }),
+      prisma.cmsEmployee.count({ where: { ...where, status: "InActive" } as any }),
+      prisma.cmsEmployee.count({ where: { ...where, status: "leave" } as any }),
+      prisma.cmsEmployee.findMany({
+        where,
+        distinct: ["campCode"],
+        select: { campCode: true },
+        orderBy: { campCode: "asc" },
+      }),
+    ]);
+
+    res.json({
+      counts: { total, active, inactive, leave },
+      camps: campRows.map((c) => c.campCode),
+    });
   } catch (e) { next(e); }
 });
 

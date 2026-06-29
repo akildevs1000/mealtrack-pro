@@ -1,17 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, Users, Building2, Building, BadgeCheck, BadgeAlert, Briefcase, Calendar,
   IdCard, Coffee, UtensilsCrossed, Moon, Check, X,
   Upload, AlertTriangle, Loader2, Printer, User as UserIcon,
   LayoutGrid, List, Eye, Pencil, Save, ImagePlus, Trash2,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { QRCodeSVG } from "qrcode.react";
-import { useCampScope, useSession } from "@/lib/session";
+import { useSession } from "@/lib/session";
 import { CmsSyncCard } from "@/components/app/CmsSyncCard";
 import {
-  useEmployees, useEmployeeMeals, useImportEmployees, useUpdateEmployee, useCompanies,
+  useEmployees, useEmployeesMeta, useEmployeeMeals, useImportEmployees, useUpdateEmployee, useCompanies,
   useSetEmployeePhoto, useDeleteEmployeePhoto, employeePhotoUrl,
   type CmsEmployee, type MealRecord, type EmployeeImportRow, type EmployeeUpdate,
 } from "@/lib/hooks";
@@ -22,22 +23,53 @@ export const Route = createFileRoute("/employees")({
 });
 
 function EmployeesPage() {
-  const scope = useCampScope();
   const { can } = useSession();
   const canImport = can("employees", "edit");
-  const { data: employees = [] } = useEmployees();
-  const { data: companies = [] } = useCompanies();
-  const importMutation = useImportEmployees();
-  // Backend already applies camp scope based on the auth context; this is
-  // a defensive belt-and-braces in case the response includes anything wider.
-  const scopedEmployees = useMemo(
-    () => (scope ? employees.filter((e) => scope.includes(e.campCode)) : employees),
-    [employees, scope],
-  );
+
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "Active" | "InActive" | "leave">("all");
   const [campFilter, setCampFilter] = useState<string>("all");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
+
+  // Debounce the search box so we refetch ~300ms after typing stops, not per key.
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Any filter/search change snaps back to the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery, statusFilter, campFilter, companyFilter]);
+
+  const { data: companies = [] } = useCompanies();
+  // Roster facets (status counts + camp codes) span the whole scoped roster,
+  // independent of the active filters — so the list itself can be paginated.
+  const { data: meta } = useEmployeesMeta();
+  const counts = meta?.counts ?? { total: 0, active: 0, inactive: 0, leave: 0 };
+  const camps = meta?.camps ?? [];
+
+  // The server paginates and applies every filter; the client never holds the
+  // full roster. `placeholderData` keeps the previous page visible while the
+  // next one loads.
+  const { data: pageData, isFetching } = useEmployees({
+    q: debouncedQuery,
+    status: statusFilter,
+    campCode: campFilter,
+    company: companyFilter,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const rows = pageData?.rows ?? [];
+  const total = pageData?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeTo = Math.min(page * PAGE_SIZE, total);
+
+  const importMutation = useImportEmployees();
   const [view, setView] = useState<"card" | "list">("list");
   const [selected, setSelected] = useState<CmsEmployee | null>(null);
   const [editing, setEditing] = useState<CmsEmployee | null>(null);
@@ -78,28 +110,6 @@ function EmployeesPage() {
     }
   }
 
-  const camps = useMemo(
-    () => Array.from(new Set(scopedEmployees.map((e) => e.campCode))).sort(),
-    [scopedEmployees],
-  );
-
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase();
-    return scopedEmployees.filter((e) => {
-      if (statusFilter !== "all" && e.status !== statusFilter) return false;
-      if (campFilter !== "all" && e.campCode !== campFilter) return false;
-      if (companyFilter !== "all" && e.company !== companyFilter) return false;
-      if (!q) return true;
-      return (
-        e.name.toLowerCase().includes(q) ||
-        e.laborCode.toLowerCase().includes(q) ||
-        String(e.laborId).includes(q) ||
-        e.designation.toLowerCase().includes(q) ||
-        e.campName.toLowerCase().includes(q)
-      );
-    });
-  }, [query, statusFilter, campFilter, companyFilter, scopedEmployees]);
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -111,10 +121,10 @@ function EmployeesPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
-            <Stat label="Total" value={scopedEmployees.length} tone="primary" />
-            <Stat label="Active" value={scopedEmployees.filter((e) => e.status === "Active").length} tone="success" />
-            <Stat label="Inactive" value={scopedEmployees.filter((e) => e.status === "InActive").length} tone="muted" />
-            <Stat label="On Leave" value={scopedEmployees.filter((e) => e.status === "leave").length} tone="warning" />
+            <Stat label="Total" value={counts.total} tone="primary" />
+            <Stat label="Active" value={counts.active} tone="success" />
+            <Stat label="Inactive" value={counts.inactive} tone="muted" />
+            <Stat label="On Leave" value={counts.leave} tone="warning" />
           </div>
           {canImport && (
             <>
@@ -197,13 +207,15 @@ function EmployeesPage() {
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-secondary/40">
             <div className="text-sm font-semibold">Employee Roster</div>
-            <div className="text-xs text-muted-foreground">{filtered.length} of {scopedEmployees.length}</div>
+            <div className="text-xs text-muted-foreground">
+              {isFetching ? "Loading…" : `${rangeFrom}–${rangeTo} of ${total}`}
+            </div>
           </div>
-          {filtered.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-12">No employees match.</div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-              {filtered.map((e) => (
+              {rows.map((e) => (
                 <button
                   key={e.laborId}
                   onClick={() => setSelected(e)}
@@ -243,9 +255,11 @@ function EmployeesPage() {
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-secondary/40">
             <div className="text-sm font-semibold">Employee Roster</div>
-            <div className="text-xs text-muted-foreground">{filtered.length} of {scopedEmployees.length}</div>
+            <div className="text-xs text-muted-foreground">
+              {isFetching ? "Loading…" : `${rangeFrom}–${rangeTo} of ${total}`}
+            </div>
           </div>
-          {filtered.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-12">No employees match.</div>
           ) : (
             <div className="overflow-x-auto max-h-[640px] overflow-y-auto">
@@ -264,7 +278,7 @@ function EmployeesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((e) => {
+                  {rows.map((e) => {
                     const active = selected?.laborId === e.laborId;
                     return (
                       <tr
@@ -331,6 +345,34 @@ function EmployeesPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{rangeFrom}–{rangeTo}</span> of{" "}
+            <span className="font-medium text-foreground">{total}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary/60 transition"
+            >
+              <ChevronLeft className="size-3.5" /> Prev
+            </button>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary/60 transition"
+            >
+              Next <ChevronRight className="size-3.5" />
+            </button>
+          </div>
         </div>
       )}
 

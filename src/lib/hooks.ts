@@ -275,19 +275,47 @@ export function useCreateFoodEstimation() {
 }
 
 // CMS employees
+export type EmployeesPage = {
+  rows: CmsEmployee[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export function useEmployees(params?: {
   q?: string;
   status?: string;
   campCode?: string;
+  company?: string;
+  page?: number;
+  pageSize?: number;
 }) {
   const search = new URLSearchParams();
   if (params?.q) search.set("q", params.q);
-  if (params?.status) search.set("status", params.status);
-  if (params?.campCode) search.set("campCode", params.campCode);
+  if (params?.status && params.status !== "all") search.set("status", params.status);
+  if (params?.campCode && params.campCode !== "all") search.set("campCode", params.campCode);
+  if (params?.company && params.company !== "all") search.set("company", params.company);
+  if (params?.page) search.set("page", String(params.page));
+  if (params?.pageSize) search.set("pageSize", String(params.pageSize));
   const qs = search.toString();
   return useQuery({
     queryKey: ["employees", params ?? {}],
-    queryFn: () => api<CmsEmployee[]>(`/employees${qs ? `?${qs}` : ""}`),
+    queryFn: () => api<EmployeesPage>(`/employees${qs ? `?${qs}` : ""}`),
+    // Keep showing the previous page while the next one loads — no flicker.
+    placeholderData: (prev) => prev,
+  });
+}
+
+export type EmployeesMeta = {
+  counts: { total: number; active: number; inactive: number; leave: number };
+  camps: string[];
+};
+
+/** Roster facets (status counts + distinct camp codes) for the Employees page. */
+export function useEmployeesMeta() {
+  return useQuery({
+    queryKey: ["employees", "meta"],
+    queryFn: () => api<EmployeesMeta>("/employees/meta"),
   });
 }
 
