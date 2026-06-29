@@ -28,10 +28,20 @@ function isoDay(daysAgo: number): string {
 }
 
 async function main() {
-  const camp = await prisma.camp.findFirst({ where: { companyCode: COMPANY } });
-  const supplier = await prisma.campManager.findFirst({ where: { companyCode: COMPANY } });
-  const project = await prisma.project.findFirst({ where: { companyCode: COMPANY } });
-  const emps = await prisma.cmsEmployee.findMany({ where: { company: COMPANY }, take: 30 });
+  // Prefer the company's own sites/supplier, but fall back to any — on live the
+  // CMS-created camps/managers may not carry a companyCode yet, which would make
+  // the company-scoped lookups (and thus the whole seed) silently no-op.
+  const camp =
+    (await prisma.camp.findFirst({ where: { companyCode: COMPANY } })) ??
+    (await prisma.camp.findFirst());
+  const supplier =
+    (await prisma.campManager.findFirst({ where: { companyCode: COMPANY } })) ??
+    (await prisma.campManager.findFirst());
+  const project =
+    (await prisma.project.findFirst({ where: { companyCode: COMPANY } })) ??
+    (await prisma.project.findFirst());
+  let emps = await prisma.cmsEmployee.findMany({ where: { company: COMPANY }, take: 30 });
+  if (emps.length === 0) emps = await prisma.cmsEmployee.findMany({ take: 30 });
   if (!camp || emps.length === 0) {
     console.log(`[demo] missing base data (camp/employees) for ${COMPANY} — nothing seeded`);
     return;
