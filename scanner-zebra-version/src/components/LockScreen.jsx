@@ -28,16 +28,22 @@ export default function LockScreen({ manager, deviceMac, onUnlock }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const keyGap = 10;
+  const keyGap = 12;
   const sidePad = spacing.lg;
   const padInnerW = Math.max(0, width - sidePad * 2);
-  const keyW = Math.min(68, Math.floor((padInnerW - keyGap * 2) / 3));
-  const keyH = Math.max(46, Math.min(54, Math.floor(keyW * 0.78)));
+  // 3-column grid that fills the row width (capped so keys don't get oversized
+  // on tablets). Height is also bounded by the space left under the header so
+  // all 4 rows fit on short screens — on phones the keys grow to fill instead
+  // of staying clustered at the old fixed 68×54 size.
+  const keyW = Math.min(120, Math.floor((padInnerW - keyGap * 2) / 3));
+  const availH = height - insets.top - insets.bottom - spacing.md * 2;
+  const maxKeyH = Math.floor((availH - 210 - keyGap * 3) / 4);
+  const keyH = Math.max(48, Math.min(keyW, maxKeyH));
 
-  const lockBadgeSize = 72;
-  const lockIconSize = 36;
-  const keyIconSize = 20;
-  const keyFontSize = 20;
+  const lockBadgeSize = Math.min(88, Math.max(60, Math.round(width * 0.18)));
+  const lockIconSize = Math.round(lockBadgeSize * 0.5);
+  const keyIconSize = Math.max(22, Math.min(30, Math.round(keyH * 0.42)));
+  const keyFontSize = Math.max(22, Math.min(34, Math.round(keyH * 0.46)));
 
   const styles = makeStyles(colors, {
     keyW,
