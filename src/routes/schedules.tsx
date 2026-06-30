@@ -167,7 +167,7 @@ function SchedulesPage() {
       dayOfMonth: null,
       destination: "email",
       recipientIds: [],
-      recipientEmails: adminRecipients.map((u) => u.email).filter(Boolean),
+      recipientEmails: adminRecipients.map((u) => u.email).filter((e) => EMAIL_RE.test(e)),
     };
     createSchedule.mutate(body, {
       onError: (e) =>
