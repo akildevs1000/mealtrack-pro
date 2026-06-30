@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "MealPass Scanner",
+    "slug": "scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f131e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.akilgroup.scanner",
+      "infoPlist": {
+        "NSCameraUsageDescription": "MealPass needs the camera to scan employee QR codes."
+      }
+    },
+    "android": {
+      "package": "com.akilgroup.scanner",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f131e"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "MealPass needs the camera to scan employee QR codes."
+        }
+      ],
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ada95765-bc98-4595-952b-9ac31629addf"
+      }
+    }
+  }
+}

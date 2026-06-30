@@ -31,6 +31,8 @@ dist-ssr
 *.sln
 *.sw?
 
-scanner-zebra-version
 .claude/settings.json
 .claude/settings.local.json
+.claude/settings.json
+scanner-zebra-version/MealPass-Scanner-v1.0.0-port5044.apk
+scanner-zebra-version/MealPass-Scanner-v1.0.1-photos.apk
