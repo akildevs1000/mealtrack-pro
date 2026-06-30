@@ -807,6 +807,9 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
   const doj = employee.doj ? String(employee.doj).slice(0, 10) : null;
   const dojFormatted = doj ? `${doj.slice(8, 10)}/${doj.slice(5, 7)}/${doj.slice(0, 4)}` : "—";
   const brandPrimary = "#0e7490";
+  // The printed card shows only the first two words of the name to keep it on
+  // one line within the fixed card width.
+  const cardName = (employee.name || "").trim().split(/\s+/).slice(0, 2).join(" ") || employee.name;
 
   return (
     <div
@@ -842,7 +845,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
       </div>
 
       <div className="text-center" style={{ marginTop: "2mm" }}>
-        <div className="text-[12px] font-bold leading-tight">{employee.name}</div>
+        <div className="text-[12px] font-bold leading-tight">{cardName}</div>
         <div className="text-[15px] font-bold leading-tight" style={{ marginTop: "1mm" }}>
           {employee.designation || "—"}
         </div>
@@ -923,9 +926,7 @@ function MealCell({ taken, time }: { taken: boolean; time: string | null }) {
 }
 
 function DurationCell({ doj, effectiveDate }: { doj: string; effectiveDate: string | null }) {
-  const expiry = effectiveDate ? new Date(effectiveDate) : null;
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const expired = expiry !== null && expiry.getTime() < todayStart.getTime();
+  const expired = isExpired(effectiveDate);
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="text-muted-foreground">{fmtDate(doj)}</span>
@@ -971,11 +972,10 @@ function StatusPill({ status }: { status: CmsEmployee["status"] }) {
 }
 
 function MealsEligibilityPill({ emp }: { emp: CmsEmployee }) {
-  // Expiry comes from the EFECTIVE_DATE column. If it's in the past, the
-  // employee is no longer eligible regardless of the Y/N flag.
-  const expiry = emp.effectiveDate ? new Date(emp.effectiveDate) : null;
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const expired = expiry !== null && expiry.getTime() < todayStart.getTime();
+  // Expiry comes from the EFECTIVE_DATE column. The employee stays eligible
+  // through a grace period after that date; only once it's fully past (see
+  // isExpired) are they no longer eligible regardless of the Y/N flag.
+  const expired = isExpired(emp.effectiveDate);
   const eligible = !expired && emp.mealsEligibility === "Y";
 
   const start = fmtDate(emp.doj);
@@ -1144,6 +1144,22 @@ function fmtDate(iso: string) {
 }
 function dayName(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { weekday: "short" });
+}
+
+// Meal eligibility expires on the EFECTIVE_DATE, but employees keep access for a
+// grace period after that before being treated as expired. Keep in sync with
+// EXPIRY_GRACE_DAYS in server/src/routes/scanner.ts.
+const EXPIRY_GRACE_DAYS = 15;
+
+// Returns true once an employee is past their effectiveDate + grace window.
+// Within the grace window (or with no expiry date) they are still eligible.
+function isExpired(effectiveDate: string | null): boolean {
+  if (!effectiveDate) return false;
+  const cutoff = new Date(effectiveDate);
+  cutoff.setDate(cutoff.getDate() + EXPIRY_GRACE_DAYS);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  return cutoff.getTime() < todayStart.getTime();
 }
 
 // === Excel import ============================================================

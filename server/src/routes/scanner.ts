@@ -4,10 +4,16 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { signScannerToken, verifyPin } from "../lib/auth.js";
 import { requireScannerAuth } from "../middleware/auth.js";
-import { dubaiHHMM, dubaiStartOfToday, formatDubaiTime } from "../lib/time.js";
+import { dubaiHHMM, dubaiStartOfToday, dubaiStartOfDay, formatDubaiTime } from "../lib/time.js";
 import { photoUrl } from "../lib/employee-photos.js";
 
 const router = Router();
+
+// Meal eligibility expires on the employee's `effectiveDate` (the EFECTIVE_DATE
+// column from CMS). Workers keep meal access for this many days after that date
+// — a grace period for in-flight contract renewals — before the ID is treated
+// as expired. Keep in sync with EXPIRY_GRACE_DAYS in src/routes/employees.tsx.
+const EXPIRY_GRACE_DAYS = 15;
 
 // A scanning site is a Camp OR a Project (both physical sites with meal windows).
 // resolveSite() unifies them into one camp-shaped object the scanner flow uses.
@@ -358,6 +364,28 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
       });
     }
 
+    // Eligibility expiry (effectiveDate) + 15-day grace. Past the grace window
+    // the ID is denied as expired even if the Y/N flag still says eligible.
+    if (employee.effectiveDate) {
+      const graceCutoff = dubaiStartOfDay(employee.effectiveDate);
+      graceCutoff.setUTCDate(graceCutoff.getUTCDate() + EXPIRY_GRACE_DAYS);
+      if (dubaiStartOfToday(now).getTime() > graceCutoff.getTime()) {
+        const scan = await prisma.scan.create({
+          data: {
+            name: employee.name, labourId: employee.laborCode, campCode, meal,
+            status: "NotEligible",
+            managerId: req.scanner!.managerId,
+          },
+        });
+        return res.json({
+          status: "not_eligible",
+          reason: "id_expired",
+          employee: toEmployeeApi(employee, req),
+          scan: toScanApi(scan),
+        });
+      }
+    }
+
     if (employee.mealsEligibility !== "Y" || employee.status !== "Active") {
       const scan = await prisma.scan.create({
         data: {
@@ -368,7 +396,12 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
       });
       return res.json({
         status: "not_eligible",
-        reason: employee.status !== "Active" ? "employee_inactive" : "meal_ineligible",
+        reason:
+          employee.status === "leave"
+            ? "on_leave"
+            : employee.status !== "Active"
+              ? "employee_inactive"
+              : "meal_ineligible",
         employee: toEmployeeApi(employee, req),
         scan: toScanApi(scan),
       });

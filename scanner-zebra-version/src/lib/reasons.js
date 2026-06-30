@@ -9,7 +9,9 @@ const MAP = {
   // mealtrack-pro reason codes
   unknown_employee: 'Not Registered',
   employee_inactive: 'Account Inactive',
+  on_leave: 'On Leave',
   meal_ineligible: 'Not Eligible For Meals',
+  id_expired: 'ID Expired',
   already_breakfast: 'Already Had Breakfast',
   already_lunch: 'Already Had Lunch',
   already_dinner: 'Already Had Dinner',
