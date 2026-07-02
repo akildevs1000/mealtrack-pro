@@ -35,11 +35,16 @@ function DevicesPage() {
   const [query, setQuery] = useState("");
   const [campFilter, setCampFilter] = useState<string>("all");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
-  // Camps are siblings of the Company, so a device's company is its camp's
-  // company. Build the set of camp codes for the selected company.
-  const companyCampCodes = useMemo(
-    () => new Set(camps.filter((c) => c.companyCode === companyFilter).map((c) => c.code)),
-    [camps, companyFilter],
+  // A device's company is that of the camp OR project it's bound to. Build the
+  // set of BOTH camp and project codes for the selected company so the list
+  // filter matches project-bound devices too (not just camp-bound ones).
+  const companySiteCodes = useMemo(
+    () =>
+      new Set([
+        ...camps.filter((c) => c.companyCode === companyFilter).map((c) => c.code),
+        ...projects.filter((p) => p.companyCode === companyFilter).map((p) => p.code),
+      ]),
+    [camps, projects, companyFilter],
   );
   const visibleCamps = useMemo(() => {
     let cs = scope ? camps.filter((c) => scope.includes(c.code)) : camps;
@@ -110,7 +115,12 @@ function DevicesPage() {
   const filtered = useMemo(() => {
     const scoped = scope ? list.filter((d) => scope.includes(d.camp ?? "")) : list;
     return scoped.filter((d) => {
-      if (companyFilter !== "all" && !companyCampCodes.has(d.camp ?? "")) return false;
+      if (
+        companyFilter !== "all" &&
+        !companySiteCodes.has(d.camp ?? "") &&
+        !companySiteCodes.has(d.projectCode ?? "")
+      )
+        return false;
       if (campFilter !== "all" && d.camp !== campFilter) return false;
       if (!query) return true;
       const q = query.toLowerCase();
@@ -120,7 +130,7 @@ function DevicesPage() {
         d.serial.toLowerCase().includes(q)
       );
     });
-  }, [list, query, campFilter, companyFilter, companyCampCodes, scope]);
+  }, [list, query, campFilter, companyFilter, companySiteCodes, scope]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
