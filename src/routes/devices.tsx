@@ -46,16 +46,36 @@ function DevicesPage() {
     if (companyFilter !== "all") cs = cs.filter((c) => c.companyCode === companyFilter);
     return cs;
   }, [scope, camps, companyFilter]);
-  const visibleProjects = useMemo(
-    () => (companyFilter === "all" ? projects : projects.filter((p) => p.companyCode === companyFilter)),
-    [projects, companyFilter],
-  );
   const [open, setOpen] = useState(false);
   // When set, the modal is editing this device; otherwise it's registering a new one.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(() => initialForm());
   // Merged Camp/Project picker value: "c:<code>" (camp), "p:<code>" (project), or "".
   const [location, setLocation] = useState<string>("");
+  // Company chosen INSIDE the dialog; the Project/Camp options below cascade
+  // from it. Separate from the page-level companyFilter (the list filter above).
+  const [formCompany, setFormCompany] = useState<string>("");
+  // Camps/projects for the dialog, scoped to the chosen company (none until one
+  // is picked, so the operator selects company → then its camp/project).
+  const formCamps = useMemo(() => {
+    if (!formCompany) return [];
+    const cs = scope ? camps.filter((c) => scope.includes(c.code)) : camps;
+    return cs.filter((c) => c.companyCode === formCompany);
+  }, [scope, camps, formCompany]);
+  const formProjects = useMemo(
+    () => (formCompany ? projects.filter((p) => p.companyCode === formCompany) : []),
+    [projects, formCompany],
+  );
+  // Resolve which company a camp/project code belongs to (used when editing).
+  const companyForLocation = useMemo(() => {
+    const campCompany = new Map(camps.map((c) => [c.code, c.companyCode]));
+    const projCompany = new Map(projects.map((p) => [p.code, p.companyCode]));
+    return (loc: string): string => {
+      if (loc.startsWith("c:")) return campCompany.get(loc.slice(2)) ?? "";
+      if (loc.startsWith("p:")) return projCompany.get(loc.slice(2)) ?? "";
+      return "";
+    };
+  }, [camps, projects]);
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Device | null>(null);
@@ -80,7 +100,9 @@ function DevicesPage() {
       androidVersion: d.androidVersion, appVersion: d.appVersion, ipAddress: d.ipAddress,
       assignedTo: d.assignedTo, registeredOn: d.registeredOn,
     });
-    setLocation(d.camp ? `c:${d.camp}` : d.projectCode ? `p:${d.projectCode}` : "");
+    const loc = d.camp ? `c:${d.camp}` : d.projectCode ? `p:${d.projectCode}` : "";
+    setLocation(loc);
+    setFormCompany(companyForLocation(loc));
     setError(null);
     setOpen(true);
   }
@@ -141,6 +163,7 @@ function DevicesPage() {
       else await createDevice.mutateAsync(input);
       setForm(initialForm());
       setLocation("");
+      setFormCompany("");
       setEditingId(null);
       setError(null);
       setOpen(false);
@@ -178,7 +201,8 @@ function DevicesPage() {
           onClick={() => {
             setEditingId(null);
             setForm(initialForm());
-            setLocation(visibleCamps[0] ? `c:${visibleCamps[0].code}` : "");
+            setFormCompany("");
+            setLocation("");
             setOpen(true);
             setError(null);
           }}
@@ -325,21 +349,34 @@ function DevicesPage() {
               <Field label="MAC Address *">
                 <input required value={form.macAddress} onChange={(e) => setForm({ ...form, macAddress: e.target.value.toUpperCase() })} placeholder="e.g. A4:5E:60:11:8C:23 or L30325BT00423" className={`${inputCls} font-mono`} />
               </Field>
+              <Field label="Company *">
+                <select
+                  value={formCompany}
+                  onChange={(e) => { setFormCompany(e.target.value); setLocation(""); }}
+                  className={inputCls}
+                >
+                  <option value="">— Select Company —</option>
+                  {companies.map((co) => (
+                    <option key={co.id} value={co.code}>{co.code} — {co.name}</option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Project / Camp Location *">
                 <select
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   className={inputCls}
+                  disabled={!formCompany}
                 >
-                  <option value="">— Select Project or Camp —</option>
-                  {visibleProjects.length > 0 && (
+                  <option value="">{formCompany ? "— Select Project or Camp —" : "— Select a company first —"}</option>
+                  {formProjects.length > 0 && (
                     <optgroup label="Projects">
-                      {visibleProjects.map((p) => <option key={`p-${p.id}`} value={`p:${p.code}`}>{p.code} — {p.name}</option>)}
+                      {formProjects.map((p) => <option key={`p-${p.id}`} value={`p:${p.code}`}>{p.code} — {p.name}</option>)}
                     </optgroup>
                   )}
-                  {visibleCamps.length > 0 && (
+                  {formCamps.length > 0 && (
                     <optgroup label="Camp Locations">
-                      {visibleCamps.map((c) => <option key={`c-${c.id}`} value={`c:${c.code}`}>{c.code} — {c.name}</option>)}
+                      {formCamps.map((c) => <option key={`c-${c.id}`} value={`c:${c.code}`}>{c.code} — {c.name}</option>)}
                     </optgroup>
                   )}
                 </select>
