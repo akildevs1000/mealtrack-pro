@@ -19,7 +19,6 @@ const initialForm = (): FormState => ({
   ipAddress: "", assignedTo: "", registeredOn: new Date().toISOString().slice(0, 10),
 });
 
-const macRegex = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 
 function DevicesPage() {
   const scope = useCampScope();
@@ -103,8 +102,8 @@ function DevicesPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!macRegex.test(form.macAddress)) {
-      setError("MAC address must be in format AA:BB:CC:11:22:33");
+    if (!form.macAddress.trim()) {
+      setError("MAC address / device ID is required.");
       return;
     }
     if (
@@ -324,7 +323,7 @@ function DevicesPage() {
                 <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Scanner-AD01-C" className={inputCls} />
               </Field>
               <Field label="MAC Address *">
-                <input required value={form.macAddress} onChange={(e) => setForm({ ...form, macAddress: e.target.value.toUpperCase() })} placeholder="A4:5E:60:11:8C:23" className={`${inputCls} font-mono`} />
+                <input required value={form.macAddress} onChange={(e) => setForm({ ...form, macAddress: e.target.value.toUpperCase() })} placeholder="e.g. A4:5E:60:11:8C:23 or L30325BT00423" className={`${inputCls} font-mono`} />
               </Field>
               <Field label="Project / Camp Location *">
                 <select
