@@ -78,6 +78,48 @@ async function main() {
   console.log(`✓ connected as ${env.ORACLE_CMS_USER}\n`);
 
   try {
+    // 0. CONNECTION IDENTITY — which DB/host/service/user our app actually hits.
+    //    Compare this to where the DBA applied the grant (hrms.innovogroup.com).
+    console.log("=== 0. CONNECTION IDENTITY (what OUR app connects to) ===");
+    const id = await safeRun(
+      conn,
+      "identity",
+      `SELECT USER AS USR,
+              SYS_CONTEXT('USERENV','DB_NAME')       AS DB,
+              SYS_CONTEXT('USERENV','SERVICE_NAME')  AS SVC,
+              SYS_CONTEXT('USERENV','SERVER_HOST')   AS HOST,
+              SYS_CONTEXT('USERENV','CON_NAME')      AS PDB
+         FROM DUAL`,
+    );
+    const i = id[0] as any;
+    if (i) console.log(`   user=${i.USR}  db=${i.DB}  service=${i.SVC}  host=${i.HOST}  pdb=${i.PDB ?? "-"}`);
+    console.log(`   configured host=${env.ORACLE_CMS_HOST}  service=${env.ORACLE_CMS_SERVICE ?? "-"}  sid=${env.ORACLE_CMS_SID ?? "-"}`);
+
+    // 0b. Does THIS connection actually have SELECT on EMP_PHOTO? (the grant the
+    //     DBA showed was on hrms.innovogroup.com — is it the same instance?)
+    console.log("\n=== 0b. SELECT PRIVS this user holds on the photo/roster tables ===");
+    const privs = await safeRun(
+      conn,
+      "privs",
+      `SELECT owner, table_name, privilege
+         FROM all_tab_privs
+        WHERE grantee = USER
+          AND table_name IN ('EMP_PHOTO','CMS_EMPLOYEE_MASTER')
+        ORDER BY table_name`,
+    );
+    if (!privs.length) console.log("   (this user has NO direct SELECT on EMP_PHOTO / CMS_EMPLOYEE_MASTER here)");
+    for (const r of privs as any[]) console.log(`   ${r.OWNER}.${r.TABLE_NAME}  ${r.PRIVILEGE}`);
+
+    // 0c. Is EMP_PHOTO visible here at all (any schema / synonym / db-link)?
+    console.log("\n=== 0c. EMP_PHOTO objects visible here ===");
+    const ep = await safeRun(
+      conn,
+      "emp_photo objects",
+      `SELECT owner, object_name, object_type FROM all_objects WHERE object_name = 'EMP_PHOTO' ORDER BY owner`,
+    );
+    if (!ep.length) console.log("   (EMP_PHOTO not visible from this connection at all)");
+    for (const r of ep as any[]) console.log(`   ${r.OBJECT_TYPE.padEnd(7)} ${r.OWNER}.${r.OBJECT_NAME}`);
+
     // 1. BINARY columns — the primary signal for where an image is stored.
     console.log("=== 1. BINARY COLUMNS visible to this account (BLOB/RAW/LONG RAW/BFILE) ===");
     const bin = await safeRun(
