@@ -124,6 +124,21 @@ async function main() {
     for (const r of emps.slice(0, 60)) console.log(`   ${r.OBJECT_TYPE.padEnd(7)} ${r.OWNER}.${r.OBJECT_NAME}`);
     if (emps.length > 60) console.log(`   … and ${emps.length - 60} more`);
 
+    // 3b. EMP_PHOTO columns — the payoff once SELECT is granted: shows the
+    //     employee-number column and the BLOB column to configure.
+    console.log(`\n=== 3b. COLUMNS of ${PHOTO_TABLE} (once granted) ===`);
+    try {
+      const meta = await conn.execute(`SELECT * FROM ${PHOTO_TABLE} WHERE 1 = 0`);
+      const cols = (meta.metaData ?? []).map((m: any) => ({ name: m.name, type: m.dbTypeName ?? "?" }));
+      for (const c of cols) console.log(`   ${c.name.padEnd(24)} ${c.type}`);
+      const blob = cols.find((c: any) => /BLOB|LONG RAW|RAW|BFILE/i.test(c.type));
+      console.log(`\n   → BLOB column looks like: ${blob ? blob.name : "(none found)"}`);
+      console.log(`   → set ORACLE_CMS_PHOTO_COL=<blob col>, ORACLE_CMS_PHOTO_EMPID_COL=<employee-number col>`);
+    } catch (e: any) {
+      console.log(`   ✗ ${String(e?.message ?? e).split("\n")[0]}`);
+      console.log(`   → still not granted? ask the DBA: GRANT SELECT ON ${PHOTO_TABLE} TO ${env.ORACLE_CMS_USER};`);
+    }
+
     // 4. CMS_EMPLOYEE_MASTER columns — find the empid key (+ any inline photo).
     console.log(`\n=== 4. COLUMNS of ${TABLE} (find the empid key) ===`);
     try {
