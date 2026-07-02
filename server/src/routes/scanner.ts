@@ -73,48 +73,24 @@ router.get("/managers", async (_req, res, next) => {
 });
 
 // ---------- LOGIN ----------
-// Body: { managerId, pin, deviceMac }   (deviceMac is REQUIRED)
+// Body: { managerId, pin, deviceMac? }   (deviceMac is OPTIONAL and IGNORED)
 // Returns: { token, manager, device, camp }
 //
-// The scanner cannot log in unless its MAC is registered in the Devices table.
-// This is the only enrolment gate — operators can't bypass it by skipping the
-// MAC entry.
+// The device MAC is no longer an enrolment gate — the scanner does NOT need to
+// be registered in the Devices table. The session's site (meal windows + parent
+// company) comes from the MANAGER's assigned camp. deviceMac is accepted for
+// backward-compat and echoed back, but never validated.
 const loginSchema = z.object({
   managerId: z.string().min(1),
   pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
-  deviceMac: z.string().min(1, "Device MAC is required"),
+  deviceMac: z.string().optional(),
 });
 
 router.post("/login", async (req, res, next) => {
   try {
     const { managerId, pin, deviceMac } = loginSchema.parse(req.body);
 
-    // 1) Device gate FIRST — surface the clear error before checking PIN so
-    //    operators understand the problem isn't their credentials.
-    const device = await prisma.device.findFirst({
-      where: { macAddress: { equals: deviceMac, mode: "insensitive" } },
-      select: { id: true, name: true, campCode: true, projectCode: true, model: true, serial: true },
-    });
-    if (!device) {
-      return res.status(403).json({
-        error: "Device not registered",
-        reason: "device_not_registered",
-        message: "Ask an admin to register this device in the web app first.",
-      });
-    }
-    // The device is anchored to a site — a camp OR a project. Resolve it now so
-    // we have the meal windows + parent company for this session.
-    const siteCode = device.campCode ?? device.projectCode;
-    const site = await resolveSite(siteCode);
-    if (!site) {
-      return res.status(403).json({
-        error: "Device not bound to a site",
-        reason: "device_no_site",
-        message: "This device isn't bound to a camp or project. Ask an admin to set its location.",
-      });
-    }
-
-    // 2) Credentials.
+    // 1) Credentials.
     const manager = await prisma.campManager.findUnique({
       where: { id: managerId },
       select: {
@@ -134,13 +110,21 @@ router.post("/login", async (req, res, next) => {
       return res.status(401).json({ error: "Invalid manager or PIN" });
     }
 
-    // Scans always belong to the SITE the DEVICE is bound to — the device is the
-    // physical anchor, so reports stay honest even for a supplier assigned
-    // elsewhere. For a camp site, warn if it's outside the supplier's camp set
-    // (cosmetic only). Project sites never raise the warning.
+    // 2) Site = the manager's assigned camp (primary campCode, else first of the
+    //    supplier's camp set). The device MAC is ignored entirely.
+    const siteCode = manager.campCode ?? manager.camps[0]?.code ?? null;
+    const site = await resolveSite(siteCode);
+    if (!site) {
+      return res.status(403).json({
+        error: "No site for this session",
+        reason: "manager_no_site",
+        message: "This manager isn't assigned to a camp or project. Ask an admin to set it.",
+      });
+    }
+
+    // Scans belong to the manager's own camp, so there is never a mismatch.
     const sessionCampCode = site.code;
-    const campSet = new Set([manager.campCode, ...manager.camps.map((c) => c.code)]);
-    const campMismatch = site.siteType === "camp" ? !campSet.has(site.code) : false;
+    const campMismatch = false;
 
     // Camp-shaped site object the scanner app renders (name + meal windows).
     const camp = {
@@ -164,6 +148,18 @@ router.post("/login", async (req, res, next) => {
       siteType: site.siteType,
       companyCode: site.companyCode,
     });
+
+    // Synthetic device row so the client keeps its expected shape (no Devices
+    // table row is required anymore).
+    const device = {
+      id: null,
+      name: "Scanner",
+      campCode: site.siteType === "camp" ? site.code : null,
+      projectCode: site.siteType === "project" ? site.code : null,
+      model: null,
+      serial: null,
+      macAddress: deviceMac ?? null,
+    };
 
     res.json({
       token,
