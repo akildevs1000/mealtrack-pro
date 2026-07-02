@@ -389,6 +389,16 @@ export function employeePhotoUrl(laborCode: string): string {
   return `${API_BASE}/employees/photo/${encodeURIComponent(laborCode)}`;
 }
 
+/**
+ * Photo URL for the printable access card: the live Oracle CMS EMP_PHOTO if the
+ * backend can reach Oracle, falling back server-side to a manually-uploaded disk
+ * photo, else 404. Usable directly in `<img src>` — render with an onError
+ * fallback to the placeholder icon.
+ */
+export function employeeCardPhotoUrl(laborCode: string): string {
+  return `${API_BASE}/employees/${encodeURIComponent(laborCode)}/cms-photo`;
+}
+
 /** Upload/replace an employee's profile photo. `dataUrl` is a base64 data URL. */
 export function useSetEmployeePhoto() {
   const qc = useQueryClient();

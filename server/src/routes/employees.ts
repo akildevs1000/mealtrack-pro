@@ -11,6 +11,7 @@ import {
   safeCode,
   writePhoto,
 } from "../lib/employee-photos.js";
+import { fetchCmsPhoto, isCmsPhotoConfigured } from "../lib/cms-oracle-photo.js";
 
 const router = Router();
 
@@ -33,6 +34,53 @@ router.get("/photo/:file", (req, res, next) => {
     res.set("Cache-Control", "no-cache");
     res.sendFile(found.file);
   } catch (e) { next(e); }
+});
+
+// ---- Access-card photo: live from Oracle CMS, disk upload as fallback -------
+// PUBLIC GET (same reason as /photo above — used in <img> on the printable
+// access card, which can't attach a Bearer token). Resolution order:
+//   1. live EMP_PHOTO blob from Oracle CMS (fetchCmsPhoto), else
+//   2. a manually-uploaded photo on disk (findPhotoFile), else
+//   3. 404 → the card renders its placeholder icon.
+// On staging / any host where Oracle isn't configured, step 1 is skipped and it
+// behaves exactly like the disk photo route.
+router.get("/:code/cms-photo", async (req, res, next) => {
+  try {
+    const code = safeCode(req.params.code);
+    if (!code) return res.status(400).json({ error: "Invalid code" });
+
+    const emp = await prisma.cmsEmployee.findFirst({
+      where: { laborCode: code },
+      select: { laborId: true, laborCode: true },
+    });
+
+    // 1. Live CMS photo. Oracle hiccups must not break the card — fall through.
+    if (emp && isCmsPhotoConfigured()) {
+      try {
+        const photo = await fetchCmsPhoto(emp);
+        if (photo) {
+          res.type(photo.mime);
+          res.set("Cache-Control", "private, max-age=300");
+          return res.send(photo.bytes);
+        }
+      } catch (err) {
+        console.error(`cms-photo: Oracle fetch failed for ${code}:`, (err as Error)?.message ?? err);
+      }
+    }
+
+    // 2. Manually-uploaded disk photo as fallback.
+    const found = findPhotoFile(code);
+    if (found) {
+      res.type(found.mime);
+      res.set("Cache-Control", "no-cache");
+      return res.sendFile(found.file);
+    }
+
+    // 3. Nothing available.
+    return res.status(404).json({ error: "No photo" });
+  } catch (e) {
+    next(e);
+  }
 });
 
 router.use(requireAuth);

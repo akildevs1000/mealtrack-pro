@@ -13,7 +13,7 @@ import { useSession } from "@/lib/session";
 import { CmsSyncCard } from "@/components/app/CmsSyncCard";
 import {
   useEmployees, useEmployeesMeta, useEmployeeMeals, useImportEmployees, useUpdateEmployee, useCompanies,
-  useSetEmployeePhoto, useDeleteEmployeePhoto, employeePhotoUrl,
+  useSetEmployeePhoto, useDeleteEmployeePhoto, employeePhotoUrl, employeeCardPhotoUrl,
   type CmsEmployee, type MealRecord, type EmployeeImportRow, type EmployeeUpdate,
 } from "@/lib/hooks";
 
@@ -892,16 +892,18 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
   );
 }
 
-// Photo for the printable access card: the uploaded photo if present, else the
-// gray placeholder icon. Fills the circular frame from AccessCard.
+// Photo for the printable access card: the live Oracle CMS photo, falling back
+// (server-side) to a manually-uploaded disk photo, else the gray placeholder
+// icon. Always attempts the fetch — CMS photos aren't reflected in emp.hasPhoto
+// (that flag only tracks disk uploads). Fills the circular frame from AccessCard.
 function CardPhoto({ emp }: { emp: CmsEmployee }) {
   const [failed, setFailed] = useState(false);
-  if (!emp.hasPhoto || failed) {
+  if (failed) {
     return <UserIcon style={{ width: "60%", height: "60%", color: "#94a3b8" }} strokeWidth={1.25} />;
   }
   return (
     <img
-      src={employeePhotoUrl(emp.laborCode)}
+      src={employeeCardPhotoUrl(emp.laborCode)}
       alt={emp.name}
       onError={() => setFailed(true)}
       style={{ width: "100%", height: "100%", objectFit: "cover" }}
