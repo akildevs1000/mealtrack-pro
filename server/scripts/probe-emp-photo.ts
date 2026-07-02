@@ -21,7 +21,8 @@
 // must run on the whitelisted CMS app server.
 
 import "dotenv/config";
-import { connectionAttrs, isOracleConfigured } from "../src/lib/cms-oracle.js";
+import { isOracleConfigured } from "../src/lib/cms-oracle.js";
+import { photoConnectionAttrs } from "../src/lib/cms-oracle-photo.js";
 
 const env = process.env;
 const TABLE = env.ORACLE_CMS_TABLE || "CMS_EMPLOYEE_MASTER";
@@ -72,8 +73,8 @@ async function main() {
   oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
   oracledb.fetchAsBuffer = [oracledb.BLOB];
 
-  console.log("→ connecting to Oracle…");
-  const conn = await oracledb.getConnection(connectionAttrs());
+  console.log(`→ connecting to Oracle… ${env.ORACLE_CMS_PHOTO_HOST ? `(photo host ${env.ORACLE_CMS_PHOTO_HOST})` : "(roster connection)"}`);
+  const conn = await oracledb.getConnection(photoConnectionAttrs());
   conn.callTimeout = Number(env.ORACLE_CMS_CALL_TIMEOUT_MS || 60_000);
   console.log(`✓ connected as ${env.ORACLE_CMS_USER}\n`);
 
@@ -101,7 +102,7 @@ async function main() {
     const privs = await safeRun(
       conn,
       "privs",
-      `SELECT owner, table_name, privilege
+      `SELECT table_schema AS owner, table_name, privilege
          FROM all_tab_privs
         WHERE grantee = USER
           AND table_name IN ('EMP_PHOTO','CMS_EMPLOYEE_MASTER')

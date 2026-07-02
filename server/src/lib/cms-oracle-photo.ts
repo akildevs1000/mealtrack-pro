@@ -15,6 +15,31 @@ import { connectionAttrs, isOracleConfigured } from "./cms-oracle.js";
 
 const env = process.env;
 
+// The photos may live on a DIFFERENT Oracle instance than the roster (at Innovo
+// the roster is on CMSDB @ cms-db, but EMP_PHOTO is on the HRMS box
+// hrms.innovogroup.com). If ORACLE_CMS_PHOTO_HOST is set we open a dedicated
+// connection to that instance; otherwise we reuse the roster connection.
+export function photoConnectionAttrs() {
+  const host = env.ORACLE_CMS_PHOTO_HOST;
+  if (!host) return connectionAttrs();
+
+  const port = Number(env.ORACLE_CMS_PHOTO_PORT || env.ORACLE_CMS_PORT || 1521);
+  const sdu = Number(env.ORACLE_CMS_SDU || 1400);
+  const service = env.ORACLE_CMS_PHOTO_SERVICE;
+  const sid = env.ORACLE_CMS_PHOTO_SID;
+  const connectData = service ? `(SERVICE_NAME=${service})` : `(SID=${sid || "hrms"})`;
+  const connectString =
+    env.ORACLE_CMS_PHOTO_CONNECT_STRING ||
+    `(DESCRIPTION=(SDU=${sdu})(ADDRESS=(PROTOCOL=TCP)(HOST=${host})(PORT=${port}))(CONNECT_DATA=${connectData}))`;
+
+  return {
+    user: env.ORACLE_CMS_PHOTO_USER || env.ORACLE_CMS_USER,
+    password: env.ORACLE_CMS_PHOTO_PASSWORD || env.ORACLE_CMS_PASSWORD,
+    connectString,
+    disableOOB: true,
+  };
+}
+
 const PHOTO_TABLE = env.ORACLE_CMS_PHOTO_TABLE || "EMP_PHOTO";
 const PHOTO_COL = env.ORACLE_CMS_PHOTO_COL || "PHOTO";
 const EMPID_COL = env.ORACLE_CMS_PHOTO_EMPID_COL || "EMP_ID";
@@ -75,7 +100,7 @@ export async function fetchCmsPhoto(emp: {
 
   let conn: any;
   try {
-    conn = await oracledb.getConnection(connectionAttrs());
+    conn = await oracledb.getConnection(photoConnectionAttrs());
     conn.callTimeout = Number(env.ORACLE_CMS_PHOTO_TIMEOUT_MS || env.ORACLE_CMS_CALL_TIMEOUT_MS || 30_000);
 
     const result = await conn.execute(buildQuery(), { id: keyVal }, { maxRows: 1 });
