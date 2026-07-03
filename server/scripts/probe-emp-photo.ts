@@ -192,12 +192,44 @@ async function main() {
       console.log(`   ✗ ${String(e?.message ?? e).split("\n")[0]}`);
     }
 
-    // 5. Optional photo-fetch test (only once the table/col/key are known).
+    // 5. Photo-fetch test + join diagnosis (once the table/cols are configured).
     const empidArg = argVal("--empid");
     const empArg = argVal("--emp");
     const blobCol = env.ORACLE_CMS_PHOTO_COL;
     const empidCol = env.ORACLE_CMS_PHOTO_EMPID_COL;
     let empid = empidArg;
+    let sampledIds: string[] = [];
+
+    // 4b. JOIN DIAGNOSIS — which master column does EMP_PHOTO.<empidCol> match?
+    //     Sample real ids from the photo table (can't filter on the LONG column)
+    //     and cross-reference them against the master's LABOR_ID / LABOR_CODE.
+    if (env.ORACLE_CMS_PHOTO_TABLE && blobCol && empidCol) {
+      console.log(`\n=== 4b. JOIN DIAGNOSIS — how ${PHOTO_TABLE}.${empidCol} maps to ${TABLE} ===`);
+      const samples = await safeRun(
+        conn,
+        "sample empids",
+        `SELECT ${empidCol} AS EMPID FROM ${PHOTO_TABLE} WHERE ROWNUM <= 5`,
+      );
+      sampledIds = samples.map((s: any) => s.EMPID).filter((v: any) => v != null).map(String);
+      console.log(`   sample ${empidCol} values: ${sampledIds.join(", ") || "(none)"}`);
+      if (sampledIds.length) {
+        const inNums = sampledIds.map(Number).filter((n) => Number.isFinite(n)).join(",");
+        const inStrs = sampledIds.map((v) => `'${v.replace(/'/g, "''")}'`).join(",");
+        const m = await safeRun(
+          conn,
+          "master cross-ref",
+          `SELECT LABOR_ID, LABOR_CODE, EMPNAME FROM ${TABLE}
+            WHERE ${inNums ? `LABOR_ID IN (${inNums})` : "1=0"} OR LABOR_CODE IN (${inStrs})`,
+        );
+        if (!m.length) console.log("   → these ids match NEITHER LABOR_ID nor LABOR_CODE in the master.");
+        for (const r of m as any[]) {
+          const byId = sampledIds.includes(String(r.LABOR_ID));
+          const byCode = sampledIds.includes(String(r.LABOR_CODE));
+          const tag = byId ? "← matches LABOR_ID" : byCode ? "← matches LABOR_CODE" : "";
+          console.log(`   ${r.EMPNAME}: LABOR_ID=${r.LABOR_ID} LABOR_CODE=${r.LABOR_CODE}  ${tag}`);
+        }
+      }
+    }
 
     if (empArg && !empid) {
       const empidMasterCol = env.ORACLE_CMS_COL_EMPID || "EMP_ID";
@@ -212,7 +244,13 @@ async function main() {
       console.log(empid ? `   → empid = ${empid}` : "   → no match (check ORACLE_CMS_COL_EMPID / _LABOR_CODE)");
     }
 
-    if ((empidArg || empArg) && empid && env.ORACLE_CMS_PHOTO_TABLE && blobCol && empidCol) {
+    // No id given → use a sampled photo id so we can prove the fetch works.
+    if (!empid && !empArg && sampledIds.length) {
+      empid = sampledIds[0];
+      console.log(`\n→ auto-sampled empid ${empid} from ${PHOTO_TABLE}`);
+    }
+
+    if (empid && env.ORACLE_CMS_PHOTO_TABLE && blobCol && empidCol) {
       console.log(`\n=== 5. FETCH TEST — ${PHOTO_TABLE}.${blobCol} WHERE ${empidCol} = ${empid} ===`);
       try {
         const r = await conn.execute(
