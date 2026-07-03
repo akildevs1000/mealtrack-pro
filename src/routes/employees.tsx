@@ -810,6 +810,11 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
   // The printed card shows only the first two words of the name to keep it on
   // one line within the fixed card width.
   const cardName = (employee.name || "").trim().split(/\s+/).slice(0, 2).join(" ") || employee.name;
+  // Real company name for the card footer (falls back to the company code, then
+  // the campName, if the Company row has no readable name).
+  const { data: companies = [] } = useCompanies();
+  const companyName =
+    companies.find((c) => c.code === employee.company)?.name || employee.company || employee.campName || "";
 
   return (
     <div
@@ -862,30 +867,22 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
         </div>
       </div>
 
-      <div className="text-center" style={{ position: "absolute", left: 0, right: 0, bottom: "3mm" }}>
+      <div
+        className="text-center"
+        style={{ position: "absolute", left: 0, right: 0, bottom: "3mm", padding: "0 3mm" }}
+      >
         <div
           style={{
             color: brandPrimary,
             fontFamily: '"Montserrat", "Inter", system-ui, sans-serif',
-            lineHeight: 1,
-            letterSpacing: "-0.02em",
+            fontWeight: 800,
+            fontSize: "13px",
+            lineHeight: 1.15,
+            letterSpacing: "-0.01em",
+            textTransform: "uppercase",
           }}
         >
-          <span style={{ fontWeight: 800, fontSize: "23px", textTransform: "lowercase" }}>i</span>
-          <span style={{ fontWeight: 800, fontSize: "30px", textTransform: "lowercase" }}>nnovo</span>
-          <span style={{ fontWeight: 800, fontSize: "24px", textTransform: "uppercase", letterSpacing: "0.02em", marginLeft: "1.4mm" }}>MEP</span>
-        </div>
-        <div
-          style={{
-            fontFamily: '"Montserrat", "Inter", system-ui, sans-serif',
-            fontSize: "11px",
-            fontWeight: "bold",
-            color: "#000",
-            marginTop: "1mm",
-            letterSpacing: "0.02em",
-          }}
-        >
-          innovogroup.com
+          {companyName}
         </div>
       </div>
     </div>
