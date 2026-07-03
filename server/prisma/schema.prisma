@@ -208,6 +208,7 @@ model CmsEmployee {
   laborCode       String             @unique
   name            String
   designation     String
+  grade           String?            // CMS GRADE column (nullable — not every row has one)
   doj             DateTime
   campCode        String             // e.g. "CAMP 19"
   campName        String

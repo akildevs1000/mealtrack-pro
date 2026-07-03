@@ -82,6 +82,7 @@ export type CmsEmployee = {
   laborCode: string;
   name: string;
   designation: string;
+  grade: string | null;
   doj: string;
   campCode: string;
   campName: string;
@@ -325,6 +326,7 @@ export type EmployeeImportRow = {
   laborCode: string;
   name: string;
   designation: string;
+  grade?: string | null;
   doj: string;             // YYYY-MM-DD
   campCode: string;
   campName: string;

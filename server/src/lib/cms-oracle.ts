@@ -19,6 +19,7 @@ export interface CmsRow {
   laborCode: string;
   name: string;
   designation: string;
+  grade: string | null;
   doj: Date;
   campCode: string;
   campName: string;
@@ -76,6 +77,7 @@ const COL = {
   laborCode: env.ORACLE_CMS_COL_LABOR_CODE || "LABOR_CODE",
   name: env.ORACLE_CMS_COL_NAME || "NAME",
   designation: env.ORACLE_CMS_COL_DESIGNATION || "DESIGNATION",
+  grade: env.ORACLE_CMS_COL_GRADE || "GRADE",
   doj: env.ORACLE_CMS_COL_DOJ || "DOJ",
   campCode: env.ORACLE_CMS_COL_CAMP_CODE || "CAMP_CODE",
   campName: env.ORACLE_CMS_COL_CAMP_NAME || "CAMP_NAME",
@@ -95,6 +97,7 @@ function buildQuery(): string {
       ${COL.laborCode}      AS LABOR_CODE,
       ${COL.name}           AS EMP_NAME,
       ${COL.designation}    AS DESIGNATION,
+      ${COL.grade}          AS GRADE,
       ${COL.doj}            AS DOJ,
       ${COL.campCode}       AS CAMP_CODE,
       ${COL.campName}       AS CAMP_NAME,
@@ -199,6 +202,7 @@ export async function fetchCmsEmployees(): Promise<FetchResult> {
         laborCode,
         name: str(r.EMP_NAME),
         designation: str(r.DESIGNATION),
+        grade: str(r.GRADE) || null,
         doj: dateOnly(doj)!,
         campCode: str(r.CAMP_CODE),
         campName: str(r.CAMP_NAME),

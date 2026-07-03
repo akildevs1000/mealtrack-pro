@@ -860,7 +860,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
         <div className="text-[12.5px] font-bold" style={{ lineHeight: 1.4 }}>
           <div>{employee.laborCode}</div>
           <div>DOJ: {dojFormatted}</div>
-          <div>Grade: —</div>
+          <div>Grade: {employee.grade || "—"}</div>
         </div>
         <div className="bg-white">
           <QRCodeSVG value={employee.laborCode} size={50} />
@@ -1177,6 +1177,7 @@ const COLUMN_ALIASES: Record<keyof EmployeeImportRow, string[]> = {
   laborCode: ["laborcode", "labor_code", "labourcode", "labour_code"],
   name: ["empname", "name", "employee_name", "employeename"],
   designation: ["designation", "designaiton", "desig"],
+  grade: ["grade"],
   doj: ["doj", "date_of_joining", "dateofjoining", "joindate", "join_date"],
   campCode: ["campcode", "camp_code"],
   campName: ["campname", "camp_name"],
@@ -1278,6 +1279,7 @@ function parseEmployeeWorkbook(buf: ArrayBuffer): { rows: EmployeeImportRow[]; w
       laborCode: String(get("laborCode") ?? "").trim(),
       name: String(get("name") ?? "").trim(),
       designation: String(get("designation") ?? "").trim(),
+      grade: String(get("grade") ?? "").trim() || null,
       doj,
       campCode: String(get("campCode") ?? "").trim(),
       campName: String(get("campName") ?? "").trim(),

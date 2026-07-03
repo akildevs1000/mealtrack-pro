@@ -73,6 +73,7 @@ export async function runCmsSync(): Promise<SyncSummary> {
         laborCode: r.laborCode,
         name: r.name,
         designation: r.designation,
+        grade: r.grade,
         doj: r.doj,
         campCode: r.campCode,
         campName: r.campName,
