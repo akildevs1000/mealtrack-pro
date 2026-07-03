@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from "@tanstack/react-router";
+import { Link, Navigate, Outlet, useLocation } from "@tanstack/react-router";
 import {
   LayoutDashboard, Users, BuildingIcon, Building2, FolderKanban, Smartphone, FileBarChart, CalendarRange,
   Bell, Settings, UtensilsCrossed, Moon, Sun, Search, KeyRound, ShieldCheck,
@@ -27,6 +27,27 @@ export function AppLayout() {
     <SessionProvider>
       <AppLayoutInner />
     </SessionProvider>
+  );
+}
+
+// Shown when a signed-in user has no viewable tab at all (every permission off).
+function NoAccess({ onLogout }: { onLogout: () => void }) {
+  return (
+    <div className="min-h-screen grid place-items-center bg-background text-center px-6">
+      <div className="max-w-sm">
+        <ShieldCheck className="size-10 text-muted-foreground mx-auto mb-4" />
+        <h1 className="text-lg font-semibold">No access</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Your account doesn't have permission to view any section. Ask an admin to grant access.
+        </p>
+        <button
+          onClick={onLogout}
+          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium hover:bg-secondary/80"
+        >
+          <LogOut className="size-4" /> Sign out
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -59,6 +80,23 @@ function Shell() {
   if (!session.currentUser) return null;
 
   const visibleNav = nav.filter((n) => session.can(n.key, "view"));
+
+  // Central route guard: hiding a sidebar tab isn't enough — the route itself
+  // must be blocked, or a user can still reach it via a direct URL or the
+  // "/" → "/overview" redirect. If the current path maps to a gated tab the
+  // user can't view, bounce them to their first allowed tab (or a no-access
+  // screen if they have none). Non-tab routes pass through untouched.
+  const currentTab = nav.find(
+    (n) => location.pathname === n.to || location.pathname.startsWith(`${n.to}/`),
+  );
+  if (currentTab && !session.can(currentTab.key, "view")) {
+    return visibleNav[0] ? (
+      <Navigate to={visibleNav[0].to} replace />
+    ) : (
+      <NoAccess onLogout={session.logout} />
+    );
+  }
+
   const initials = session.currentUser.name
     .split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 
