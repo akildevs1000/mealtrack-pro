@@ -873,13 +873,17 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
       >
         <div
           style={{
-            color: brandPrimary,
+            // Pure black + moderate weight + slight positive tracking prints
+            // sharpest on ID-card printers (coloured/extra-bold small text
+            // renders soft). geometricPrecision keeps the glyphs crisp.
+            color: "#000000",
             fontFamily: '"Montserrat", "Inter", system-ui, sans-serif',
-            fontWeight: 800,
+            fontWeight: 700,
             fontSize: "13px",
-            lineHeight: 1.15,
-            letterSpacing: "-0.01em",
+            lineHeight: 1.2,
+            letterSpacing: "0.02em",
             textTransform: "uppercase",
+            textRendering: "geometricPrecision",
           }}
         >
           {companyName}
