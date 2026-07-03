@@ -903,7 +903,9 @@ function CardPhoto({ emp }: { emp: CmsEmployee }) {
       src={employeeCardPhotoUrl(emp.laborCode)}
       alt={emp.name}
       onError={() => setFailed(true)}
-      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      // Bias the crop toward the top so the top of the head isn't cut off inside
+      // the circular frame (keeps the circle fully filled, no gaps).
+      style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }}
     />
   );
 }
