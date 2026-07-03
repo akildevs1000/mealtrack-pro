@@ -68,23 +68,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const loadSession = async () => {
     try {
       const user = await api<AppUser>("/auth/me");
-      // Permissions endpoint is admin-only; non-admins use a sensible default
-      // matrix matching the seed defaults for their role.
+      // Load the real DB permission matrix. Admins can read all roles
+      // (/permissions/all); everyone else reads just their own role
+      // (/permissions/me) so the UI reflects what the admin actually
+      // configured — NOT a hardcoded default that would over-grant access.
       let perms = emptyMatrix();
-      try {
-        const matrix = await api<Record<string, Record<string, Perm>>>("/users/permissions/all");
-        // Only override what the API actually returned. For tabs the DB
-        // hasn't been seeded with yet, keep the emptyMatrix() defaults
-        // (admin: ALL, others: NONE) so a freshly-deployed tab isn't dead
-        // for admins until ensureDefaultPermissions catches up.
+      const applyMatrix = (matrix: Record<string, Record<string, Perm>>) => {
+        // Only override what the API returned; unseeded tabs keep emptyMatrix()
+        // defaults (admin: ALL, others: NONE) so a freshly-deployed tab isn't
+        // dead for admins until ensureDefaultPermissions catches up.
         for (const role of Object.keys(perms) as Role[]) {
           for (const t of TABS) {
             const apiPerm = matrix[role]?.[t.key];
             if (apiPerm) perms[role][t.key] = apiPerm;
           }
         }
+      };
+      try {
+        const endpoint =
+          user.role === "admin" ? "/users/permissions/all" : "/users/permissions/me";
+        applyMatrix(await api<Record<string, Record<string, Perm>>>(endpoint));
       } catch {
-        // Non-admin: derive perms from a static default that matches the seed.
+        // Network/endpoint failure only — fall back to the seed-matching default.
         perms = defaultPermsFor(user.role);
       }
       setState({ status: "authenticated", user, perms });

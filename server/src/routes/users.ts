@@ -113,6 +113,22 @@ router.get("/permissions/all", requireRole("admin"), async (_req, res, next) => 
   } catch (e) { next(e); }
 });
 
+// The CALLER's own role permissions — readable by any authenticated user (not
+// just admins) so the client can gate the UI to what the admin actually
+// configured for that role, instead of a hardcoded default. Shape matches
+// /permissions/all but only for the caller's role: { role: { tab: {…} } }.
+router.get("/permissions/me", async (req, res, next) => {
+  try {
+    const role = req.user!.role;
+    const perms = await prisma.rolePermission.findMany({ where: { role } });
+    const out: Record<string, Record<string, { view: boolean; edit: boolean; delete: boolean }>> = {
+      [role]: {},
+    };
+    for (const p of perms) out[role][p.tab] = { view: p.view, edit: p.edit, delete: p.delete };
+    res.json(out);
+  } catch (e) { next(e); }
+});
+
 const setPermSchema = z.object({
   role: z.enum(["admin", "operator", "user", "manager"]),
   tab: z.string(),
