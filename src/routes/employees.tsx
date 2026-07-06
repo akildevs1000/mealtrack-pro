@@ -16,6 +16,7 @@ import {
   useSetEmployeePhoto, useDeleteEmployeePhoto, employeePhotoUrl, employeeCardPhotoUrl,
   type CmsEmployee, type MealRecord, type EmployeeImportRow, type EmployeeUpdate,
 } from "@/lib/hooks";
+import { INNOVO_LOGO } from "@/lib/innovo-logo";
 
 export const Route = createFileRoute("/employees")({
   component: EmployeesPage,
@@ -803,18 +804,25 @@ function PrintCardDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () => vo
   );
 }
 
+// The card footer reads "innovo <DIVISION>" where the division word comes from
+// the employee's parent company (e.g. IMEP → MEP, INNOVOBLD → BUILD). Unknown
+// companies just show the innovo wordmark with no division word.
+const DIVISION_BY_COMPANY: Record<string, string> = {
+  IMEP: "MEP",
+  INNOVOBLD: "BUILD",
+};
+function divisionFor(company: string): string {
+  return DIVISION_BY_COMPANY[(company || "").toUpperCase().trim()] ?? "";
+}
+
 function AccessCard({ employee }: { employee: CmsEmployee }) {
   const doj = employee.doj ? String(employee.doj).slice(0, 10) : null;
   const dojFormatted = doj ? `${doj.slice(8, 10)}/${doj.slice(5, 7)}/${doj.slice(0, 4)}` : "—";
-  const brandPrimary = "#0e7490";
   // The printed card shows only the first two words of the name to keep it on
   // one line within the fixed card width.
   const cardName = (employee.name || "").trim().split(/\s+/).slice(0, 2).join(" ") || employee.name;
-  // Real company name for the card footer (falls back to the company code, then
-  // the campName, if the Company row has no readable name).
-  const { data: companies = [] } = useCompanies();
-  const companyName =
-    companies.find((c) => c.code === employee.company)?.name || employee.company || employee.campName || "";
+  // Division word under the innovo logo, derived from the employee's company.
+  const division = divisionFor(employee.company);
 
   return (
     <div
@@ -833,8 +841,8 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
       <div className="flex justify-center relative" style={{ marginTop: "2mm" }}>
         <div
           style={{
-            width: "34mm",
-            height: "34mm",
+            width: "30mm",
+            height: "30mm",
             borderRadius: "50%",
             overflow: "hidden",
             backgroundColor: "#f8fafc",
@@ -856,7 +864,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
         </div>
       </div>
 
-      <div className="flex justify-between items-end gap-2" style={{ marginTop: "2.5mm" }}>
+      <div className="flex justify-between items-end gap-2" style={{ marginTop: "2mm" }}>
         <div className="text-[12.5px] font-bold" style={{ lineHeight: 1.4 }}>
           <div>{employee.laborCode}</div>
           <div>DOJ: {dojFormatted}</div>
@@ -869,24 +877,41 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
 
       <div
         className="text-center"
-        style={{ position: "absolute", left: 0, right: 0, bottom: "3mm", padding: "0 3mm" }}
+        style={{ position: "absolute", left: 0, right: 0, bottom: "2.5mm", padding: "0 3mm" }}
       >
+        <img
+          src={INNOVO_LOGO}
+          alt="innovo"
+          style={{ display: "block", width: "30mm", height: "auto", margin: "0 auto" }}
+        />
+        {division && (
+          <div
+            style={{
+              color: "#17469a",
+              fontFamily: "Arial, Helvetica, sans-serif",
+              fontWeight: 800,
+              fontSize: "17px",
+              letterSpacing: "0.03em",
+              textTransform: "uppercase",
+              marginTop: "0.5mm",
+              textRendering: "geometricPrecision",
+            }}
+          >
+            {division}
+          </div>
+        )}
         <div
           style={{
-            // Pure black + moderate weight + slight positive tracking prints
-            // sharpest on ID-card printers (coloured/extra-bold small text
-            // renders soft). geometricPrecision keeps the glyphs crisp.
-            color: "#000000",
-            fontFamily: '"Montserrat", "Inter", system-ui, sans-serif',
+            fontFamily: "Arial, Helvetica, sans-serif",
             fontWeight: 700,
-            fontSize: "13px",
-            lineHeight: 1.2,
-            letterSpacing: "0.02em",
-            textTransform: "uppercase",
+            fontSize: "12px",
+            color: "#000000",
+            marginTop: "1mm",
+            letterSpacing: "0.03em",
             textRendering: "geometricPrecision",
           }}
         >
-          {companyName}
+          innovogroup.com
         </div>
       </div>
     </div>
