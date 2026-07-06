@@ -887,7 +887,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
         {division && (
           <div
             style={{
-              color: "#17469a",
+              color: "#1a3a6e",
               fontFamily: "Arial, Helvetica, sans-serif",
               fontWeight: 800,
               fontSize: "17px",
