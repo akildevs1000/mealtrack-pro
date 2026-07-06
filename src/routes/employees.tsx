@@ -815,6 +815,18 @@ function divisionFor(company: string): string {
   return DIVISION_BY_COMPANY[(company || "").toUpperCase().trim()] ?? "";
 }
 
+// Shrink the designation so a long title stays on ONE line — a wrapped second
+// line pushes the meta row down and collides with the footer. Tuned to the card's
+// ~44mm printable width.
+function desigFontSize(text: string): string {
+  const n = (text || "").trim().length;
+  if (n <= 14) return "15px";
+  if (n <= 18) return "13px";
+  if (n <= 22) return "12px";
+  if (n <= 28) return "10px";
+  return "9px";
+}
+
 function AccessCard({ employee }: { employee: CmsEmployee }) {
   const doj = employee.doj ? String(employee.doj).slice(0, 10) : null;
   const dojFormatted = doj ? `${doj.slice(8, 10)}/${doj.slice(5, 7)}/${doj.slice(0, 4)}` : "—";
@@ -859,7 +871,16 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
 
       <div className="text-center" style={{ marginTop: "2mm" }}>
         <div className="text-[12px] font-bold leading-tight">{cardName}</div>
-        <div className="text-[15px] font-bold leading-tight" style={{ marginTop: "1mm" }}>
+        <div
+          className="font-bold leading-tight"
+          style={{
+            marginTop: "1mm",
+            fontSize: desigFontSize(employee.designation),
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
           {employee.designation || "—"}
         </div>
       </div>
