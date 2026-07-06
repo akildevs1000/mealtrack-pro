@@ -841,8 +841,8 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
       <div className="flex justify-center relative" style={{ marginTop: "2mm" }}>
         <div
           style={{
-            width: "30mm",
-            height: "30mm",
+            width: "26mm",
+            height: "26mm",
             borderRadius: "50%",
             overflow: "hidden",
             backgroundColor: "#f8fafc",
@@ -877,7 +877,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
 
       <div
         className="text-center"
-        style={{ position: "absolute", left: 0, right: 0, bottom: "1.5mm", padding: "0 3mm" }}
+        style={{ position: "absolute", left: 0, right: 0, bottom: "2.5mm", padding: "0 3mm" }}
       >
         <img
           src={INNOVO_LOGO}
