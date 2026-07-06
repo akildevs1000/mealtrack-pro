@@ -234,8 +234,5 @@
     page-break-after: avoid;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    /* Crisper glyph edges on card printers. */
-    text-rendering: geometricPrecision;
-    -webkit-font-smoothing: antialiased;
   }
 }

@@ -877,7 +877,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
 
       <div
         className="text-center"
-        style={{ position: "absolute", left: 0, right: 0, bottom: "2.5mm", padding: "0 3mm" }}
+        style={{ position: "absolute", left: 0, right: 0, bottom: "1.5mm", padding: "0 3mm" }}
       >
         <img
           src={INNOVO_LOGO}
@@ -894,7 +894,6 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
               letterSpacing: "0.03em",
               textTransform: "uppercase",
               marginTop: "0.5mm",
-              textRendering: "geometricPrecision",
             }}
           >
             {division}
@@ -904,11 +903,10 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
           style={{
             fontFamily: "Arial, Helvetica, sans-serif",
             fontWeight: 700,
-            fontSize: "12px",
+            fontSize: "14px",
             color: "#000000",
             marginTop: "1mm",
-            letterSpacing: "0.03em",
-            textRendering: "geometricPrecision",
+            letterSpacing: "0.01em",
           }}
         >
           innovogroup.com
