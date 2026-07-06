@@ -877,7 +877,7 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
 
       <div
         className="text-center"
-        style={{ position: "absolute", left: 0, right: 0, bottom: "2.5mm", padding: "0 3mm" }}
+        style={{ position: "absolute", left: 0, right: 0, bottom: "4mm", padding: "0 3mm" }}
       >
         <img
           src={INNOVO_LOGO}
