@@ -923,8 +923,8 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
         <div
           style={{
             fontFamily: "Arial, Helvetica, sans-serif",
-            fontWeight: 700,
-            fontSize: "14px",
+            fontWeight: 500,
+            fontSize: "11px",
             color: "#000000",
             marginTop: "1mm",
             letterSpacing: "0.01em",
