@@ -907,37 +907,52 @@ function Profile({ emp, canEdit, onEdit }: { emp: CmsEmployee; canEdit: boolean;
 }
 
 function PrintCardDialog({ emp, onClose }: { emp: CmsEmployee; onClose: () => void }) {
-  return (
-    <div
-      className="print-card-overlay fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur p-4"
-      onClick={onClose}
-    >
+  // Print through the SAME crisp path as bulk printing: a normal-flow card in a
+  // body-level #bulk-print-area. The old position:fixed print area rasterised
+  // the text (it came out light/broken); normal flow prints it as sharp vector.
+  useEffect(() => {
+    document.documentElement.classList.add("bulk-printing");
+    return () => document.documentElement.classList.remove("bulk-printing");
+  }, []);
+  return createPortal(
+    <>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-elegant overflow-hidden"
+        className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur p-4"
+        onClick={onClose}
       >
-        <div className="px-5 py-3 border-b border-border flex items-center justify-between">
-          <div className="font-display font-semibold">Access card</div>
-          <button onClick={onClose} className="size-7 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground">
-            <X className="size-4" />
-          </button>
-        </div>
-        <div className="flex justify-center bg-secondary/40 p-5">
-          <div id="print-card-area">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-elegant overflow-hidden"
+        >
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+            <div className="font-display font-semibold">Access card</div>
+            <button onClick={onClose} className="size-7 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground">
+              <X className="size-4" />
+            </button>
+          </div>
+          <div className="flex justify-center bg-secondary/40 p-5">
             <AccessCard employee={emp} />
           </div>
-        </div>
-        <div className="px-5 py-3 border-t border-border bg-secondary/30 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-sm hover:bg-secondary">Close</button>
-          <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow"
-          >
-            <Printer className="size-4" /> Print
-          </button>
+          <div className="px-5 py-3 border-t border-border bg-secondary/30 flex items-center justify-end gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-sm hover:bg-secondary">Close</button>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow"
+            >
+              <Printer className="size-4" /> Print
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Off-screen print area — identical crisp path used by bulk printing. */}
+      <div id="bulk-print-area">
+        <div className="bulk-card-page">
+          <AccessCard employee={emp} />
+        </div>
+      </div>
+    </>,
+    document.body,
   );
 }
 
