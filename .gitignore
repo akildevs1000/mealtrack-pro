@@ -36,3 +36,8 @@ dist-ssr
 .claude/settings.json
 scanner-zebra-version/MealPass-Scanner-v1.0.0-port5044.apk
 scanner-zebra-version/MealPass-Scanner-v1.0.1-photos.apk
+
+# local card-design scratch files
+sample-card.html
+innovo-logo.png
+innovo-clean.png
