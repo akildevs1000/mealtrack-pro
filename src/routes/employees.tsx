@@ -186,7 +186,11 @@ function EmployeesPage() {
         <select value={campFilter} onChange={(e) => setCampFilter(e.target.value)}
           className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none">
           <option value="all">All camps</option>
-          {camps.map((c) => <option key={c} value={c}>{c}</option>)}
+          {camps.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.name?.trim() ? `${c.code} — ${c.name.trim()}` : c.code}
+            </option>
+          ))}
         </select>
         <div className="ml-auto inline-flex rounded-lg border border-border bg-card p-1">
           <button

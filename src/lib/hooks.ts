@@ -309,7 +309,7 @@ export function useEmployees(params?: {
 
 export type EmployeesMeta = {
   counts: { total: number; active: number; inactive: number; leave: number };
-  camps: string[];
+  camps: { code: string; name: string }[];
 };
 
 /** Roster facets (status counts + distinct camp codes) for the Employees page. */

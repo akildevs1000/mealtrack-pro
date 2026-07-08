@@ -156,14 +156,14 @@ router.get("/meta", async (req, res, next) => {
       prisma.cmsEmployee.findMany({
         where,
         distinct: ["campCode"],
-        select: { campCode: true },
+        select: { campCode: true, campName: true },
         orderBy: { campCode: "asc" },
       }),
     ]);
 
     res.json({
       counts: { total, active, inactive, leave },
-      camps: campRows.map((c) => c.campCode),
+      camps: campRows.map((c) => ({ code: c.campCode, name: c.campName })),
     });
   } catch (e) { next(e); }
 });
