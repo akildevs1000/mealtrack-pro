@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Search, Users, Building2, Building, BadgeCheck, BadgeAlert, Briefcase, Calendar,
   IdCard, Coffee, UtensilsCrossed, Moon, Check, X,
@@ -469,53 +470,61 @@ function EmployeesPage() {
 // #bulk-print-area rules in styles.css). Reuses the same AccessCard as the
 // single-card print, so the design stays identical.
 function BulkPrintDialog({ employees, onClose }: { employees: CmsEmployee[]; onClose: () => void }) {
-  // While this dialog is open, mark <html> so the print stylesheet lets the page
-  // grow beyond one card (the single-card rule pins it to 85.6mm otherwise).
+  // While this dialog is open, mark <html> so the print stylesheet switches to
+  // bulk mode (multi-page, one card per sheet) without affecting single-card print.
   useEffect(() => {
     document.documentElement.classList.add("bulk-printing");
     return () => document.documentElement.classList.remove("bulk-printing");
   }, []);
-  return (
-    <div
-      className="print-card-overlay fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur p-4"
-      onClick={onClose}
-    >
+
+  // Portal to <body> so the print area (#bulk-print-area) is a DIRECT body child.
+  // That keeps it in normal flow at card width during print (so the @page card
+  // size is honoured and each card fills its own sheet) and lets the print CSS
+  // hide every other body child. On screen it's parked off-canvas so the photos
+  // still load. The small modal is the on-screen control.
+  return createPortal(
+    <>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-5xl max-h-[90vh] flex flex-col bg-card border border-border rounded-2xl shadow-elegant overflow-hidden"
+        className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur p-4"
+        onClick={onClose}
       >
-        <div className="px-5 py-3 border-b border-border flex items-center justify-between">
-          <div className="font-display font-semibold">
-            Print {employees.length} card{employees.length > 1 ? "s" : ""}
-          </div>
-          <button onClick={onClose} className="size-7 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground">
-            <X className="size-4" />
-          </button>
-        </div>
-        <div className="px-5 py-2 text-xs text-muted-foreground border-b border-border bg-secondary/30">
-          Wait for the photos to load, then Print. In the print dialog set <b>Margins → None</b>. Each card prints on its own page.
-        </div>
         <div
-          id="bulk-print-area"
-          className="flex-1 overflow-y-auto bg-secondary/40 p-4 flex flex-wrap gap-4 justify-center"
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-elegant overflow-hidden"
         >
-          {employees.map((emp) => (
-            <div className="bulk-card-page" key={emp.laborId}>
-              <AccessCard employee={emp} />
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+            <div className="font-display font-semibold">
+              Print {employees.length} card{employees.length > 1 ? "s" : ""}
             </div>
-          ))}
-        </div>
-        <div className="px-5 py-3 border-t border-border bg-secondary/30 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-sm hover:bg-secondary">Close</button>
-          <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow"
-          >
-            <Printer className="size-4" /> Print
-          </button>
+            <button onClick={onClose} className="size-7 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground">
+              <X className="size-4" />
+            </button>
+          </div>
+          <div className="px-5 py-4 text-sm text-muted-foreground space-y-2">
+            <p>Each card prints on its own card-size page.</p>
+            <p>Give the photos a moment to load, then click <b>Print</b>. In the print dialog choose your card printer and set <b>Margins → None</b>.</p>
+          </div>
+          <div className="px-5 py-3 border-t border-border bg-secondary/30 flex items-center justify-end gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-sm hover:bg-secondary">Close</button>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow"
+            >
+              <Printer className="size-4" /> Print
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <div id="bulk-print-area" aria-hidden>
+        {employees.map((emp) => (
+          <div className="bulk-card-page" key={emp.laborId}>
+            <AccessCard employee={emp} />
+          </div>
+        ))}
+      </div>
+    </>,
+    document.body,
   );
 }
 
