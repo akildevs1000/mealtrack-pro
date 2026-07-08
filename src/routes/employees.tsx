@@ -1029,7 +1029,12 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
           <div>Grade: {employee.grade || "—"}</div>
         </div>
         <div className="bg-white">
-          <QRCodeSVG value={employee.laborCode} size={50} />
+          <QRCodeSVG
+            value={employee.laborCode}
+            size={50}
+            // Red QR for meal-ineligible employees so it's obvious on the card.
+            fgColor={employee.mealsEligibility === "N" ? "#c1121f" : "#000000"}
+          />
         </div>
       </div>
 
