@@ -1093,10 +1093,11 @@ function CardPhoto({ emp }: { emp: CmsEmployee }) {
       src={employeeCardPhotoUrl(emp.laborCode)}
       alt={emp.name}
       onError={() => setFailed(true)}
-      // Anchor the crop to the TOP of the photo so the top of the head is never
-      // cut inside the circular frame (shoulders get cropped instead). Keeps the
-      // circle fully filled, no gaps.
-      style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
+      // Show the WHOLE photo (contain) rather than cropping to fill. Source
+      // photos are framed inconsistently, so any fill-crop cuts some heads —
+      // contain guarantees the full head is visible on every photo (at the cost
+      // of a little space around portraits that aren't square).
+      style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }}
     />
   );
 }
