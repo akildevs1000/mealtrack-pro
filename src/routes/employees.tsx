@@ -74,6 +74,30 @@ function EmployeesPage() {
   const [view, setView] = useState<"card" | "list">("list");
   const [selected, setSelected] = useState<CmsEmployee | null>(null);
   const [editing, setEditing] = useState<CmsEmployee | null>(null);
+
+  // Bulk card printing — a set of picked employees (keyed by laborId, full row
+  // data kept so the card can render). Kept SEPARATE from `selected` (the
+  // profile modal) so the existing row-click / profile / single-print flow is
+  // untouched. Selection persists across pages.
+  const [checked, setChecked] = useState<Map<number, CmsEmployee>>(new Map());
+  const [bulkPrint, setBulkPrint] = useState<CmsEmployee[] | null>(null);
+  const toggleChecked = (e: CmsEmployee) =>
+    setChecked((m) => {
+      const n = new Map(m);
+      if (n.has(e.laborId)) n.delete(e.laborId);
+      else n.set(e.laborId, e);
+      return n;
+    });
+  const pageChecked = rows.length > 0 && rows.every((e) => checked.has(e.laborId));
+  const togglePage = () =>
+    setChecked((m) => {
+      const n = new Map(m);
+      rows.forEach((e) => {
+        if (pageChecked) n.delete(e.laborId);
+        else n.set(e.laborId, e);
+      });
+      return n;
+    });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [importState, setImportState] = useState<
     | null
@@ -208,6 +232,31 @@ function EmployeesPage() {
         </div>
       </div>
 
+      {checked.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
+          <div className="text-sm">
+            <span className="font-semibold">{checked.size}</span> selected for printing
+            {view === "card" && (
+              <span className="text-muted-foreground"> · switch to List view to pick employees</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setChecked(new Map())}
+              className="px-3 py-1.5 rounded-lg text-sm hover:bg-secondary"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setBulkPrint([...checked.values()])}
+              className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-3.5 py-1.5 text-sm font-semibold shadow-glow"
+            >
+              <Printer className="size-4" /> Print {checked.size} card{checked.size > 1 ? "s" : ""}
+            </button>
+          </div>
+        </div>
+      )}
+
       {view === "card" ? (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-secondary/40">
@@ -271,6 +320,15 @@ function EmployeesPage() {
               <table className="w-full text-sm">
                 <thead className="bg-secondary/60 text-xs text-muted-foreground sticky top-0 z-10">
                   <tr className="text-left">
+                    <th className="px-4 py-2.5 font-medium w-10">
+                      <input
+                        type="checkbox"
+                        checked={pageChecked}
+                        onChange={togglePage}
+                        aria-label="Select all on this page"
+                        className="size-4 accent-primary cursor-pointer align-middle"
+                      />
+                    </th>
                     <th className="px-4 py-2.5 font-medium">Employee</th>
                     <th className="px-4 py-2.5 font-medium">Labour Code</th>
                     <th className="px-4 py-2.5 font-medium">Designation</th>
@@ -291,6 +349,15 @@ function EmployeesPage() {
                         onClick={() => setSelected(e)}
                         className={`border-t border-border cursor-pointer transition ${active ? "bg-primary/5" : "hover:bg-secondary/30"}`}
                       >
+                        <td className="px-4 py-2.5" onClick={(ev) => ev.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={checked.has(e.laborId)}
+                            onChange={() => toggleChecked(e)}
+                            aria-label={`Select ${e.name}`}
+                            className="size-4 accent-primary cursor-pointer align-middle"
+                          />
+                        </td>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-3">
                             <EmployeeAvatar emp={e} size="size-9" text="text-xs" />
@@ -391,6 +458,63 @@ function EmployeesPage() {
       )}
 
       {editing && <EditEmployeeDialog emp={editing} onClose={() => setEditing(null)} />}
+
+      {bulkPrint && <BulkPrintDialog employees={bulkPrint} onClose={() => setBulkPrint(null)} />}
+    </div>
+  );
+}
+
+// Bulk card printing: renders every selected employee's access card in a
+// preview grid, then window.print() lays each card on its own page (see the
+// #bulk-print-area rules in styles.css). Reuses the same AccessCard as the
+// single-card print, so the design stays identical.
+function BulkPrintDialog({ employees, onClose }: { employees: CmsEmployee[]; onClose: () => void }) {
+  // While this dialog is open, mark <html> so the print stylesheet lets the page
+  // grow beyond one card (the single-card rule pins it to 85.6mm otherwise).
+  useEffect(() => {
+    document.documentElement.classList.add("bulk-printing");
+    return () => document.documentElement.classList.remove("bulk-printing");
+  }, []);
+  return (
+    <div
+      className="print-card-overlay fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-5xl max-h-[90vh] flex flex-col bg-card border border-border rounded-2xl shadow-elegant overflow-hidden"
+      >
+        <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+          <div className="font-display font-semibold">
+            Print {employees.length} card{employees.length > 1 ? "s" : ""}
+          </div>
+          <button onClick={onClose} className="size-7 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="px-5 py-2 text-xs text-muted-foreground border-b border-border bg-secondary/30">
+          Wait for the photos to load, then Print. In the print dialog set <b>Margins → None</b>. Each card prints on its own page.
+        </div>
+        <div
+          id="bulk-print-area"
+          className="flex-1 overflow-y-auto bg-secondary/40 p-4 flex flex-wrap gap-4 justify-center"
+        >
+          {employees.map((emp) => (
+            <div className="bulk-card-page" key={emp.laborId}>
+              <AccessCard employee={emp} />
+            </div>
+          ))}
+        </div>
+        <div className="px-5 py-3 border-t border-border bg-secondary/30 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-sm hover:bg-secondary">Close</button>
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow"
+          >
+            <Printer className="size-4" /> Print
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

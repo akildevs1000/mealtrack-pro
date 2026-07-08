@@ -208,11 +208,13 @@
   /* Hide everything... */
   body * { visibility: hidden !important; }
 
-  /* ...then re-show only the card and its descendants. */
+  /* ...then re-show only the card(s) and their descendants. */
   #print-card-area,
-  #print-card-area * { visibility: visible !important; }
+  #print-card-area *,
+  #bulk-print-area,
+  #bulk-print-area * { visibility: visible !important; }
 
-  /* Pin the card to the page corner at exact card dimensions. */
+  /* Pin the (single) card to the page corner at exact card dimensions. */
   #print-card-area {
     position: fixed !important;
     top: 0 !important;
@@ -223,6 +225,38 @@
     padding: 0 !important;
     background: white !important;
     overflow: hidden !important;
+  }
+
+  /* Bulk print: allow the document to grow past one card and lay each card on
+     its own sheet. The single-card rule above pins html/body to one card height,
+     so bulk mode (toggled by a class on <html>) overrides that. */
+  html.bulk-printing,
+  html.bulk-printing body {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  #bulk-print-area {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+    background: white !important;
+  }
+  #bulk-print-area .bulk-card-page {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-after: always;
+    break-after: page;
+  }
+  #bulk-print-area .bulk-card-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
 
   .access-card {
