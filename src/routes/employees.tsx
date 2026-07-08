@@ -987,34 +987,6 @@ function AccessCard({ employee }: { employee: CmsEmployee }) {
         boxShadow: "none",
       }}
     >
-      {/* Decorative concentric ripple, top-right corner, behind all content. */}
-      <svg
-        viewBox="0 0 100 100"
-        fill="none"
-        stroke="#d7dce3"
-        strokeWidth={0.7}
-        aria-hidden
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          width: "42mm",
-          height: "42mm",
-          zIndex: -1,
-          pointerEvents: "none",
-        }}
-      >
-        {/* z-index -1: above the white card background, behind all card content. */}
-        <circle cx="70" cy="28" r="1.6" fill="#d7dce3" stroke="none" />
-        <circle cx="70" cy="28" r="6" />
-        <circle cx="70" cy="28" r="12" />
-        <circle cx="70" cy="28" r="18" />
-        <circle cx="70" cy="28" r="24" />
-        <circle cx="70" cy="28" r="30" />
-        <circle cx="70" cy="28" r="36" />
-        <circle cx="70" cy="28" r="42" />
-      </svg>
-
       <div className="flex justify-center relative" style={{ marginTop: "2mm" }}>
         <div
           style={{
