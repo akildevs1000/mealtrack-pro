@@ -46,10 +46,12 @@ const upsertSchema = z.object({
 });
 
 function buildDeviceData(body: z.infer<typeof upsertSchema>) {
-  const serial =
-    body.serial && body.serial.trim().length > 0
-      ? body.serial
-      : `SCN-${body.macAddress.replace(/[^0-9A-Za-z]/g, "").toUpperCase()}`;
+  // Serial is ALWAYS derived from the MAC — it isn't captured in the register
+  // dialog. Deriving it on UPDATE too (not just create) keeps it in sync: before,
+  // editing a device's MAC left the old MAC's serial behind, and because `serial`
+  // is @unique that stale value permanently blocked any new device using the
+  // original MAC (surfaced as a 500).
+  const serial = `SCN-${body.macAddress.replace(/[^0-9A-Za-z]/g, "").toUpperCase()}`;
   return {
     name: body.name,
     campCode: body.campCode ?? null,
