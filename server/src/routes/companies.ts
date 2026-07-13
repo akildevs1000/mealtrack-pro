@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requirePerm } from "../middleware/auth.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -35,7 +35,7 @@ const upsertSchema = z.object({
   active: z.boolean().optional(),
 });
 
-router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
+router.post("/", requirePerm("companies", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const company = await p.company.create({ data: fromApi(body) });
@@ -43,7 +43,7 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put("/:code", requireRole("admin", "operator"), async (req, res, next) => {
+router.put("/:code", requirePerm("companies", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const company = await p.company.update({
@@ -54,7 +54,7 @@ router.put("/:code", requireRole("admin", "operator"), async (req, res, next) =>
   } catch (e) { next(e); }
 });
 
-router.delete("/:code", requireRole("admin"), async (req, res, next) => {
+router.delete("/:code", requirePerm("companies", "delete"), async (req, res, next) => {
   try {
     await p.company.delete({ where: { code: req.params.code } });
     res.status(204).end();

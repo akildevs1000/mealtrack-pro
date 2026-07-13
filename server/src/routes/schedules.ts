@@ -4,7 +4,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requirePerm } from "../middleware/auth.js";
 import { computeNextRunAt, runSchedule } from "../lib/schedule-runner.js";
 
 const router = Router();
@@ -51,7 +51,7 @@ router.get("/", async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
+router.post("/", requirePerm("automation", "edit"), async (req, res, next) => {
   try {
     const data = baseSchema.parse(req.body);
     const created = await p.schedule.create({
@@ -61,7 +61,7 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.patch("/:id", requireRole("admin", "operator"), async (req, res, next) => {
+router.patch("/:id", requirePerm("automation", "edit"), async (req, res, next) => {
   try {
     const id = req.params.id;
     const existing = await p.schedule.findUnique({ where: { id } });
@@ -93,7 +93,7 @@ router.patch("/:id", requireRole("admin", "operator"), async (req, res, next) =>
   } catch (e) { next(e); }
 });
 
-router.delete("/:id", requireRole("admin", "operator"), async (req, res, next) => {
+router.delete("/:id", requirePerm("automation", "delete"), async (req, res, next) => {
   try {
     await p.schedule.delete({ where: { id: req.params.id } });
     res.json({ ok: true });
@@ -102,7 +102,7 @@ router.delete("/:id", requireRole("admin", "operator"), async (req, res, next) =
 
 // Manual trigger — runs synchronously and returns the outcome so the UI can
 // surface success/failure immediately.
-router.post("/:id/run", requireRole("admin", "operator"), async (req, res, next) => {
+router.post("/:id/run", requirePerm("automation", "edit"), async (req, res, next) => {
   try {
     const outcome = await runSchedule(req.params.id);
     res.status(outcome.ok ? 200 : 502).json(outcome);

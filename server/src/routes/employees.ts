@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { campScopeOf, requireAuth, requireRole } from "../middleware/auth.js";
+import { campScopeOf, requireAuth, requirePerm } from "../middleware/auth.js";
 import {
   decodeImagePayload,
   deletePhoto,
@@ -224,7 +224,7 @@ const upsertSchema = z.object({
   lastUpdated: z.string(),
 });
 
-router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
+router.post("/", requirePerm("employees", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const created = await prisma.cmsEmployee.create({
@@ -239,7 +239,7 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put("/:laborId", requireRole("admin", "operator"), async (req, res, next) => {
+router.put("/:laborId", requirePerm("employees", "edit"), async (req, res, next) => {
   try {
     const id = Number(req.params.laborId);
     const body = upsertSchema.parse(req.body);
@@ -265,7 +265,7 @@ const photoSchema = z.object({
   data: z.string().optional(),
 });
 
-router.put("/photo/:laborCode", requireRole("admin", "operator"), async (req, res, next) => {
+router.put("/photo/:laborCode", requirePerm("employees", "edit"), async (req, res, next) => {
   try {
     const code = safeCode(req.params.laborCode.replace(PHOTO_EXT_RE, ""));
     if (!code) return res.status(400).json({ error: "Invalid employee code" });
@@ -281,7 +281,7 @@ router.put("/photo/:laborCode", requireRole("admin", "operator"), async (req, re
   }
 });
 
-router.delete("/photo/:laborCode", requireRole("admin", "operator"), async (req, res, next) => {
+router.delete("/photo/:laborCode", requirePerm("employees", "edit"), async (req, res, next) => {
   try {
     const code = safeCode(req.params.laborCode.replace(PHOTO_EXT_RE, ""));
     if (!code) return res.status(400).json({ error: "Invalid employee code" });
@@ -290,7 +290,7 @@ router.delete("/photo/:laborCode", requireRole("admin", "operator"), async (req,
   } catch (e) { next(e); }
 });
 
-router.delete("/:laborId", requireRole("admin"), async (req, res, next) => {
+router.delete("/:laborId", requirePerm("employees", "delete"), async (req, res, next) => {
   try {
     const id = Number(req.params.laborId);
     await prisma.cmsEmployee.delete({ where: { laborId: id } });
@@ -321,7 +321,7 @@ const importRowSchema = z.object({
 });
 const importSchema = z.object({ rows: z.array(importRowSchema).min(1) });
 
-router.post("/import", requireRole("admin", "operator"), async (req, res, next) => {
+router.post("/import", requirePerm("employees", "edit"), async (req, res, next) => {
   try {
     const { rows } = importSchema.parse(req.body);
 

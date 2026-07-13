@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { campScopeOf, requireAuth, requireRole } from "../middleware/auth.js";
+import { campScopeOf, requireAuth, requirePerm } from "../middleware/auth.js";
 import { hashPassword, hashPin } from "../lib/auth.js";
 
 const router = Router();
@@ -49,7 +49,7 @@ const createSchema = z.object({
   permReports: z.boolean().optional(),
 });
 
-router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
+router.post("/", requirePerm("managers", "edit"), async (req, res, next) => {
   try {
     const body = createSchema.parse(req.body);
     const status = body.status ?? "Active";
@@ -117,7 +117,7 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
 
 const updateSchema = createSchema.partial().omit({ password: true });
 
-router.put("/:id", requireRole("admin", "operator"), async (req, res, next) => {
+router.put("/:id", requirePerm("managers", "edit"), async (req, res, next) => {
   try {
     const body = updateSchema.parse(req.body);
     const existing = await prisma.campManager.findUnique({ where: { id: req.params.id } });
@@ -166,7 +166,7 @@ router.put("/:id", requireRole("admin", "operator"), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.delete("/:id", requireRole("admin"), async (req, res, next) => {
+router.delete("/:id", requirePerm("managers", "delete"), async (req, res, next) => {
   try {
     const existing = await prisma.campManager.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Camp manager not found" });

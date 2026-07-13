@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { campScopeOf, requireAuth, requireRole } from "../middleware/auth.js";
+import { campScopeOf, requireAuth, requirePerm } from "../middleware/auth.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -66,7 +66,7 @@ function buildDeviceData(body: z.infer<typeof upsertSchema>) {
   };
 }
 
-router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
+router.post("/", requirePerm("devices", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const d = await prisma.device.create({
@@ -76,7 +76,7 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put("/:id", requireRole("admin", "operator"), async (req, res, next) => {
+router.put("/:id", requirePerm("devices", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const d = await prisma.device.update({
@@ -87,7 +87,7 @@ router.put("/:id", requireRole("admin", "operator"), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.delete("/:id", requireRole("admin"), async (req, res, next) => {
+router.delete("/:id", requirePerm("devices", "delete"), async (req, res, next) => {
   try {
     await prisma.device.delete({ where: { id: req.params.id } });
     res.status(204).end();

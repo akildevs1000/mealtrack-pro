@@ -7,7 +7,7 @@
 // endpoint here — unlike mail-config / ftp-config which store creds in the DB.
 
 import { Router } from "express";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requirePerm } from "../middleware/auth.js";
 import { isOracleConfigured } from "../lib/cms-oracle.js";
 import { getLastSync, isSyncRunning, runCmsSync } from "../lib/cms-sync.js";
 
@@ -29,7 +29,7 @@ router.get("/", (_req, res) => {
   });
 });
 
-router.post("/run", requireRole("admin", "operator"), async (_req, res, next) => {
+router.post("/run", requirePerm("employees", "edit"), async (_req, res, next) => {
   try {
     if (!isOracleConfigured()) {
       return res.status(400).json({ error: "Oracle CMS is not configured on this server." });

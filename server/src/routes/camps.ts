@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { campScopeOf, requireAuth, requireRole } from "../middleware/auth.js";
+import { campScopeOf, requireAuth, requirePerm } from "../middleware/auth.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -41,7 +41,7 @@ const upsertSchema = z.object({
   }).optional(),
 });
 
-router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
+router.post("/", requirePerm("camps", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const camp = await prisma.camp.create({ data: fromApi(body) });
@@ -49,7 +49,7 @@ router.post("/", requireRole("admin", "operator"), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put("/:code", requireRole("admin", "operator"), async (req, res, next) => {
+router.put("/:code", requirePerm("camps", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const camp = await prisma.camp.update({
@@ -60,7 +60,7 @@ router.put("/:code", requireRole("admin", "operator"), async (req, res, next) =>
   } catch (e) { next(e); }
 });
 
-router.delete("/:code", requireRole("admin"), async (req, res, next) => {
+router.delete("/:code", requirePerm("camps", "delete"), async (req, res, next) => {
   try {
     await prisma.camp.delete({ where: { code: req.params.code } });
     res.status(204).end();

@@ -4,7 +4,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requirePerm } from "../middleware/auth.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -40,7 +40,7 @@ router.get("/", async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put("/", requireRole("admin", "operator"), async (req, res, next) => {
+router.put("/", requirePerm("automation", "edit"), async (req, res, next) => {
   try {
     const data = upsertSchema.parse(req.body);
     const cfg = await p.ftpConfig.upsert({
@@ -60,7 +60,7 @@ router.put("/", requireRole("admin", "operator"), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.delete("/", requireRole("admin", "operator"), async (_req, res, next) => {
+router.delete("/", requirePerm("automation", "edit"), async (_req, res, next) => {
   try {
     await p.ftpConfig.delete({ where: { id: FTP_ID } }).catch(() => null);
     res.json({ ok: true });

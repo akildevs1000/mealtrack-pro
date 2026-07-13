@@ -71,6 +71,36 @@ export function requireRole(...roles: Role[]) {
   };
 }
 
+export type PermAction = "view" | "edit" | "delete";
+
+/**
+ * Enforce the ADMIN-EDITABLE permission matrix (RolePermission) instead of a
+ * hardcoded role list — so ticking View/Edit/Delete on the Users page actually
+ * grants API access, not just UI visibility. Admins always pass; a missing row
+ * means denied.
+ *
+ * NB: /api/users stays hardcoded admin-only on purpose — granting a role
+ * "users: edit" via the matrix must not become a privilege-escalation path.
+ */
+export function requirePerm(tab: string, action: PermAction) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({ error: "Unauthenticated" });
+    if (req.user.role === "admin") return next();
+    try {
+      const perm = await prisma.rolePermission.findUnique({
+        where: { role_tab: { role: req.user.role, tab } },
+        select: { view: true, edit: true, delete: true },
+      });
+      if (!perm?.[action]) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      next();
+    } catch (e) {
+      next(e);
+    }
+  };
+}
+
 // Returns the camp scope for the current request (null = unrestricted)
 export function campScopeOf(req: Request): string[] | null {
   if (!req.user) return null;
