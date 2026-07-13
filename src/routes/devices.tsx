@@ -138,13 +138,12 @@ function DevicesPage() {
       setError("MAC address / device ID is required.");
       return;
     }
-    if (
-      list.some(
-        (d) =>
-          d.id !== editingId && d.macAddress.toLowerCase() === form.macAddress.toLowerCase(),
-      )
-    ) {
-      setError("This MAC address is already registered.");
+    // Compare MACs with punctuation stripped: the server derives the (unique)
+    // serial the same way, so "68:50:8C:81:BD:CE" and "68508C81BDCE" are the
+    // SAME device and would otherwise collide server-side with a 500.
+    const normMac = (m: string) => m.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+    if (list.some((d) => d.id !== editingId && normMac(d.macAddress) === normMac(form.macAddress))) {
+      setError("This MAC address / device ID is already registered.");
       return;
     }
     const campCode = location.startsWith("c:") ? location.slice(2) : null;

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth, requirePerm } from "../middleware/auth.js";
@@ -66,6 +67,35 @@ function buildDeviceData(body: z.infer<typeof upsertSchema>) {
   };
 }
 
+// Device.name and Device.serial are both @unique, and `serial` is DERIVED from
+// the MAC (punctuation stripped) — so "68:50:8C:81:BD:CE" and "68508C81BDCE"
+// collide on serial even though the raw MAC strings differ. Surface these as a
+// clear 409 instead of letting Prisma bubble up as a bare 500.
+function writeError(e: unknown, res: Response): boolean {
+  const err = e as { code?: string; meta?: { target?: string[] | string } };
+  if (err?.code === "P2002") {
+    const raw = err.meta?.target;
+    const target = Array.isArray(raw) ? raw.join(",") : String(raw ?? "");
+    if (target.includes("serial")) {
+      res.status(409).json({
+        error: "This MAC / device ID is already registered on another device.",
+      });
+      return true;
+    }
+    if (target.includes("name")) {
+      res.status(409).json({ error: "A device with this name already exists. Use a different name." });
+      return true;
+    }
+    res.status(409).json({ error: `Already exists (duplicate ${target}).` });
+    return true;
+  }
+  if (err?.code === "P2003") {
+    res.status(400).json({ error: "The selected camp/project no longer exists." });
+    return true;
+  }
+  return false;
+}
+
 router.post("/", requirePerm("devices", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
@@ -73,7 +103,9 @@ router.post("/", requirePerm("devices", "edit"), async (req, res, next) => {
       data: { ...buildDeviceData(body), lastSync: new Date() },
     });
     res.status(201).json(toApi(d));
-  } catch (e) { next(e); }
+  } catch (e) {
+    if (!writeError(e, res)) next(e);
+  }
 });
 
 router.put("/:id", requirePerm("devices", "edit"), async (req, res, next) => {
@@ -84,7 +116,9 @@ router.put("/:id", requirePerm("devices", "edit"), async (req, res, next) => {
       data: buildDeviceData(body),
     });
     res.json(toApi(d));
-  } catch (e) { next(e); }
+  } catch (e) {
+    if (!writeError(e, res)) next(e);
+  }
 });
 
 router.delete("/:id", requirePerm("devices", "delete"), async (req, res, next) => {
