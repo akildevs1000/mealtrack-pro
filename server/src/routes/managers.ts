@@ -14,7 +14,7 @@ router.get("/", async (req, res, next) => {
     const rows = await prisma.campManager.findMany({
       where: scope ? { camps: { some: { code: { in: scope } } } } : undefined,
       orderBy: { name: "asc" },
-      include: { camps: { select: { code: true } } },
+      include: { camps: { select: { code: true } }, cateringCompany: { select: { name: true } } },
     });
     res.json(rows.map(toApi));
   } catch (e) { next(e); }
@@ -37,6 +37,7 @@ const createSchema = z.object({
   // One or more camps. campCodes[0] is treated as the primary camp.
   campCodes: z.array(z.string()).min(1, "At least one camp is required"),
   companyCode: z.string().nullable().optional(),
+  cateringCompanyId: z.string().nullable().optional(),
   role: z.enum(["CampManager", "SeniorManager", "Supervisor"]),
   shift: z.enum(["Morning", "Evening", "FullDay"]),
   joinDate: z.string(),
@@ -83,6 +84,7 @@ router.post("/", requirePerm("managers", "edit"), async (req, res, next) => {
           campCode: primaryCamp,
           camps: { connect: campCodes.map((code) => ({ code })) },
           companyCode: body.companyCode ?? null,
+          cateringCompanyId: body.cateringCompanyId ?? null,
           role: body.role,
           shift: body.shift,
           joinDate: new Date(body.joinDate),
@@ -94,7 +96,7 @@ router.post("/", requirePerm("managers", "edit"), async (req, res, next) => {
           permDinner: body.permDinner ?? true,
           permReports: body.permReports ?? true,
         },
-        include: { camps: { select: { code: true } } },
+        include: { camps: { select: { code: true } }, cateringCompany: { select: { name: true } } },
       });
       await tx.user.create({
         data: {
@@ -145,7 +147,7 @@ router.put("/:id", requirePerm("managers", "edit"), async (req, res, next) => {
       const m = await tx.campManager.update({
         where: { id: req.params.id },
         data,
-        include: { camps: { select: { code: true } } },
+        include: { camps: { select: { code: true } }, cateringCompany: { select: { name: true } } },
       });
       // Keep the linked User in sync.
       const userPatch: any = {};
@@ -191,6 +193,8 @@ function toApi(m: any) {
     // the relation wasn't included on the query.
     camps: Array.isArray(m.camps) ? m.camps.map((c: any) => c.code) : [m.campCode],
     companyCode: m.companyCode ?? null,
+    cateringCompanyId: m.cateringCompanyId ?? null,
+    cateringCompanyName: m.cateringCompany?.name ?? null,
     role: m.role === "CampManager" ? "Camp Manager" : m.role === "SeniorManager" ? "Senior Manager" : "Supervisor",
     shift: m.shift === "FullDay" ? "Full Day" : m.shift,
     joinDate: m.joinDate.toISOString().slice(0, 10),

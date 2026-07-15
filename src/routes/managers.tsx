@@ -28,6 +28,8 @@ import {
   useUpdateManager,
   useDeleteManager,
   useToggleManagerStatus,
+  useCateringCompanies,
+  useUpsertCateringCompany,
   type Manager as CampManager,
 } from "@/lib/hooks";
 
@@ -47,6 +49,7 @@ type FormState = {
   emiratesId: string;
   camps: string[];
   companyCode: string | null;
+  cateringCompanyId: string | null;
   role: CampManager["role"];
   shift: CampManager["shift"];
   joinDate: string;
@@ -80,6 +83,7 @@ const emptyForm: FormState = {
   emiratesId: "",
   camps: [],
   companyCode: null,
+  cateringCompanyId: null,
   role: "Camp Manager",
   shift: "Full Day",
   joinDate: today(),
@@ -147,6 +151,7 @@ function Managers() {
       emiratesId: form.emiratesId,
       campCodes: form.camps,
       companyCode: form.companyCode,
+      cateringCompanyId: form.cateringCompanyId,
       role: form.role,
       shift: form.shift,
       joinDate: form.joinDate,
@@ -480,6 +485,7 @@ function ManagerDialog({
           emiratesId: manager.emiratesId,
           camps: manager.camps?.length ? manager.camps : [manager.camp],
           companyCode: manager.companyCode,
+          cateringCompanyId: manager.cateringCompanyId,
           role: manager.role,
           shift: manager.shift,
           joinDate: manager.joinDate,
@@ -627,6 +633,12 @@ function ManagerDialog({
               ))}
             </select>
           </Field>
+          <Field label="Catering Company">
+            <CateringCompanySelect
+              value={form.cateringCompanyId}
+              onChange={(id) => setForm({ ...form, cateringCompanyId: id })}
+            />
+          </Field>
           <Field label="Assigned Camps *">
             <MultiCampSelect
               camps={camps}
@@ -706,6 +718,139 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
 // opens a checklist dropdown. Self-contained (no portal) so it plays nicely
 // inside the hand-rolled modal; closes on outside click. First selected camp
 // is the primary.
+// Searchable catering-company picker with an inline "+ New" (Zoho-style). Reads
+// the catering-company list and can create a new one on the fly, then selects it.
+function CateringCompanySelect({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const { data: list = [] } = useCateringCompanies();
+  const create = useUpsertCateringCompany();
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const boxRef = useRef<HTMLDivElement | null>(null);
+
+  const selected = list.find((c) => c.id === value) ?? null;
+  const filtered = list.filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase()));
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  async function addNew() {
+    const name = newName.trim();
+    if (!name) return;
+    try {
+      const created = await create.mutateAsync({
+        name, contact: "", email: "", phone: "", notes: "", status: "Active",
+      });
+      onChange(created.id);
+      setAdding(false);
+      setNewName("");
+      setOpen(false);
+      setQ("");
+    } catch {
+      /* name clash etc. — leave the input so the user can adjust */
+    }
+  }
+
+  return (
+    <div className="relative" ref={boxRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${inputCls} flex items-center justify-between text-left`}
+      >
+        <span className={selected ? "" : "text-muted-foreground"}>
+          {selected ? selected.name : "— Select catering company —"}
+        </span>
+        <ChevronDown className="size-4 opacity-60 shrink-0" />
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1 w-full rounded-lg border border-border bg-card shadow-elegant overflow-hidden">
+          <div className="relative p-2 border-b border-border">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search…"
+              autoFocus
+              className="w-full h-8 pl-8 pr-2 rounded-md bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto py-1">
+            {value && (
+              <button
+                type="button"
+                onClick={() => { onChange(null); setOpen(false); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary"
+              >
+                — None —
+              </button>
+            )}
+            {filtered.map((c) => (
+              <button
+                type="button"
+                key={c.id}
+                onClick={() => { onChange(c.id); setOpen(false); }}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-secondary ${c.id === value ? "text-primary font-medium" : ""}`}
+              >
+                {c.name}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">No matches.</div>
+            )}
+          </div>
+          <div className="border-t border-border p-1.5">
+            {adding ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="New catering company name"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); void addNew(); }
+                  }}
+                  className="flex-1 h-8 px-2 rounded-md bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addNew()}
+                  disabled={create.isPending || !newName.trim()}
+                  className="px-3 h-8 rounded-md gradient-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-primary hover:bg-primary/10"
+              >
+                <Plus className="size-3.5" /> New Catering Company
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MultiCampSelect({
   camps,
   value,

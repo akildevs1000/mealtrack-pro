@@ -4,7 +4,7 @@ import { api, setToken } from "./api";
 export type Role = "admin" | "operator" | "user" | "manager";
 export type TabKey =
   | "overview" | "scanner" | "companies" | "camps" | "projects" | "employees" | "managers"
-  | "forecast" | "devices" | "reports" | "automation" | "users";
+  | "catering" | "forecast" | "devices" | "reports" | "automation" | "users";
 
 export type Perm = { view: boolean; edit: boolean; delete: boolean };
 export type RolePermissions = Record<TabKey, Perm>;
@@ -28,6 +28,7 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: "projects", label: "Projects" },
   { key: "employees", label: "Employees" },
   { key: "managers", label: "Distributors" },
+  { key: "catering", label: "Catering Companies" },
   { key: "forecast", label: "Forecast" },
   { key: "devices", label: "Devices" },
   { key: "reports", label: "Reports" },

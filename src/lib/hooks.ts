@@ -132,6 +132,8 @@ export type Manager = {
   // Full set of assigned camps (includes `camp`).
   camps: string[];
   companyCode: string | null;
+  cateringCompanyId: string | null;
+  cateringCompanyName: string | null;
   role: "Camp Manager" | "Senior Manager" | "Supervisor";
   shift: "Morning" | "Evening" | "Full Day";
   joinDate: string;
@@ -224,6 +226,45 @@ export function useDeleteCompany() {
   return useMutation({
     mutationFn: (code: string) => api<void>(`/companies/${code}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
+  });
+}
+
+// Catering companies
+export type CateringCompany = {
+  id: string;
+  name: string;
+  contact: string;
+  email: string;
+  phone: string;
+  notes: string;
+  status: "Active" | "Inactive";
+};
+
+export function useCateringCompanies() {
+  return useQuery({
+    queryKey: ["catering-companies"],
+    queryFn: () => api<CateringCompany[]>("/catering-companies"),
+  });
+}
+
+export function useUpsertCateringCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id?: string } & Omit<CateringCompany, "id">) => {
+      const { id, ...body } = input;
+      return id
+        ? api<CateringCompany>(`/catering-companies/${id}`, { method: "PUT", body: JSON.stringify(body) })
+        : api<CateringCompany>(`/catering-companies`, { method: "POST", body: JSON.stringify(body) });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catering-companies"] }),
+  });
+}
+
+export function useDeleteCateringCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/catering-companies/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catering-companies"] }),
   });
 }
 
@@ -499,6 +540,7 @@ export type ManagerInput = {
   // One or more camps; campCodes[0] becomes the primary camp.
   campCodes: string[];
   companyCode?: string | null;
+  cateringCompanyId?: string | null;
   role: "Camp Manager" | "Senior Manager" | "Supervisor";
   shift: "Morning" | "Evening" | "Full Day";
   joinDate: string;
@@ -518,6 +560,7 @@ function packManager(input: ManagerInput) {
     emiratesId: input.emiratesId,
     campCodes: input.campCodes,
     companyCode: input.companyCode ?? null,
+    cateringCompanyId: input.cateringCompanyId ?? null,
     role: input.role === "Camp Manager" ? "CampManager"
         : input.role === "Senior Manager" ? "SeniorManager" : "Supervisor",
     shift: input.shift === "Full Day" ? "FullDay" : input.shift,

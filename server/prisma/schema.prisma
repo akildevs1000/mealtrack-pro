@@ -305,6 +305,10 @@ model CampManager {
   // Parent company (a Supplier belongs to a Company).
   companyCode String?
   companyRef  Company?      @relation(fields: [companyCode], references: [code])
+  // Catering company this distributor belongs to (optional, separate from the
+  // parent Company). Picked from the searchable dropdown on the distributor form.
+  cateringCompanyId String?
+  cateringCompany   CateringCompany? @relation(fields: [cateringCompanyId], references: [id])
   role        ManagerRole
   shift       ManagerShift
   joinDate    DateTime
@@ -323,6 +327,22 @@ model CampManager {
   updatedAt DateTime @updatedAt
 
   @@index([campCode])
+  @@index([cateringCompanyId])
+}
+
+// Catering company — a vendor/customer record. Distributors can be assigned to
+// one via the searchable dropdown on the distributor form.
+model CateringCompany {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  contact   String        @default("")
+  email     String        @default("")
+  phone     String        @default("")
+  notes     String        @default("")
+  status    String        @default("Active") // "Active" | "Inactive"
+  managers  CampManager[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 // Audit log (used by /audit route)
