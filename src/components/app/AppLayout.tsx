@@ -2,7 +2,7 @@ import { Link, Navigate, Outlet, useLocation } from "@tanstack/react-router";
 import {
   LayoutDashboard, Users, BuildingIcon, Building2, FolderKanban, Smartphone, FileBarChart, CalendarRange,
   Bell, Settings, UtensilsCrossed, Moon, Sun, Search, KeyRound, ShieldCheck,
-  LogOut, Loader2, CalendarClock, ChefHat,
+  LogOut, Loader2, CalendarClock, ChefHat, Contact,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SessionProvider, useSession, type TabKey } from "@/lib/session";
@@ -14,8 +14,9 @@ const nav: { to: string; label: string; icon: typeof LayoutDashboard; key: TabKe
   { to: "/camps", label: "Camps", icon: BuildingIcon, key: "camps" },
   { to: "/projects", label: "Projects", icon: FolderKanban, key: "projects" },
   { to: "/employees", label: "Employees", icon: Users, key: "employees" },
-  { to: "/managers", label: "Distributors", icon: KeyRound, key: "managers" },
   { to: "/catering", label: "Catering Companies", icon: ChefHat, key: "catering" },
+  { to: "/managers", label: "Distributors", icon: KeyRound, key: "managers" },
+  { to: "/distributor-employees", label: "Distributor Employees", icon: Contact, key: "distributorEmployees" },
   { to: "/forecast", label: "Forecast", icon: CalendarRange, key: "forecast" },
   { to: "/devices", label: "Devices", icon: Smartphone, key: "devices" },
   { to: "/reports", label: "Reports", icon: FileBarChart, key: "reports" },

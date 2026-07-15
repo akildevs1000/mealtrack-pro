@@ -10,7 +10,7 @@ import type { Role } from "@prisma/client";
 
 const TABS = [
   "overview", "scanner", "companies", "camps", "projects", "employees", "managers",
-  "catering", "forecast", "devices", "reports", "automation", "users",
+  "catering", "distributorEmployees", "forecast", "devices", "reports", "automation", "users",
 ];
 
 const ALL = { view: true, edit: true, delete: true };
@@ -22,17 +22,17 @@ const DEFAULTS: Record<Role, Record<string, typeof ALL>> = {
   admin: Object.fromEntries(TABS.map((t) => [t, ALL])) as Record<string, typeof ALL>,
   operator: {
     overview: VIEW, scanner: EDIT, companies: EDIT, camps: EDIT, projects: EDIT, employees: EDIT,
-    managers: VIEW, catering: EDIT, forecast: EDIT, devices: EDIT, reports: VIEW,
+    managers: VIEW, catering: EDIT, distributorEmployees: EDIT, forecast: EDIT, devices: EDIT, reports: VIEW,
     automation: EDIT, users: NONE,
   },
   user: {
     overview: VIEW, scanner: VIEW, companies: VIEW, camps: VIEW, projects: VIEW, employees: VIEW,
-    managers: NONE, catering: VIEW, forecast: VIEW, devices: VIEW, reports: VIEW,
+    managers: NONE, catering: VIEW, distributorEmployees: VIEW, forecast: VIEW, devices: VIEW, reports: VIEW,
     automation: NONE, users: NONE,
   },
   manager: {
     overview: VIEW, scanner: EDIT, companies: VIEW, camps: VIEW, projects: VIEW, employees: VIEW,
-    managers: NONE, catering: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
+    managers: NONE, catering: NONE, distributorEmployees: NONE, forecast: VIEW, devices: VIEW, reports: VIEW,
     automation: NONE, users: NONE,
   },
 };

@@ -134,6 +134,7 @@ export type Manager = {
   companyCode: string | null;
   cateringCompanyId: string | null;
   cateringCompanyName: string | null;
+  distributorEmployeeId: string | null;
   role: "Camp Manager" | "Senior Manager" | "Supervisor";
   shift: "Morning" | "Evening" | "Full Day";
   joinDate: string;
@@ -276,6 +277,57 @@ export function useDeleteCateringCompany() {
   return useMutation({
     mutationFn: (id: string) => api<void>(`/catering-companies/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catering-companies"] }),
+  });
+}
+
+// Distributor-employee roster (people per catering company). Surfaced as a
+// searchable picker on the Add/Edit Distributor form once a Catering Company
+// is selected — pick a name to fill Full Name, or add a new person inline.
+export type DistributorEmployee = {
+  id: string;
+  cateringCompanyId: string;
+  // Read-only, server-computed — resolved company name and whether a
+  // Distributor login account has been created for this roster entry yet.
+  cateringCompanyName: string | null;
+  hasAccount: boolean;
+  name: string;
+  phone: string;
+  email: string;
+  emiratesId: string;
+  status: "Active" | "Inactive";
+  notes: string;
+};
+
+export function useDistributorEmployees(cateringCompanyId?: string) {
+  return useQuery({
+    queryKey: ["distributor-employees", cateringCompanyId ?? "all"],
+    queryFn: () =>
+      api<DistributorEmployee[]>(
+        `/distributor-employees${cateringCompanyId ? `?cateringCompanyId=${cateringCompanyId}` : ""}`,
+      ),
+  });
+}
+
+export type DistributorEmployeeInput = Omit<DistributorEmployee, "id" | "cateringCompanyName" | "hasAccount">;
+
+export function useUpsertDistributorEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id?: string } & DistributorEmployeeInput) => {
+      const { id, ...body } = input;
+      return id
+        ? api<DistributorEmployee>(`/distributor-employees/${id}`, { method: "PUT", body: JSON.stringify(body) })
+        : api<DistributorEmployee>(`/distributor-employees`, { method: "POST", body: JSON.stringify(body) });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["distributor-employees"] }),
+  });
+}
+
+export function useDeleteDistributorEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/distributor-employees/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["distributor-employees"] }),
   });
 }
 
@@ -552,6 +604,7 @@ export type ManagerInput = {
   campCodes: string[];
   companyCode?: string | null;
   cateringCompanyId?: string | null;
+  distributorEmployeeId?: string | null;
   role: "Camp Manager" | "Senior Manager" | "Supervisor";
   shift: "Morning" | "Evening" | "Full Day";
   joinDate: string;
@@ -572,6 +625,7 @@ function packManager(input: ManagerInput) {
     campCodes: input.campCodes,
     companyCode: input.companyCode ?? null,
     cateringCompanyId: input.cateringCompanyId ?? null,
+    distributorEmployeeId: input.distributorEmployeeId ?? null,
     role: input.role === "Camp Manager" ? "CampManager"
         : input.role === "Senior Manager" ? "SeniorManager" : "Supervisor",
     shift: input.shift === "Full Day" ? "FullDay" : input.shift,

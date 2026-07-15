@@ -313,6 +313,11 @@ model CampManager {
   // parent Company). Picked from the searchable dropdown on the distributor form.
   cateringCompanyId String?
   cateringCompany   CateringCompany? @relation(fields: [cateringCompanyId], references: [id])
+  // The roster entry (person) this login account represents, if created via
+  // the catering company's distributor-employee picker. Optional — the roster
+  // is a separate list of people that can exist before any login is created.
+  distributorEmployeeId String?
+  distributorEmployee   DistributorEmployee? @relation(fields: [distributorEmployeeId], references: [id], onDelete: SetNull)
   role        ManagerRole
   shift       ManagerShift
   joinDate    DateTime
@@ -332,6 +337,7 @@ model CampManager {
 
   @@index([campCode])
   @@index([cateringCompanyId])
+  @@index([distributorEmployeeId])
 }
 
 // Catering company — a vendor/customer record. Distributors can be assigned to
@@ -359,8 +365,32 @@ model CateringCompany {
   notes        String        @default("")
   status       String        @default("Active") // "Active" | "Inactive"
   managers     CampManager[]
+  distributorEmployees DistributorEmployee[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+}
+
+// Roster of people who work for a catering company — a lightweight "who could
+// become a distributor login" list, independent of whether a CampManager
+// (login account) has actually been created for them yet. Surfaced as a
+// searchable picker on the Add/Edit Distributor form once a Catering Company
+// is selected: pick a name to fill Full Name, or add a new person inline.
+model DistributorEmployee {
+  id                String          @id @default(cuid())
+  cateringCompanyId String
+  cateringCompany   CateringCompany @relation(fields: [cateringCompanyId], references: [id], onDelete: Cascade)
+  name              String
+  phone             String          @default("")
+  email             String          @default("")
+  emiratesId        String          @default("")
+  status            String          @default("Active") // "Active" | "Inactive"
+  notes             String          @default("")
+  managers          CampManager[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([cateringCompanyId, name])
+  @@index([cateringCompanyId])
 }
 
 // Audit log (used by /audit route)

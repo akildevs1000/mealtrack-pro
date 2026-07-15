@@ -30,7 +30,10 @@ import {
   useDeleteManager,
   useToggleManagerStatus,
   useCateringCompanies,
+  useDistributorEmployees,
+  useUpsertDistributorEmployee,
   type Manager as CampManager,
+  type DistributorEmployee,
 } from "@/lib/hooks";
 import { CateringCompanyDialog } from "@/components/app/CateringCompanyDialog";
 
@@ -51,6 +54,7 @@ type FormState = {
   camps: string[];
   companyCode: string | null;
   cateringCompanyId: string | null;
+  distributorEmployeeId: string | null;
   role: CampManager["role"];
   shift: CampManager["shift"];
   joinDate: string;
@@ -85,6 +89,7 @@ const emptyForm: FormState = {
   camps: [],
   companyCode: null,
   cateringCompanyId: null,
+  distributorEmployeeId: null,
   role: "Camp Manager",
   shift: "Full Day",
   joinDate: today(),
@@ -156,6 +161,7 @@ function Managers() {
       campCodes: form.camps,
       companyCode: form.companyCode,
       cateringCompanyId: form.cateringCompanyId,
+      distributorEmployeeId: form.distributorEmployeeId,
       role: form.role,
       shift: form.shift,
       joinDate: form.joinDate,
@@ -507,6 +513,7 @@ function ManagerDialog({
           camps: manager.camps?.length ? manager.camps : [manager.camp],
           companyCode: manager.companyCode,
           cateringCompanyId: manager.cateringCompanyId,
+          distributorEmployeeId: manager.distributorEmployeeId,
           role: manager.role,
           shift: manager.shift,
           joinDate: manager.joinDate,
@@ -577,13 +584,50 @@ function ManagerDialog({
           </button>
         </div>
         <form onSubmit={submit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Full Name *">
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+          <Field label="Company">
+            <select
+              value={form.companyCode ?? ""}
+              onChange={(e) => setForm({ ...form, companyCode: e.target.value || null })}
               className={inputCls}
-              placeholder="Ahmed Al Mansouri"
+            >
+              <option value="">— Select company —</option>
+              {companies.map((co) => (
+                <option key={co.id} value={co.code}>
+                  {co.code} — {co.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Catering Company">
+            <CateringCompanySelect
+              value={form.cateringCompanyId}
+              onChange={(id) =>
+                setForm({ ...form, cateringCompanyId: id, distributorEmployeeId: null })
+              }
+            />
+          </Field>
+
+          <Field label="Full Name *">
+            <DistributorEmployeeInput
+              cateringCompanyId={form.cateringCompanyId}
+              name={form.name}
+              distributorEmployeeId={form.distributorEmployeeId}
+              onChange={(name, distributorEmployeeId, person) =>
+                setForm({
+                  ...form,
+                  name,
+                  distributorEmployeeId,
+                  // Picking/adding a roster person also carries over the
+                  // details already captured for them — no retyping.
+                  ...(person
+                    ? {
+                        phone: person.phone || form.phone,
+                        email: person.email || form.email,
+                        emiratesId: person.emiratesId || form.emiratesId,
+                      }
+                    : {}),
+                })
+              }
             />
           </Field>
           <Field label="Username *">
@@ -640,26 +684,6 @@ function ManagerDialog({
             />
           </Field>
 
-          <Field label="Company">
-            <select
-              value={form.companyCode ?? ""}
-              onChange={(e) => setForm({ ...form, companyCode: e.target.value || null })}
-              className={inputCls}
-            >
-              <option value="">— Select company —</option>
-              {companies.map((co) => (
-                <option key={co.id} value={co.code}>
-                  {co.code} — {co.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Catering Company">
-            <CateringCompanySelect
-              value={form.cateringCompanyId}
-              onChange={(id) => setForm({ ...form, cateringCompanyId: id })}
-            />
-          </Field>
           <Field label="Assigned Camps *">
             <MultiCampSelect
               camps={camps}
@@ -841,6 +865,159 @@ function CateringCompanySelect({
           onClose={() => setShowNewDialog(false)}
           onSaved={(c) => { onChange(c.id); setShowNewDialog(false); setQ(""); }}
         />
+      )}
+    </div>
+  );
+}
+
+// Full Name field, roster-aware: once a Catering Company is selected, this
+// becomes a searchable picker over that company's DistributorEmployee roster
+// (pick a person to fill Full Name, or add a new person inline) — since a
+// roster entry IS a named person, filling Full Name from it is safe (unlike
+// the earlier attempt to fill it from the CATERING COMPANY's own name). With
+// no Catering Company selected, it's just a plain text input.
+function DistributorEmployeeInput({
+  cateringCompanyId,
+  name,
+  distributorEmployeeId,
+  onChange,
+}: {
+  cateringCompanyId: string | null;
+  name: string;
+  distributorEmployeeId: string | null;
+  // `person` is passed whenever a roster entry was just picked/created, so the
+  // caller can also auto-fill Phone / Email / Emirates ID from it — not just
+  // Name. It's omitted when the admin is simply typing a free-form name.
+  onChange: (name: string, distributorEmployeeId: string | null, person?: DistributorEmployee) => void;
+}) {
+  const { data: roster = [] } = useDistributorEmployees(cateringCompanyId ?? undefined);
+  const createPerson = useUpsertDistributorEmployee();
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const boxRef = useRef<HTMLDivElement | null>(null);
+
+  const q = name.trim().toLowerCase();
+  const filtered = q ? roster.filter((p) => p.name.toLowerCase().includes(q)) : roster;
+  const linked = distributorEmployeeId ? roster.find((p) => p.id === distributorEmployeeId) : null;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  function pick(person: DistributorEmployee) {
+    onChange(person.name, person.id, person);
+    setOpen(false);
+  }
+
+  function typeName(v: string) {
+    // Retyping away from the linked person's name drops the link; it's
+    // re-established only by picking a suggestion or adding a new one.
+    onChange(v, linked && linked.name === v ? distributorEmployeeId : null);
+  }
+
+  async function addNew() {
+    const value = newName.trim();
+    if (!value || !cateringCompanyId) return;
+    try {
+      const created = await createPerson.mutateAsync({
+        cateringCompanyId, name: value, phone: "", email: "", emiratesId: "", status: "Active", notes: "",
+      });
+      onChange(created.name, created.id, created);
+      setAdding(false);
+      setNewName("");
+      setOpen(false);
+    } catch {
+      /* duplicate name in this roster etc. — leave the input so the user can adjust */
+    }
+  }
+
+  if (!cateringCompanyId) {
+    return (
+      <input
+        required
+        value={name}
+        onChange={(e) => onChange(e.target.value, null)}
+        className={inputCls}
+        placeholder="Ahmed Al Mansouri"
+      />
+    );
+  }
+
+  return (
+    <div className="relative" ref={boxRef}>
+      <input
+        required
+        value={name}
+        onChange={(e) => typeName(e.target.value)}
+        onFocus={() => setOpen(true)}
+        className={inputCls}
+        placeholder="Search or add a person from this catering company"
+        autoComplete="off"
+      />
+      {linked && (
+        <div className="mt-1 text-[11px] text-primary flex items-center gap-1">
+          <Check className="size-3" /> From the catering company's roster
+        </div>
+      )}
+
+      {open && (
+        <div className="absolute z-30 mt-1 w-full rounded-lg border border-border bg-card shadow-elegant overflow-hidden">
+          <div className="max-h-52 overflow-y-auto py-1">
+            {filtered.map((person) => (
+              <button
+                type="button"
+                key={person.id}
+                onClick={() => pick(person)}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-secondary ${
+                  person.id === distributorEmployeeId ? "bg-primary/5 text-primary font-medium" : ""
+                }`}
+              >
+                {person.name}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">No matches.</div>
+            )}
+          </div>
+          <div className="border-t border-border p-1.5">
+            {adding ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="New person's name"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); void addNew(); }
+                  }}
+                  className="flex-1 h-8 px-2 rounded-md bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addNew()}
+                  disabled={createPerson.isPending || !newName.trim()}
+                  className="px-3 h-8 rounded-md gradient-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-primary hover:bg-primary/10"
+              >
+                <Plus className="size-3.5" /> Add new person to this catering company
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
