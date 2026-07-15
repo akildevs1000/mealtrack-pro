@@ -4,6 +4,8 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth, requirePerm } from "../middleware/auth.js";
 import { hashPassword, hashPin } from "../lib/auth.js";
+import { dubaiDateKey } from "../lib/time.js";
+import { listReportSites } from "../lib/sites.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -165,6 +167,62 @@ router.put("/:id", requirePerm("managers", "edit"), async (req, res, next) => {
     });
 
     res.json(toApi(result));
+  } catch (e) { next(e); }
+});
+
+// Per-distributor meal-serving report: which camp/site they scanned at and how
+// many breakfast/lunch/dinner they served, day by day, over a date range. Used
+// by the Catering Company drill-down (company → distributor → this report).
+router.get("/:id/scan-report", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const fromQ = req.query.from as string | undefined;
+    const toQ = req.query.to as string | undefined;
+    if (!fromQ || !toQ) return res.status(400).json({ error: "from and to required (YYYY-MM-DD)" });
+
+    const manager = await prisma.campManager.findUnique({ where: { id }, select: { id: true } });
+    if (!manager) return res.status(404).json({ error: "Distributor not found" });
+
+    const from = new Date(`${fromQ}T00:00:00.000Z`);
+    const to = new Date(`${toQ}T23:59:59.999Z`);
+
+    const scans = await prisma.scan.findMany({
+      where: { managerId: id, status: "Eligible", time: { gte: from, lte: to } },
+      select: { time: true, campCode: true, meal: true },
+    });
+
+    const sites = await listReportSites();
+    const nameByCode = new Map(sites.map((s) => [s.code, s.name]));
+
+    const byKey = new Map<string, { date: string; campCode: string; breakfast: number; lunch: number; dinner: number }>();
+    for (const s of scans) {
+      const day = dubaiDateKey(s.time);
+      const key = `${day}|${s.campCode}`;
+      const row = byKey.get(key) ?? { date: day, campCode: s.campCode, breakfast: 0, lunch: 0, dinner: 0 };
+      if (s.meal === "Breakfast") row.breakfast++;
+      else if (s.meal === "Lunch") row.lunch++;
+      else if (s.meal === "Dinner") row.dinner++;
+      byKey.set(key, row);
+    }
+
+    const rows = [...byKey.values()]
+      .map((r) => ({ ...r, campName: nameByCode.get(r.campCode) ?? r.campCode }))
+      .sort((a, b) => b.date.localeCompare(a.date) || a.campCode.localeCompare(b.campCode));
+
+    const totals = rows.reduce(
+      (acc, r) => ({
+        breakfast: acc.breakfast + r.breakfast,
+        lunch: acc.lunch + r.lunch,
+        dinner: acc.dinner + r.dinner,
+      }),
+      { breakfast: 0, lunch: 0, dinner: 0 },
+    );
+
+    const camps = [...new Set(rows.map((r) => r.campCode))].map((code) => ({
+      code, name: nameByCode.get(code) ?? code,
+    }));
+
+    res.json({ rows, totals, camps });
   } catch (e) { next(e); }
 });
 

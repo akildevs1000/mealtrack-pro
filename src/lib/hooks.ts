@@ -616,6 +616,25 @@ export function useDeleteManager() {
   });
 }
 
+// Per-distributor meal-serving report (which camp/site + breakfast/lunch/dinner
+// counts, day by day) for the Catering Company → distributor drill-down.
+export type ManagerScanReportRow = {
+  date: string; campCode: string; campName: string;
+  breakfast: number; lunch: number; dinner: number;
+};
+export type ManagerScanReport = {
+  rows: ManagerScanReportRow[];
+  totals: { breakfast: number; lunch: number; dinner: number };
+  camps: { code: string; name: string }[];
+};
+export function useManagerScanReport(id: string, from: string, to: string) {
+  return useQuery({
+    queryKey: ["managers", id, "scan-report", from, to],
+    queryFn: () => api<ManagerScanReport>(`/managers/${id}/scan-report?from=${from}&to=${to}`),
+    enabled: Boolean(id),
+  });
+}
+
 export function useToggleManagerStatus() {
   const qc = useQueryClient();
   return useMutation({
@@ -752,7 +771,7 @@ export type BySupplierData = {
   suppliers: { id: string; name: string }[];
   rows: { date: string; perSupplier: Record<string, MealTriple>; totals: MealTriple; avgPerDay: number }[];
 };
-export function useReportBySupplier(p: { from: string; to: string; companyCode?: string; campCode?: string; supplierId?: string }) {
+export function useReportBySupplier(p: { from: string; to: string; companyCode?: string; campCode?: string; supplierId?: string; cateringCompanyId?: string }) {
   return useQuery({
     queryKey: ["reports", "by-supplier", p],
     queryFn: () => api<BySupplierData>(`/reports/by-supplier${reportQs(p)}`),

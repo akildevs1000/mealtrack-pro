@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Clock,
   Smartphone,
+  ChefHat,
 } from "lucide-react";
 import {
   useCamps,
@@ -29,9 +30,9 @@ import {
   useDeleteManager,
   useToggleManagerStatus,
   useCateringCompanies,
-  useUpsertCateringCompany,
   type Manager as CampManager,
 } from "@/lib/hooks";
+import { CateringCompanyDialog } from "@/components/app/CateringCompanyDialog";
 
 export const Route = createFileRoute("/managers")({
   component: Managers,
@@ -106,9 +107,11 @@ function Managers() {
   const deleteMgr = useDeleteManager();
   const toggle = useToggleManagerStatus();
   const { data: companies = [] } = useCompanies();
+  const { data: cateringCompanies = [] } = useCateringCompanies();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CampManager["status"]>("all");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [cateringFilter, setCateringFilter] = useState<string>("all");
   const [editing, setEditing] = useState<CampManager | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<CampManager | null>(null);
@@ -120,13 +123,14 @@ function Managers() {
     return list.filter((m) => {
       if (statusFilter !== "all" && m.status !== statusFilter) return false;
       if (companyFilter !== "all" && m.companyCode !== companyFilter) return false;
+      if (cateringFilter !== "all" && m.cateringCompanyId !== cateringFilter) return false;
       if (!q) return true;
       return [m.name, m.username, ...(m.camps ?? [m.camp]), m.email, m.phone]
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [list, query, statusFilter, companyFilter]);
+  }, [list, query, statusFilter, companyFilter, cateringFilter]);
 
   // Keep the open detail overlay in sync with the latest data (e.g. after an
   // edit/toggle) so it reflects fresh values without re-opening.
@@ -234,6 +238,19 @@ function Managers() {
           ))}
         </select>
         <select
+          value={cateringFilter}
+          onChange={(e) => setCateringFilter(e.target.value)}
+          className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
+        >
+          <option value="all">All catering companies</option>
+          {cateringCompanies.map((c) => {
+            const count = list.filter((m) => m.cateringCompanyId === c.id).length;
+            return (
+              <option key={c.id} value={c.id}>{c.name} ({count})</option>
+            );
+          })}
+        </select>
+        <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as never)}
           className="px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
@@ -256,6 +273,7 @@ function Managers() {
                 <th className="px-4 py-3 font-medium">Manager</th>
                 <th className="px-4 py-3 font-medium">Username</th>
                 <th className="px-4 py-3 font-medium">Camp</th>
+                <th className="px-4 py-3 font-medium">Catering Company</th>
                 <th className="px-4 py-3 font-medium">Role / Shift</th>
                 <th className="px-4 py-3 font-medium">Contact</th>
                 <th className="px-4 py-3 font-medium">Mobile PIN</th>
@@ -299,6 +317,9 @@ function Managers() {
                           </span>
                         ))}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {m.cateringCompanyName || "—"}
                     </td>
                     <td className="px-4 py-3 text-xs">
                       <div>{m.role === "Camp Manager" ? "Distributor" : m.role}</div>
@@ -381,7 +402,7 @@ function Managers() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                     No managers match.
                   </td>
                 </tr>
@@ -718,8 +739,10 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
 // opens a checklist dropdown. Self-contained (no portal) so it plays nicely
 // inside the hand-rolled modal; closes on outside click. First selected camp
 // is the primary.
-// Searchable catering-company picker with an inline "+ New" (Zoho-style). Reads
-// the catering-company list and can create a new one on the fly, then selects it.
+// Searchable catering-company picker with an inline "+ New" (Zoho-style),
+// independent of the distributor's own Full Name — so many distributors can
+// link to the SAME catering company while keeping their own distinct names.
+// "+ New" opens the full CateringCompanyDialog (not a bare-name create).
 function CateringCompanySelect({
   value,
   onChange,
@@ -728,11 +751,9 @@ function CateringCompanySelect({
   onChange: (id: string | null) => void;
 }) {
   const { data: list = [] } = useCateringCompanies();
-  const create = useUpsertCateringCompany();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [showNewDialog, setShowNewDialog] = useState(false);
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   const selected = list.find((c) => c.id === value) ?? null;
@@ -749,23 +770,6 @@ function CateringCompanySelect({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
-
-  async function addNew() {
-    const name = newName.trim();
-    if (!name) return;
-    try {
-      const created = await create.mutateAsync({
-        name, contact: "", email: "", phone: "", notes: "", status: "Active",
-      });
-      onChange(created.id);
-      setAdding(false);
-      setNewName("");
-      setOpen(false);
-      setQ("");
-    } catch {
-      /* name clash etc. — leave the input so the user can adjust */
-    }
-  }
 
   return (
     <div className="relative" ref={boxRef}>
@@ -820,38 +824,23 @@ function CateringCompanySelect({
             )}
           </div>
           <div className="border-t border-border p-1.5">
-            {adding ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="New catering company name"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") { e.preventDefault(); void addNew(); }
-                  }}
-                  className="flex-1 h-8 px-2 rounded-md bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => void addNew()}
-                  disabled={create.isPending || !newName.trim()}
-                  className="px-3 h-8 rounded-md gradient-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
-                >
-                  Add
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAdding(true)}
-                className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-primary hover:bg-primary/10"
-              >
-                <Plus className="size-3.5" /> New Catering Company
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => { setShowNewDialog(true); setOpen(false); }}
+              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-primary hover:bg-primary/10"
+            >
+              <Plus className="size-3.5" /> New Catering Company
+            </button>
           </div>
         </div>
+      )}
+
+      {showNewDialog && (
+        <CateringCompanyDialog
+          initialName={q.trim()}
+          onClose={() => setShowNewDialog(false)}
+          onSaved={(c) => { onChange(c.id); setShowNewDialog(false); setQ(""); }}
+        />
       )}
     </div>
   );
@@ -1076,6 +1065,10 @@ function SupplierDetail({
 
         <DetailCard icon={<Building2 className="size-4" />} title="Company">
           <div className="font-medium">{m.companyCode ?? "—"}</div>
+        </DetailCard>
+
+        <DetailCard icon={<ChefHat className="size-4" />} title="Catering Company">
+          <div className="font-medium">{m.cateringCompanyName ?? "—"}</div>
         </DetailCard>
 
         <DetailCard icon={<Mail className="size-4" />} title="Contact">

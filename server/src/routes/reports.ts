@@ -454,8 +454,18 @@ router.get("/by-supplier", async (req, res, next) => {
       req.query.companyCode as string,
     );
     const supplierId = req.query.supplierId as string | undefined;
+    const cateringCompanyId = req.query.cateringCompanyId as string | undefined;
     const scanWhere: any = { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) };
-    if (supplierId && supplierId !== "all") scanWhere.managerId = supplierId;
+    if (supplierId && supplierId !== "all") {
+      scanWhere.managerId = supplierId;
+    } else if (cateringCompanyId && cateringCompanyId !== "all") {
+      // Restrict to distributors (scanning managers) under this catering company.
+      const inCatering = await prisma.campManager.findMany({
+        where: { cateringCompanyId },
+        select: { id: true },
+      });
+      scanWhere.managerId = { in: inCatering.map((m) => m.id) };
+    }
     const scans = await prisma.scan.findMany({
       where: scanWhere,
       select: { time: true, managerId: true, meal: true },

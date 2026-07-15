@@ -7,6 +7,7 @@ import {
   useCamps,
   useProjects,
   useManagers,
+  useCateringCompanies,
   useReportDailyDistribution,
   useReportBySupplier,
   useReportByLocation,
@@ -46,6 +47,7 @@ function ReportsPage() {
   const { data: campsAll = [] } = useCamps();
   const { data: projectsAll = [] } = useProjects();
   const { data: allSuppliers = [] } = useManagers();
+  const { data: cateringCompanies = [] } = useCateringCompanies();
 
   const [tab, setTab] = useState<TabId>("daily");
   const [company, setCompany] = useState("all");
@@ -54,10 +56,24 @@ function ReportsPage() {
   const [to, setTo] = useState(todayIso);
   const [camp, setCamp] = useState("all");
   const [supplier, setSupplier] = useState("all");
+  const [catering, setCatering] = useState("all");
 
   const companyParam = company === "all" ? undefined : company;
   const campParam = camp === "all" ? undefined : camp;
   const supplierParam = supplier === "all" ? undefined : supplier;
+  const cateringParam = catering === "all" ? undefined : catering;
+
+  // The two are mutually exclusive on the backend (an explicit distributor wins
+  // over the catering-company scope), so picking one clears the other to avoid
+  // a filter silently having no effect.
+  function onSupplier(v: string) {
+    setSupplier(v);
+    if (v !== "all") setCatering("all");
+  }
+  function onCatering(v: string) {
+    setCatering(v);
+    if (v !== "all") setSupplier("all");
+  }
 
   // Parent company → sibling lists (camps / suppliers) filtered by it.
   const camps = useMemo(() => {
@@ -81,10 +97,14 @@ function ReportsPage() {
     setCompany(v);
     setCamp("all");
     setSupplier("all");
+    setCatering("all");
   }
 
   const daily = useReportDailyDistribution({ date, companyCode: companyParam, campCode: campParam });
-  const bySupplier = useReportBySupplier({ from, to, companyCode: companyParam, campCode: campParam, supplierId: supplierParam });
+  const bySupplier = useReportBySupplier({
+    from, to, companyCode: companyParam, campCode: campParam,
+    supplierId: supplierParam, cateringCompanyId: cateringParam,
+  });
   const byLocation = useReportByLocation({ from, to, companyCode: companyParam, campCode: campParam });
   const comparison = useReportRequestComparison({ from, to, companyCode: companyParam, supplierId: supplierParam });
   const duplicate = useReportDuplicateEligibility({ from, to, companyCode: companyParam, campCode: campParam });
@@ -547,10 +567,20 @@ function ReportsPage() {
         )}
         {showSupplier && (
           <Labeled label="Distributor">
-            <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className={inputCls}>
+            <select value={supplier} onChange={(e) => onSupplier(e.target.value)} className={inputCls}>
               <option value="all">All distributors</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </Labeled>
+        )}
+        {tab === "supplier" && (
+          <Labeled label="Catering Company">
+            <select value={catering} onChange={(e) => onCatering(e.target.value)} className={inputCls}>
+              <option value="all">All catering companies</option>
+              {cateringCompanies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </Labeled>

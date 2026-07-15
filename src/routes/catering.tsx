@@ -1,44 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ChefHat, Plus, Search, Pencil, Trash2, X, Mail, Phone as PhoneIcon } from "lucide-react";
+import { ChefHat, Plus, Search, Pencil, Trash2, Mail, Phone as PhoneIcon } from "lucide-react";
 import { useSession } from "@/lib/session";
-import {
-  useCateringCompanies,
-  useUpsertCateringCompany,
-  useDeleteCateringCompany,
-  type CateringCompany,
-} from "@/lib/hooks";
+import { CateringCompanyDialog } from "@/components/app/CateringCompanyDialog";
+import { CateringCompanyDetailDialog } from "@/components/app/CateringCompanyDetailDialog";
+import { useCateringCompanies, useDeleteCateringCompany, type CateringCompany } from "@/lib/hooks";
 
 export const Route = createFileRoute("/catering")({
   component: CateringPage,
-});
-
-const inputCls =
-  "mt-1 w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30";
-
-// UAE-relevant option lists.
-const EMIRATES = ["Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al Quwain", "Ras Al Khaimah", "Fujairah"];
-const TAX_TREATMENTS = ["VAT Registered", "Non VAT Registered", "GCC VAT Registered", "Non GCC"];
-
-type FormState = Omit<CateringCompany, "id">;
-const emptyForm = (): FormState => ({
-  name: "",
-  customerType: "Business",
-  companyName: "",
-  salutation: "",
-  firstName: "",
-  lastName: "",
-  contact: "",
-  email: "",
-  phone: "",
-  addressLine: "",
-  city: "",
-  country: "United Arab Emirates",
-  trn: "",
-  taxTreatment: "",
-  placeOfSupply: "",
-  notes: "",
-  status: "Active",
 });
 
 // Best contact label from the (optional) primary-contact fields, else legacy contact.
@@ -49,7 +18,6 @@ function contactLabel(c: Pick<CateringCompany, "salutation" | "firstName" | "las
 
 function CateringPage() {
   const { data: list = [] } = useCateringCompanies();
-  const upsert = useUpsertCateringCompany();
   const del = useDeleteCateringCompany();
   const { can } = useSession();
   const canEdit = can("catering", "edit");
@@ -58,11 +26,9 @@ function CateringPage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm());
-  const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<CateringCompany | null>(null);
-
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<CateringCompany | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -74,34 +40,15 @@ function CateringPage() {
     );
   }, [list, query]);
 
+  const editing = editingId ? list.find((c) => c.id === editingId) ?? null : null;
+
   function openNew() {
     setEditingId(null);
-    setForm(emptyForm());
-    setError(null);
     setOpen(true);
   }
   function openEdit(c: CateringCompany) {
     setEditingId(c.id);
-    const { id: _id, ...rest } = c;
-    setForm(rest);
-    setError(null);
     setOpen(true);
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.name.trim()) {
-      setError("Catering company name is required.");
-      return;
-    }
-    try {
-      await upsert.mutateAsync({ ...(editingId ? { id: editingId } : {}), ...form });
-      setOpen(false);
-      setEditingId(null);
-      setForm(emptyForm());
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save catering company");
-    }
   }
 
   async function confirmDelete() {
@@ -109,8 +56,9 @@ function CateringPage() {
     try {
       await del.mutateAsync(deleting.id);
       setDeleting(null);
+      setDeleteError(null);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete");
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete");
     }
   }
 
@@ -164,7 +112,12 @@ function CateringPage() {
               </thead>
               <tbody>
                 {filtered.map((c) => (
-                  <tr key={c.id} className="border-t border-border hover:bg-secondary/30">
+                  <tr
+                    key={c.id}
+                    onClick={() => setViewing(c)}
+                    className="border-t border-border hover:bg-secondary/30 cursor-pointer"
+                    title="View distributors under this catering company"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="size-9 rounded-lg bg-primary/10 text-primary grid place-items-center shrink-0">
@@ -205,7 +158,7 @@ function CateringPage() {
                         {c.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="inline-flex items-center gap-1.5">
                         {canEdit && (
                           <button
@@ -235,135 +188,16 @@ function CateringPage() {
         )}
       </div>
 
-      {/* Add / edit dialog */}
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-card border border-border shadow-elegant" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
-              <div className="flex items-center gap-3">
-                <div className="size-9 rounded-lg gradient-primary grid place-items-center text-primary-foreground">
-                  <ChefHat className="size-4" />
-                </div>
-                <div className="font-semibold">{editingId ? "Edit Catering Company" : "Add Catering Company"}</div>
-              </div>
-              <button onClick={() => setOpen(false)} className="size-8 grid place-items-center rounded-lg hover:bg-secondary">
-                <X className="size-4" />
-              </button>
-            </div>
-            <form onSubmit={submit} className="p-6 space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-medium text-muted-foreground">Catering Company Name *</label>
-                  <input required value={form.name} onChange={(e) => set("name", e.target.value)} className={inputCls} placeholder="e.g. Sabari Catering LLC" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Type</label>
-                  <select value={form.customerType} onChange={(e) => set("customerType", e.target.value as FormState["customerType"])} className={inputCls}>
-                    <option value="Business">Business</option>
-                    <option value="Individual">Individual</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Status</label>
-                  <select value={form.status} onChange={(e) => set("status", e.target.value as FormState["status"])} className={inputCls}>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-medium text-muted-foreground">Company / Trade name</label>
-                  <input value={form.companyName} onChange={(e) => set("companyName", e.target.value)} className={inputCls} />
-                </div>
-              </div>
+        <CateringCompanyDialog
+          editing={editing}
+          onClose={() => { setOpen(false); setEditingId(null); }}
+          onSaved={() => { setOpen(false); setEditingId(null); }}
+        />
+      )}
 
-              <Section title="Primary Contact">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Salutation</label>
-                    <select value={form.salutation} onChange={(e) => set("salutation", e.target.value)} className={inputCls}>
-                      <option value="">—</option>
-                      {["Mr.", "Mrs.", "Ms.", "Dr."].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">First name</label>
-                    <input value={form.firstName} onChange={(e) => set("firstName", e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Last name</label>
-                    <input value={form.lastName} onChange={(e) => set("lastName", e.target.value)} className={inputCls} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Email</label>
-                    <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Phone</label>
-                    <input value={form.phone} onChange={(e) => set("phone", e.target.value)} className={inputCls} placeholder="+971 50 000 0000" />
-                  </div>
-                </div>
-              </Section>
-
-              <Section title="Address">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-medium text-muted-foreground">Address / area</label>
-                    <input value={form.addressLine} onChange={(e) => set("addressLine", e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">City</label>
-                    <input value={form.city} onChange={(e) => set("city", e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Country</label>
-                    <input value={form.country} onChange={(e) => set("country", e.target.value)} className={inputCls} />
-                  </div>
-                </div>
-              </Section>
-
-              <Section title="Tax">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">TRN / VAT no.</label>
-                    <input value={form.trn} onChange={(e) => set("trn", e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Tax treatment</label>
-                    <select value={form.taxTreatment} onChange={(e) => set("taxTreatment", e.target.value)} className={inputCls}>
-                      <option value="">—</option>
-                      {TAX_TREATMENTS.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Place of supply</label>
-                    <select value={form.placeOfSupply} onChange={(e) => set("placeOfSupply", e.target.value)} className={inputCls}>
-                      <option value="">—</option>
-                      {EMIRATES.map((em) => <option key={em} value={em}>{em}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </Section>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Notes / Reference</label>
-                <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={2} className={inputCls} />
-              </div>
-
-              {error && (
-                <div className="rounded-lg bg-destructive/10 text-destructive text-sm px-3 py-2">{error}</div>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 rounded-lg text-sm hover:bg-secondary">Cancel</button>
-                <button type="submit" disabled={upsert.isPending} className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow disabled:opacity-60">
-                  {upsert.isPending ? "Saving…" : editingId ? "Save Changes" : "Create Catering Company"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {viewing && (
+        <CateringCompanyDetailDialog company={viewing} onClose={() => setViewing(null)} />
       )}
 
       {/* Delete confirmation */}
@@ -374,6 +208,9 @@ function CateringPage() {
             <p className="text-sm text-muted-foreground mt-1">
               This will permanently remove <span className="font-medium text-foreground">{deleting.name}</span>. Any distributors linked to it will simply be unlinked.
             </p>
+            {deleteError && (
+              <div className="mt-3 rounded-lg bg-destructive/10 text-destructive text-sm px-3 py-2">{deleteError}</div>
+            )}
             <div className="flex items-center justify-end gap-2 mt-5">
               <button onClick={() => setDeleting(null)} className="px-4 py-2 rounded-lg text-sm hover:bg-secondary">Cancel</button>
               <button onClick={confirmDelete} className="px-4 py-2 rounded-lg text-sm font-semibold bg-destructive text-destructive-foreground hover:opacity-90">Delete</button>
@@ -381,15 +218,6 @@ function CateringPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border/60 bg-secondary/20 p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{title}</div>
-      {children}
     </div>
   );
 }
