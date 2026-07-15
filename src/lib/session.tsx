@@ -27,7 +27,7 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: "camps", label: "Camps" },
   { key: "projects", label: "Projects" },
   { key: "employees", label: "Employees" },
-  { key: "managers", label: "Suppliers" },
+  { key: "managers", label: "Distributors" },
   { key: "forecast", label: "Forecast" },
   { key: "devices", label: "Devices" },
   { key: "reports", label: "Reports" },

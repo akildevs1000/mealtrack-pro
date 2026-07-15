@@ -678,9 +678,9 @@ function FoodEstimationDialog({ onClose, onSaved }: { onClose: () => void; onSav
                 ))}
               </select>
             </Field>
-            <Field label="Supplier">
+            <Field label="Distributor">
               <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} disabled={!companyCode} className={selectCls}>
-                <option value="">{companyCode ? "— Select Supplier —" : "Select a company first"}</option>
+                <option value="">{companyCode ? "— Select Distributor —" : "Select a company first"}</option>
                 {companySuppliers.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
@@ -801,7 +801,7 @@ function FoodEstimationList({ companyCode }: { companyCode?: string }) {
             <tr>
               <th className="text-left px-6 py-3 font-medium">Date</th>
               <th className="text-left px-4 py-3 font-medium">Company</th>
-              <th className="text-left px-4 py-3 font-medium">Supplier</th>
+              <th className="text-left px-4 py-3 font-medium">Distributor</th>
               <th className="text-left px-4 py-3 font-medium">Project</th>
               <th className="text-left px-4 py-3 font-medium">Camp</th>
               <th className="text-right px-4 py-3 font-medium">Breakfast</th>

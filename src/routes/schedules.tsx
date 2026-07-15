@@ -52,7 +52,7 @@ export const Route = createFileRoute("/schedules")({
 
 const REPORT_LABEL: Record<ScheduleReportType, string> = {
   dailyTransaction: "Daily Transaction Report",
-  bySupplier: "Reports by Supplier",
+  bySupplier: "Reports by Distributor",
   byLocation: "Reports by Location",
   requestComparison: "Request Comparison",
   duplicateEligibility: "Duplicate / Eligibility",

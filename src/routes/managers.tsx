@@ -33,7 +33,7 @@ import {
 
 export const Route = createFileRoute("/managers")({
   component: Managers,
-  head: () => ({ meta: [{ title: "Suppliers — MyMeals" }] }),
+  head: () => ({ meta: [{ title: "Distributors — MyMeals" }] }),
 });
 
 type FormState = {
@@ -173,23 +173,23 @@ function Managers() {
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">Suppliers</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Distributors</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Add, edit and manage suppliers — assign each to a camp and control access.
+            Add, edit and manage distributors — assign each to a camp and control access.
           </p>
         </div>
         <button
           onClick={() => setCreating(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold shadow-glow hover:opacity-95"
         >
-          <Plus className="size-4" /> Add New Manager
+          <Plus className="size-4" /> Add New Distributor
         </button>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi
           icon={<Shield className="size-4" />}
-          label="Total Managers"
+          label="Total Distributors"
           value={list.length}
           tone="primary"
         />
@@ -242,7 +242,7 @@ function Managers() {
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border bg-secondary/30">
-          Tip: double-click a row to view the full supplier profile.
+          Tip: double-click a row to view the full distributor profile.
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -296,7 +296,7 @@ function Managers() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs">
-                      <div>{m.role === "Camp Manager" ? "Supplier" : m.role}</div>
+                      <div>{m.role === "Camp Manager" ? "Distributor" : m.role}</div>
                       <div className="text-muted-foreground">{m.shift}</div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
@@ -536,9 +536,9 @@ function ManagerDialog({
               <KeyRound className="size-4" />
             </div>
             <div>
-              <div className="font-semibold">{manager ? "Edit Supplier" : "Add New Supplier"}</div>
+              <div className="font-semibold">{manager ? "Edit Distributor" : "Add New Distributor"}</div>
               <div className="text-xs text-muted-foreground">
-                {manager ? `Updating @${manager.username}` : "Create a new supplier account"}
+                {manager ? `Updating @${manager.username}` : "Create a new distributor account"}
               </div>
             </div>
           </div>
@@ -684,7 +684,7 @@ function ManagerDialog({
               disabled={submitting}
               className="rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {submitting ? "Saving…" : manager ? "Save Changes" : "Create Supplier"}
+              {submitting ? "Saving…" : manager ? "Save Changes" : "Create Distributor"}
             </button>
           </div>
         </form>
@@ -919,7 +919,7 @@ function SupplierDetail({
         </DetailCard>
 
         <DetailCard icon={<Shield className="size-4" />} title="Role & Shift">
-          <div className="font-medium">{m.role === "Camp Manager" ? "Supplier" : m.role}</div>
+          <div className="font-medium">{m.role === "Camp Manager" ? "Distributor" : m.role}</div>
           <div className="text-sm text-muted-foreground">{m.shift}</div>
         </DetailCard>
 

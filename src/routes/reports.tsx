@@ -24,7 +24,7 @@ type TabId = "daily" | "supplier" | "location" | "comparison" | "duplicate";
 
 const TABS: { id: TabId; n: number; title: string; desc: string }[] = [
   { id: "daily", n: 1, title: "Daily Transaction", desc: "Meal distribution per worker for a selected date" },
-  { id: "supplier", n: 2, title: "Reports by Supplier", desc: "Distribution-point meals by supplier, pivoted by date" },
+  { id: "supplier", n: 2, title: "Reports by Distributor", desc: "Distribution-point meals by distributor, pivoted by date" },
   { id: "location", n: 3, title: "Reports by Location", desc: "Daily meal distribution for a camp / location" },
   { id: "comparison", n: 4, title: "Request Comparison", desc: "Food estimations vs the previous day (variance)" },
   { id: "duplicate", n: 5, title: "Duplicate / Eligibility", desc: "Invalid check-ins, duplicate scans and rule exceptions" },
@@ -103,7 +103,7 @@ function ReportsPage() {
       if (!d) return [];
       const rows = supplierStackedRows(d);
       return [
-        ["Date", "Supplier", "Breakfast", "Lunch", "Dinner", "Total"],
+        ["Date", "Distributor", "Breakfast", "Lunch", "Dinner", "Total"],
         ...rows.map((r) => [r.date, r.supplier, r.breakfast, r.lunch, r.dinner, r.total]),
       ];
     }
@@ -117,7 +117,7 @@ function ReportsPage() {
     if (tab === "comparison") {
       const rows = comparison.data?.rows ?? [];
       return [
-        ["Date", "Supplier", "Site", "Meal", "Requested Yesterday", "Requested Today", "Variance", "% Change"],
+        ["Date", "Distributor", "Site", "Meal", "Requested Yesterday", "Requested Today", "Variance", "% Change"],
         ...rows.map((r) => [
           r.date, r.supplier, r.site, r.meal,
           r.requestedYesterday ?? "—", r.requestedToday,
@@ -546,9 +546,9 @@ function ReportsPage() {
           </Labeled>
         )}
         {showSupplier && (
-          <Labeled label="Supplier">
+          <Labeled label="Distributor">
             <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className={inputCls}>
-              <option value="all">All suppliers</option>
+              <option value="all">All distributors</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -646,7 +646,7 @@ function SupplierStacked({ data, loading }: { data: import("@/lib/hooks").BySupp
         <thead className="bg-secondary/60 text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className={thL}>Date</th>
-            <th className={thL}>Supplier</th>
+            <th className={thL}>Distributor</th>
             <th className={thR}>Breakfast</th>
             <th className={thR}>Lunch</th>
             <th className={thR}>Dinner</th>
@@ -713,7 +713,7 @@ function ComparisonTable({ rows, loading }: { rows: import("@/lib/hooks").Compar
         <thead className="bg-secondary/60 text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className={thL}>Date</th>
-            <th className={thL}>Supplier</th>
+            <th className={thL}>Distributor</th>
             <th className={thL}>Site</th>
             <th className={thL}>Meal</th>
             <th className={thR}>Req. Yesterday</th>
