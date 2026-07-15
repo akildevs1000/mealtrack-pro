@@ -293,7 +293,7 @@ const scanSchema = z.object({
 
 router.post("/scan", requireScannerAuth, async (req, res, next) => {
   try {
-    const { code, meal: forcedMeal } = scanSchema.parse(req.body);
+    const { code, meal: forcedMeal, deviceMac } = scanSchema.parse(req.body);
 
     const campCode = req.scanner!.campCode;
     const companyCode = req.scanner!.companyCode;
@@ -320,6 +320,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
           meal: "Lunch",
           status: "Expired",
           managerId: req.scanner!.managerId,
+          deviceMac,
         },
       });
       return res.json({
@@ -336,6 +337,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
           name: code, labourId: code, campCode, meal,
           status: "NotEligible",
           managerId: req.scanner!.managerId,
+          deviceMac,
         },
       });
       return res.json({ status: "not_eligible", reason: "unknown_employee", scan: toScanApi(scan) });
@@ -350,6 +352,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
           name: employee.name, labourId: employee.laborCode, campCode, meal,
           status: "WrongCamp",
           managerId: req.scanner!.managerId,
+          deviceMac,
         },
       });
       return res.json({
@@ -371,6 +374,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
             name: employee.name, labourId: employee.laborCode, campCode, meal,
             status: "NotEligible",
             managerId: req.scanner!.managerId,
+            deviceMac,
           },
         });
         return res.json({
@@ -388,6 +392,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
           name: employee.name, labourId: employee.laborCode, campCode, meal,
           status: "NotEligible",
           managerId: req.scanner!.managerId,
+          deviceMac,
         },
       });
       return res.json({
@@ -414,6 +419,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
           name: employee.name, labourId: employee.laborCode, campCode, meal,
           status: "AlreadyServed",
           managerId: req.scanner!.managerId,
+          deviceMac,
         },
       });
       return res.json({
@@ -439,6 +445,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
         name: employee.name, labourId: employee.laborCode, campCode, meal,
         status: "Eligible",
         managerId: req.scanner!.managerId,
+        deviceMac,
       },
     });
 

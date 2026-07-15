@@ -255,6 +255,10 @@ model Scan {
   // which camp manager was logged in. Null for legacy/admin-posted scans.
   manager   CampManager? @relation(fields: [managerId], references: [id])
   managerId String?
+  // MAC of the physical scanner device that recorded this scan, as reported by
+  // the Android app. Not a FK to Device — a device row isn't required to scan
+  // (see the /scanner/login comment). Null for legacy/admin-posted scans.
+  deviceMac String?
 
   @@index([time])
   @@index([campCode])

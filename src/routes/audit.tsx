@@ -92,8 +92,10 @@ function AuditPage() {
 
   function exportCsv() {
     const rows = [
-      ["Date", "Time", "Employee", "Labour ID", "Camp", "Meal", "Status"],
-      ...filtered.map((e) => [e.date, e.time, e.name, e.labourId, e.camp, e.meal, e.status]),
+      ["Date", "Time", "Employee", "Labour ID", "Camp", "Meal", "Device", "Status"],
+      ...filtered.map((e) => [
+        e.date, e.time, e.name, e.labourId, e.camp, e.meal, e.device ?? "—", e.status,
+      ]),
     ];
     const csv = rows
       .map((r) => r.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(","))
@@ -118,8 +120,8 @@ function AuditPage() {
       22,
     );
     autoTable(doc, {
-      head: [["Time", "Employee", "Labour ID", "Camp", "Meal", "Status"]],
-      body: filtered.map((e) => [e.time, e.name, e.labourId, e.camp, e.meal, e.status]),
+      head: [["Time", "Employee", "Labour ID", "Camp", "Meal", "Device", "Status"]],
+      body: filtered.map((e) => [e.time, e.name, e.labourId, e.camp, e.meal, e.device ?? "—", e.status]),
       startY: 28,
       styles: { fontSize: 7, cellPadding: 1.5 },
       headStyles: { fillColor: [37, 99, 235], textColor: 255 },
@@ -241,7 +243,7 @@ function AuditPage() {
           <table className="w-full text-sm">
             <thead className="bg-secondary/60 text-muted-foreground sticky top-0 z-10">
               <tr>
-                {["Time", "Employee", "Camp", "Session", "Status"].map((h) => (
+                {["Time", "Employee", "Camp", "Session", "Device", "Status"].map((h) => (
                   <th
                     key={h}
                     className="text-left px-4 py-2.5 font-medium text-[11px] uppercase tracking-wider"
@@ -268,6 +270,7 @@ function AuditPage() {
                     <div className="text-[13px] font-medium">{e.camp}</div>
                   </td>
                   <td className="px-4 py-2.5 text-xs">{e.meal}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{e.device ?? "—"}</td>
                   <td className="px-4 py-2.5">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_TONE[e.status as Status] ?? "bg-secondary text-muted-foreground border-border"}`}
@@ -279,7 +282,7 @@ function AuditPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
                     {isLoading ? "Loading scan events…" : "No scan events match the filters."}
                   </td>
                 </tr>

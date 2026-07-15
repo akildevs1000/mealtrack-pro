@@ -199,6 +199,19 @@ router.get("/scans", async (req, res, next) => {
       orderBy: { time: "desc" },
       take: limit,
     });
+
+    // Resolve each scan's deviceMac to a friendly device name, when the MAC is
+    // registered in Devices — unregistered MACs (no device row required to
+    // scan, see /scanner/login) just show the raw address.
+    const macs = [...new Set(rows.map((s) => s.deviceMac).filter((m): m is string => !!m))];
+    const devices = macs.length
+      ? await prisma.device.findMany({
+          where: { macAddress: { in: macs } },
+          select: { name: true, macAddress: true },
+        })
+      : [];
+    const nameByMac = new Map(devices.map((d) => [d.macAddress, d.name]));
+
     res.json(
       rows.map((s) => ({
         id: s.id,
@@ -209,6 +222,7 @@ router.get("/scans", async (req, res, next) => {
         camp: s.campCode,
         meal: s.meal,
         status: uiStatus(s.status),
+        device: s.deviceMac ? (nameByMac.get(s.deviceMac) ?? s.deviceMac) : undefined,
       })),
     );
   } catch (e) {
@@ -526,8 +540,21 @@ router.get("/by-location", async (req, res, next) => {
     );
     const sites = await listReportSites(codes);
     const nameByCode = new Map(sites.map((s) => [s.code, s.name]));
+    const supplierId = req.query.supplierId as string | undefined;
+    const cateringCompanyId = req.query.cateringCompanyId as string | undefined;
+    const scanWhere: any = { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) };
+    if (supplierId && supplierId !== "all") {
+      scanWhere.managerId = supplierId;
+    } else if (cateringCompanyId && cateringCompanyId !== "all") {
+      // Restrict to distributors (scanning managers) under this catering company.
+      const inCatering = await prisma.campManager.findMany({
+        where: { cateringCompanyId },
+        select: { id: true },
+      });
+      scanWhere.managerId = { in: inCatering.map((m) => m.id) };
+    }
     const scans = await prisma.scan.findMany({
-      where: { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) },
+      where: scanWhere,
       select: { time: true, meal: true, campCode: true },
     });
     // One row per (day × location). Zero-fill every date in the range for each

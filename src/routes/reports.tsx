@@ -105,7 +105,10 @@ function ReportsPage() {
     from, to, companyCode: companyParam, campCode: campParam,
     supplierId: supplierParam, cateringCompanyId: cateringParam,
   });
-  const byLocation = useReportByLocation({ from, to, companyCode: companyParam, campCode: campParam });
+  const byLocation = useReportByLocation({
+    from, to, companyCode: companyParam, campCode: campParam,
+    supplierId: supplierParam, cateringCompanyId: cateringParam,
+  });
   const comparison = useReportRequestComparison({ from, to, companyCode: companyParam, supplierId: supplierParam });
   const duplicate = useReportDuplicateEligibility({ from, to, companyCode: companyParam, campCode: campParam });
 
@@ -470,7 +473,7 @@ function ReportsPage() {
   const showDate = tab === "daily";
   const showRange = !showDate;
   const showCamp = tab === "daily" || tab === "location" || tab === "duplicate";
-  const showSupplier = tab === "supplier" || tab === "comparison";
+  const showSupplier = tab === "supplier" || tab === "comparison" || tab === "location";
 
   return (
     <div className="space-y-6">
@@ -575,7 +578,7 @@ function ReportsPage() {
             </select>
           </Labeled>
         )}
-        {tab === "supplier" && (
+        {(tab === "supplier" || tab === "location") && (
           <Labeled label="Catering Company">
             <select value={catering} onChange={(e) => onCatering(e.target.value)} className={inputCls}>
               <option value="all">All catering companies</option>
