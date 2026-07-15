@@ -736,7 +736,10 @@ function CateringCompanySelect({
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   const selected = list.find((c) => c.id === value) ?? null;
-  const filtered = list.filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const ql = q.trim().toLowerCase();
+  const filtered = list.filter((c) =>
+    [c.name, c.companyName, c.email].some((v) => (v ?? "").toLowerCase().includes(ql)),
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -804,9 +807,12 @@ function CateringCompanySelect({
                 type="button"
                 key={c.id}
                 onClick={() => { onChange(c.id); setOpen(false); }}
-                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-secondary ${c.id === value ? "text-primary font-medium" : ""}`}
+                className={`w-full text-left px-3 py-1.5 hover:bg-secondary ${c.id === value ? "bg-primary/5" : ""}`}
               >
-                {c.name}
+                <div className={`text-sm ${c.id === value ? "text-primary font-medium" : ""}`}>{c.name}</div>
+                {(c.companyName || c.email) && (
+                  <div className="text-[11px] text-muted-foreground truncate">{c.companyName || c.email}</div>
+                )}
               </button>
             ))}
             {filtered.length === 0 && (

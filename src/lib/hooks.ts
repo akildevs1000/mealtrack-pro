@@ -232,10 +232,21 @@ export function useDeleteCompany() {
 // Catering companies
 export type CateringCompany = {
   id: string;
-  name: string;
-  contact: string;
+  name: string;                 // display / catering company name
+  customerType: "Business" | "Individual";
+  companyName: string;
+  salutation: string;
+  firstName: string;
+  lastName: string;
+  contact: string;              // legacy single contact
   email: string;
   phone: string;
+  addressLine: string;
+  city: string;
+  country: string;
+  trn: string;                  // VAT / TRN
+  taxTreatment: string;
+  placeOfSupply: string;
   notes: string;
   status: "Active" | "Inactive";
 };

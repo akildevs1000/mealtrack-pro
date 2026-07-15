@@ -333,16 +333,30 @@ model CampManager {
 // Catering company — a vendor/customer record. Distributors can be assigned to
 // one via the searchable dropdown on the distributor form.
 model CateringCompany {
-  id        String        @id @default(cuid())
-  name      String        @unique
-  contact   String        @default("")
-  email     String        @default("")
-  phone     String        @default("")
-  notes     String        @default("")
-  status    String        @default("Active") // "Active" | "Inactive"
-  managers  CampManager[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id           String        @id @default(cuid())
+  name         String        @unique // Display name
+  customerType String        @default("Business") // "Business" | "Individual"
+  companyName  String        @default("")
+  // Primary contact
+  salutation   String        @default("")
+  firstName    String        @default("")
+  lastName     String        @default("")
+  contact      String        @default("") // legacy single contact field
+  email        String        @default("")
+  phone        String        @default("")
+  // Address
+  addressLine  String        @default("")
+  city         String        @default("")
+  country      String        @default("")
+  // Tax
+  trn          String        @default("") // VAT / TRN number
+  taxTreatment String        @default("")
+  placeOfSupply String       @default("")
+  notes        String        @default("")
+  status       String        @default("Active") // "Active" | "Inactive"
+  managers     CampManager[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 // Audit log (used by /audit route)

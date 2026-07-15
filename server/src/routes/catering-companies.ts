@@ -18,12 +18,24 @@ router.get("/", async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
+const s = z.string().optional();
 const upsertSchema = z.object({
   name: z.string().min(1),
-  contact: z.string().optional(),
-  email: z.string().optional(),
-  phone: z.string().optional(),
-  notes: z.string().optional(),
+  customerType: z.enum(["Business", "Individual"]).optional(),
+  companyName: s,
+  salutation: s,
+  firstName: s,
+  lastName: s,
+  contact: s,
+  email: s,
+  phone: s,
+  addressLine: s,
+  city: s,
+  country: s,
+  trn: s,
+  taxTreatment: s,
+  placeOfSupply: s,
+  notes: s,
   status: z.enum(["Active", "Inactive"]).optional(),
 });
 
@@ -70,27 +82,31 @@ router.delete("/:id", requirePerm("catering", "delete"), async (req, res, next) 
   } catch (e) { next(e); }
 });
 
+const FIELDS = [
+  "companyName", "salutation", "firstName", "lastName", "contact",
+  "email", "phone", "addressLine", "city", "country", "trn",
+  "taxTreatment", "placeOfSupply", "notes",
+] as const;
+
 function toApi(c: any) {
-  return {
+  const out: Record<string, any> = {
     id: c.id,
     name: c.name,
-    contact: c.contact,
-    email: c.email,
-    phone: c.phone,
-    notes: c.notes,
+    customerType: c.customerType,
     status: c.status,
   };
+  for (const f of FIELDS) out[f] = c[f] ?? "";
+  return out;
 }
 
 function fromApi(b: z.infer<typeof upsertSchema>) {
-  return {
+  const out: Record<string, any> = {
     name: b.name,
-    contact: b.contact ?? "",
-    email: b.email ?? "",
-    phone: b.phone ?? "",
-    notes: b.notes ?? "",
+    customerType: b.customerType ?? "Business",
     status: b.status ?? "Active",
   };
+  for (const f of FIELDS) out[f] = (b as any)[f] ?? "";
+  return out;
 }
 
 export default router;
