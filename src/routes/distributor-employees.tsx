@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  Contact, Plus, Search, Pencil, Trash2, X, Mail, Phone as PhoneIcon, BadgeCheck, ChefHat,
-  Smartphone, KeyRound, IdCard, Building2,
+  Contact, Plus, Search, Pencil, Trash2, X, Mail, Phone as PhoneIcon, BadgeCheck, ChefHat, IdCard,
 } from "lucide-react";
 import { useSession } from "@/lib/session";
 import {
@@ -10,8 +9,6 @@ import {
   useUpsertDistributorEmployee,
   useDeleteDistributorEmployee,
   useCateringCompanies,
-  useCreateManager,
-  useCamps,
   type DistributorEmployee,
 } from "@/lib/hooks";
 
@@ -27,36 +24,20 @@ type FormState = {
   name: string;
   phone: string;
   email: string;
+  emiratesId: string;
   status: "Active" | "Inactive";
   notes: string;
-  // Login fields — only used when creating the Distributor account alongside
-  // the roster entry (new person, or an existing roster person with no
-  // account yet). Ignored/hidden once the person already has a login.
-  username: string;
-  pin: string;
-  emiratesId: string;
-  campCode: string;
 };
 const emptyForm = (cateringCompanyId = ""): FormState => ({
-  cateringCompanyId, name: "", phone: "", email: "", status: "Active", notes: "",
-  username: "", pin: "", emiratesId: "", campCode: "",
+  cateringCompanyId, name: "", phone: "", email: "", emiratesId: "", status: "Active", notes: "",
 });
-
-const today = () => new Date().toISOString().slice(0, 10);
-const addDays = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-};
 
 function DistributorEmployeesPage() {
   const { data: cateringCompanies = [] } = useCateringCompanies();
-  const { data: camps = [] } = useCamps();
   const [cateringFilter, setCateringFilter] = useState<string>("all");
   const { data: list = [] } = useDistributorEmployees(cateringFilter === "all" ? undefined : cateringFilter);
   const upsert = useUpsertDistributorEmployee();
   const del = useDeleteDistributorEmployee();
-  const createMgr = useCreateManager();
   const { can } = useSession();
   const canEdit = can("distributorEmployees", "edit");
   const canDelete = can("distributorEmployees", "delete");
@@ -67,9 +48,6 @@ function DistributorEmployeesPage() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DistributorEmployee | null>(null);
-  // Tracks the roster entry once step 1 of a create succeeds, so a retry after
-  // a login-creation failure (e.g. duplicate username) doesn't re-create it.
-  const [savedRosterId, setSavedRosterId] = useState<string | null>(null);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -81,27 +59,18 @@ function DistributorEmployeesPage() {
     );
   }, [list, query]);
 
-  const editingPerson = editingId ? list.find((p) => p.id === editingId) ?? null : null;
-  // Login fields (username/PIN/camp) are offered for a brand-new person, or an
-  // existing roster person who doesn't have a Distributor login yet. Once a
-  // login exists, credentials are managed from the Distributors page instead.
-  const showLoginFields = !editingPerson || !editingPerson.hasAccount;
-
   function openNew() {
     setEditingId(null);
-    setSavedRosterId(null);
     setForm(emptyForm(cateringFilter === "all" ? "" : cateringFilter));
     setError(null);
     setOpen(true);
   }
   function openEdit(p: DistributorEmployee) {
     setEditingId(p.id);
-    setSavedRosterId(null);
     setForm({
       cateringCompanyId: p.cateringCompanyId, name: p.name,
-      phone: p.phone, email: p.email, status: p.status, notes: p.notes,
-      emiratesId: p.emiratesId,
-      username: "", pin: "", campCode: "",
+      phone: p.phone, email: p.email, emiratesId: p.emiratesId,
+      status: p.status, notes: p.notes,
     });
     setError(null);
     setOpen(true);
@@ -117,54 +86,14 @@ function DistributorEmployeesPage() {
       setError("Name is required.");
       return;
     }
-    const creatingLogin = showLoginFields && (!editingId || form.username.trim());
-    if (creatingLogin) {
-      if (!form.username.trim()) { setError("Username is required to create the login."); return; }
-      if (!/^\d{4}$/.test(form.pin)) { setError("Mobile PIN must be exactly 4 digits."); return; }
-      if (!form.campCode) { setError("Assigned camp is required to create the login."); return; }
-    }
-
-    const rosterFields = {
-      cateringCompanyId: form.cateringCompanyId, name: form.name,
-      phone: form.phone, email: form.email, emiratesId: form.emiratesId,
-      status: form.status, notes: form.notes,
-    };
-
     try {
-      // Step 1: create/update the roster entry (skip re-creating on retry).
-      let rosterId = editingId ?? savedRosterId;
-      if (!rosterId) {
-        const saved = await upsert.mutateAsync(rosterFields);
-        rosterId = saved.id;
-        setSavedRosterId(saved.id);
-      } else if (editingId) {
-        await upsert.mutateAsync({ id: editingId, ...rosterFields });
+      if (editingId) {
+        await upsert.mutateAsync({ id: editingId, ...form });
+      } else {
+        await upsert.mutateAsync(form);
       }
-
-      // Step 2: create the Distributor login too, if requested.
-      if (creatingLogin && rosterId) {
-        await createMgr.mutateAsync({
-          name: form.name,
-          username: form.username.trim().toLowerCase(),
-          pin: form.pin,
-          email: form.email,
-          phone: form.phone,
-          emiratesId: form.emiratesId,
-          campCodes: [form.campCode],
-          cateringCompanyId: form.cateringCompanyId,
-          distributorEmployeeId: rosterId,
-          role: "Camp Manager",
-          shift: "Full Day",
-          joinDate: today(),
-          expiryDate: addDays(365),
-          status: "Active",
-          permissions: { breakfast: true, lunch: true, dinner: true, reports: true },
-        });
-      }
-
       setOpen(false);
       setEditingId(null);
-      setSavedRosterId(null);
       setForm(emptyForm());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save");
@@ -319,7 +248,9 @@ function DistributorEmployeesPage() {
         )}
       </div>
 
-      {/* Add / edit dialog */}
+      {/* Add / edit dialog — roster fields only. Distributor logins are created
+          from the Distributors page (picking this person auto-fills these
+          same details), never from here. */}
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>
           <div className="w-full max-w-lg rounded-2xl bg-card border border-border shadow-elegant" onClick={(e) => e.stopPropagation()}>
@@ -351,7 +282,7 @@ function DistributorEmployeesPage() {
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs font-medium text-muted-foreground">Name *</label>
-                <input required value={form.name} onChange={(e) => set("name", e.target.value)} className={inputCls} placeholder="e.g. Ravi Kumar" />
+                <input required value={form.name} onChange={(e) => set("name", e.target.value)} className={inputCls} placeholder="e.g. Ravi Kumar" autoComplete="off" />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Phone</label>
@@ -384,64 +315,6 @@ function DistributorEmployeesPage() {
                 <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={2} className={inputCls} />
               </div>
 
-              {showLoginFields ? (
-                <div className="sm:col-span-2 rounded-xl border border-border/60 bg-secondary/20 p-4 space-y-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                    <KeyRound className="size-3.5" />
-                    Distributor Login {!editingId ? "*" : "(optional — create it now, or add it later)"}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Username {!editingId && "*"}</label>
-                      <input
-                        required={!editingId}
-                        value={form.username}
-                        onChange={(e) => set("username", e.target.value.toLowerCase())}
-                        className={`${inputCls} font-mono`}
-                        placeholder="ravi.kumar"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                        <Smartphone className="size-3" /> Mobile PIN {!editingId && "*"}
-                      </label>
-                      <input
-                        required={!editingId}
-                        type="password"
-                        inputMode="numeric"
-                        autoComplete="new-password"
-                        value={form.pin}
-                        onChange={(e) => set("pin", e.target.value.replace(/\D/g, ""))}
-                        maxLength={4}
-                        className={`${inputCls} font-mono tracking-widest`}
-                        placeholder="4 digits"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                        <Building2 className="size-3" /> Assigned Camp {!editingId && "*"}
-                      </label>
-                      <select
-                        required={!editingId}
-                        value={form.campCode}
-                        onChange={(e) => set("campCode", e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">— Select camp —</option>
-                        {camps.map((c) => (
-                          <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="sm:col-span-2 rounded-lg bg-primary/5 text-primary text-xs px-3 py-2 flex items-center gap-1.5">
-                  <BadgeCheck className="size-3.5 shrink-0" />
-                  This person already has a Distributor login. Manage their username/PIN/camp from the Distributors page.
-                </div>
-              )}
-
               {error && (
                 <div className="sm:col-span-2 rounded-lg bg-destructive/10 text-destructive text-sm px-3 py-2">{error}</div>
               )}
@@ -450,14 +323,10 @@ function DistributorEmployeesPage() {
                 <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 rounded-lg text-sm hover:bg-secondary">Cancel</button>
                 <button
                   type="submit"
-                  disabled={upsert.isPending || createMgr.isPending}
+                  disabled={upsert.isPending}
                   className="inline-flex items-center gap-2 rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow disabled:opacity-60"
                 >
-                  {upsert.isPending || createMgr.isPending
-                    ? "Saving…"
-                    : editingId
-                      ? "Save Changes"
-                      : "Add Person + Create Login"}
+                  {upsert.isPending ? "Saving…" : editingId ? "Save Changes" : "Add Person"}
                 </button>
               </div>
             </form>

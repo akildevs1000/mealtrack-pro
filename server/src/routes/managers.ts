@@ -64,14 +64,20 @@ router.post("/", requirePerm("managers", "edit"), async (req, res, next) => {
     // one so the account record is valid; it simply isn't shared with anyone.
     const passwordHash = await hashPassword(body.password ?? randomBytes(18).toString("base64url"));
 
-    // Reject if the username is already taken in either table — keeps the
-    // two-row link (CampManager + User) consistent and avoids surprises.
-    const [existingMgr, existingUser] = await Promise.all([
+    // Reject if the username or email is already taken in either table — both
+    // are @unique on CampManager AND User, so an unhandled clash here would
+    // otherwise surface as a raw Prisma P2002 (a generic 500) instead of a
+    // clean, actionable message.
+    const [existingMgr, existingUser, emailMgr, emailUser] = await Promise.all([
       prisma.campManager.findUnique({ where: { username: body.username }, select: { id: true } }),
       prisma.user.findUnique({ where: { username: body.username }, select: { id: true } }),
+      prisma.campManager.findUnique({ where: { email: body.email }, select: { id: true } }),
+      prisma.user.findUnique({ where: { email: body.email }, select: { id: true } }),
     ]);
     if (existingMgr) return res.status(409).json({ error: "Username already used by another camp manager" });
     if (existingUser) return res.status(409).json({ error: "Username already used by an app user" });
+    if (emailMgr) return res.status(409).json({ error: "Email already used by another distributor" });
+    if (emailUser) return res.status(409).json({ error: "Email already used by an app user" });
 
     const pinHash = body.pin && body.pin.length > 0 ? await hashPin(body.pin) : null;
     const result = await prisma.$transaction(async (tx) => {
@@ -128,6 +134,17 @@ router.put("/:id", requirePerm("managers", "edit"), async (req, res, next) => {
     const body = updateSchema.parse(req.body);
     const existing = await prisma.campManager.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Camp manager not found" });
+
+    // Same email-clash guard as create — only matters when the email is
+    // actually changing, since it's otherwise a no-op update.
+    if (body.email !== undefined && body.email !== existing.email) {
+      const [emailMgr, emailUser] = await Promise.all([
+        prisma.campManager.findUnique({ where: { email: body.email }, select: { id: true } }),
+        prisma.user.findUnique({ where: { email: body.email }, select: { id: true } }),
+      ]);
+      if (emailMgr) return res.status(409).json({ error: "Email already used by another distributor" });
+      if (emailUser) return res.status(409).json({ error: "Email already used by an app user" });
+    }
 
     const { pin, campCodes, ...rest } = body as any;
     const data: any = { ...rest };

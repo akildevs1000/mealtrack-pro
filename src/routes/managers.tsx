@@ -649,9 +649,9 @@ function ManagerDialog({
             }
           >
             <input
-              type="password"
+              type="text"
               inputMode="numeric"
-              autoComplete="new-password"
+              autoComplete="off"
               value={form.pin}
               onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "") })}
               maxLength={4}
@@ -945,6 +945,7 @@ function DistributorEmployeeInput({
         onChange={(e) => onChange(e.target.value, null)}
         className={inputCls}
         placeholder="Ahmed Al Mansouri"
+        autoComplete="off"
       />
     );
   }
