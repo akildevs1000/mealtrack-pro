@@ -207,12 +207,31 @@ router.get("/stats", requireScannerAuth, async (req, res, next) => {
       where: { campCode, status: "Active", mealsEligibility: "Y" },
     });
 
-    // Served today = distinct labourIds with an Eligible scan today in this camp.
-    const eligible = await prisma.scan.findMany({
+    // Meals served today, broken down by type. Each Eligible scan is one meal
+    // served — someone eating both breakfast and lunch counts in both
+    // buckets — so breakfast + lunch + dinner is the true total meal count.
+    // (Previously "served_today" counted distinct people instead of meals,
+    // which undercounted the total on any day someone ate more than once.)
+    const eligibleByMeal = await prisma.scan.groupBy({
+      by: ["meal"],
+      where: { campCode, status: "Eligible", time: { gte: dayStart } },
+      _count: { _all: true },
+    });
+    const mealCount = (name: string) =>
+      eligibleByMeal.find((g) => g.meal === name)?._count._all ?? 0;
+    const breakfast = mealCount("Breakfast");
+    const lunch = mealCount("Lunch");
+    const dinner = mealCount("Dinner");
+    const served_today = breakfast + lunch + dinner;
+
+    // Pending still needs a headcount, not a meal count: how many eligible
+    // employees haven't had any meal at all yet today.
+    const eligiblePeople = await prisma.scan.findMany({
       where: { campCode, status: "Eligible", time: { gte: dayStart } },
       select: { labourId: true },
     });
-    const served_today = new Set(eligible.map((s) => s.labourId)).size;
+    const servedPeopleToday = new Set(eligiblePeople.map((s) => s.labourId)).size;
+    const pending = Math.max(0, employees - servedPeopleToday);
 
     // "Denied" = anything that isn't a successful serve. Matches the app's NO
     // badge, which marks every non-Eligible scan (NotEligible + AlreadyServed +
@@ -221,9 +240,7 @@ router.get("/stats", requireScannerAuth, async (req, res, next) => {
       where: { campCode, status: { not: "Eligible" }, time: { gte: dayStart } },
     });
 
-    const pending = Math.max(0, employees - served_today);
-
-    res.json({ employees, served_today, pending, denied_today });
+    res.json({ employees, served_today, breakfast, lunch, dinner, pending, denied_today });
   } catch (e) { next(e); }
 });
 

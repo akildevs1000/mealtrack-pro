@@ -248,6 +248,14 @@ export default function HomeScreen({ site, brand, onScan, onChangeSite, onLock, 
           <StatCard styles={styles} tint={colors.danger} label="Denied" value={stats?.denied_today} />
         </View>
 
+        {/* "Served" above is breakfast + lunch + dinner added together — this
+            row breaks that total down by meal, per-type. */}
+        <View style={styles.statsRow}>
+          <StatCard styles={styles} tint={colors.warning} label="Breakfast" value={stats?.breakfast} />
+          <StatCard styles={styles} tint={colors.success} label="Lunch" value={stats?.lunch} />
+          <StatCard styles={styles} tint={colors.primary} label="Dinner" value={stats?.dinner} />
+        </View>
+
         <ProgressBar styles={styles} colors={colors} stats={stats} />
 
         <View style={styles.sectionHead}>
