@@ -147,6 +147,7 @@ router.post("/login", async (req, res, next) => {
       campCode: sessionCampCode,
       siteType: site.siteType,
       companyCode: site.companyCode,
+      deviceMac: deviceMac ?? null,
     });
 
     // Synthetic device row so the client keeps its expected shape (no Devices

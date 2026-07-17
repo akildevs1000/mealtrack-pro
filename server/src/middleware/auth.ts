@@ -21,6 +21,8 @@ declare global {
         campCode: string;
         siteType: "camp" | "project";
         companyCode: string | null;
+        // The physical device's MAC, if the token carries one (set at login).
+        deviceMac: string | null;
       };
     }
   }
@@ -141,6 +143,7 @@ export async function requireScannerAuth(req: Request, res: Response, next: Next
     // Site + company come from the TOKEN (set at login from the device's
     // binding), NOT the manager's primary camp — so a supplier scanning at a
     // device anchored elsewhere is attributed to that device's site.
+    const deviceMac = payload.deviceMac ?? null;
     req.scanner = {
       managerId: manager.id,
       username: manager.username,
@@ -148,7 +151,18 @@ export async function requireScannerAuth(req: Request, res: Response, next: Next
       campCode: payload.campCode,
       siteType: payload.siteType ?? "camp",
       companyCode: payload.companyCode ?? null,
+      deviceMac,
     };
+    // Heartbeat: every authenticated scanner request touches this device's
+    // "last seen" time, if it's one that's actually registered (unregistered
+    // scanners are allowed to work — see /scanner/login — they just never
+    // light up on the Camps page's online count). Fire-and-forget so a slow
+    // or failed write here never blocks/breaks the real request.
+    if (deviceMac) {
+      prisma.device
+        .updateMany({ where: { macAddress: deviceMac }, data: { lastSync: new Date() } })
+        .catch(() => {});
+    }
     next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });

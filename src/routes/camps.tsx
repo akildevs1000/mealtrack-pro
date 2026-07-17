@@ -11,9 +11,9 @@ export const Route = createFileRoute("/camps")({
 });
 
 type View = "card" | "list";
-type FormState = Omit<Camp, "id">;
+type FormState = Omit<Camp, "id" | "online" | "devicesOnline" | "devicesTotal">;
 
-const emptyForm: FormState = { code: "", name: "", site: "", companyCode: null, employees: 0, online: true, schedule: defaultSchedule };
+const emptyForm: FormState = { code: "", name: "", site: "", companyCode: null, employees: 0, schedule: defaultSchedule };
 
 function CampsPage() {
   const scope = useCampScope();
@@ -121,7 +121,7 @@ function CampsPage() {
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <Stat label="Code" value={c.code} />
                 <Stat label="Labour" value={c.employees.toLocaleString()} icon={<Users className="size-3" />} />
-                <Stat label="Scanners" value={String(2 + (c.id.charCodeAt(1) % 3))} />
+                <Stat label="Scanners" value={`${c.devicesOnline}/${c.devicesTotal}`} />
               </div>
               <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
                 <MealTime icon={<Sunrise className="size-3" />} label="Breakfast" win={c.schedule.breakfast} />
@@ -249,7 +249,7 @@ function CampDialog({ camp, existingCodes, onClose, onSave }: {
 }) {
   const { data: companies = [] } = useCompanies();
   const [form, setForm] = useState<FormState>(camp
-    ? { code: camp.code, name: camp.name, site: camp.site, companyCode: camp.companyCode, employees: camp.employees, online: camp.online, schedule: camp.schedule ?? defaultSchedule }
+    ? { code: camp.code, name: camp.name, site: camp.site, companyCode: camp.companyCode, employees: camp.employees, schedule: camp.schedule ?? defaultSchedule }
     : emptyForm);
   const [error, setError] = useState<string | null>(null);
 
@@ -287,15 +287,11 @@ function CampDialog({ camp, existingCodes, onClose, onSave }: {
           <button onClick={onClose} className="size-8 grid place-items-center rounded-lg hover:bg-secondary"><X className="size-4" /></button>
         </div>
         <form onSubmit={submit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Camp Code *">
-            <input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="AD-07" className={`${inputCls} font-mono`} />
-          </Field>
-          <Field label="Status">
-            <select value={form.online ? "online" : "offline"} onChange={(e) => setForm({ ...form, online: e.target.value === "online" })} className={inputCls}>
-              <option value="online">Online</option>
-              <option value="offline">Offline</option>
-            </select>
-          </Field>
+          <div className="md:col-span-2">
+            <Field label="Camp Code *">
+              <input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="AD-07" className={`${inputCls} font-mono`} />
+            </Field>
+          </div>
           <div className="md:col-span-2">
             <Field label="Company">
               <select

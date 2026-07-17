@@ -26,7 +26,11 @@ export type Camp = {
   site: string;
   companyCode: string | null;
   employees: number;
+  // Derived server-side from registered devices' heartbeat (Device.lastSync)
+  // — not stored/editable. online === devicesOnline > 0.
   online: boolean;
+  devicesOnline: number;
+  devicesTotal: number;
   schedule: {
     breakfast: { start: string; end: string };
     lunch: { start: string; end: string };
@@ -186,7 +190,9 @@ export function useCamps() {
 export function useUpsertCamp() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { existingCode?: string } & Omit<Camp, "id">) => {
+    mutationFn: async (
+      input: { existingCode?: string } & Omit<Camp, "id" | "online" | "devicesOnline" | "devicesTotal">,
+    ) => {
       const { existingCode, ...body } = input;
       return existingCode
         ? api<Camp>(`/camps/${existingCode}`, { method: "PUT", body: JSON.stringify(body) })

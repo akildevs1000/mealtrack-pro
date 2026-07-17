@@ -23,6 +23,10 @@ export type ScannerJwtPayload = {
   campCode: string;
   siteType?: "camp" | "project";
   companyCode?: string | null;
+  // The physical scanner's MAC, if it sent one at login — lets every later
+  // authenticated request on this token touch that Device's heartbeat.
+  // Older tokens (issued before this field existed) simply lack it.
+  deviceMac?: string | null;
   kind: "scanner";
 };
 

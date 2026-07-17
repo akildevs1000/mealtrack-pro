@@ -6,6 +6,30 @@ import { campScopeOf, requireAuth, requirePerm } from "../middleware/auth.js";
 const router = Router();
 router.use(requireAuth);
 
+// Real online/scanner status: derived from Device.lastSync, which every
+// authenticated scanner request now touches for its device (see
+// requireScannerAuth) — not a manually-set flag. A camp only counts as
+// online if at least one of its registered devices has actually been heard
+// from within this window; camps with zero registered devices show 0/0.
+const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+
+async function deviceStatsByCamp(campCodes: string[]): Promise<Map<string, { total: number; online: number }>> {
+  const devices = await prisma.device.findMany({
+    where: { campCode: { in: campCodes } },
+    select: { campCode: true, lastSync: true },
+  });
+  const cutoff = Date.now() - ONLINE_WINDOW_MS;
+  const stats = new Map<string, { total: number; online: number }>();
+  for (const d of devices) {
+    if (!d.campCode) continue;
+    const s = stats.get(d.campCode) ?? { total: 0, online: 0 };
+    s.total += 1;
+    if (d.lastSync && d.lastSync.getTime() >= cutoff) s.online += 1;
+    stats.set(d.campCode, s);
+  }
+  return stats;
+}
+
 router.get("/", async (req, res, next) => {
   try {
     const scope = campScopeOf(req);
@@ -13,7 +37,8 @@ router.get("/", async (req, res, next) => {
       where: scope ? { code: { in: scope } } : undefined,
       orderBy: { code: "asc" },
     });
-    res.json(camps.map(toApi));
+    const stats = await deviceStatsByCamp(camps.map((c) => c.code));
+    res.json(camps.map((c) => toApi(c, stats.get(c.code))));
   } catch (e) { next(e); }
 });
 
@@ -21,7 +46,8 @@ router.get("/:code", async (req, res, next) => {
   try {
     const camp = await prisma.camp.findUnique({ where: { code: req.params.code } });
     if (!camp) return res.status(404).json({ error: "Camp not found" });
-    res.json(toApi(camp));
+    const stats = await deviceStatsByCamp([camp.code]);
+    res.json(toApi(camp, stats.get(camp.code)));
   } catch (e) { next(e); }
 });
 
@@ -45,7 +71,7 @@ router.post("/", requirePerm("camps", "edit"), async (req, res, next) => {
   try {
     const body = upsertSchema.parse(req.body);
     const camp = await prisma.camp.create({ data: fromApi(body) });
-    res.status(201).json(toApi(camp));
+    res.status(201).json(toApi(camp)); // brand new — never has devices yet
   } catch (e) { next(e); }
 });
 
@@ -56,7 +82,8 @@ router.put("/:code", requirePerm("camps", "edit"), async (req, res, next) => {
       where: { code: req.params.code },
       data: fromApi(body),
     });
-    res.json(toApi(camp));
+    const stats = await deviceStatsByCamp([camp.code]);
+    res.json(toApi(camp, stats.get(camp.code)));
   } catch (e) { next(e); }
 });
 
@@ -67,7 +94,9 @@ router.delete("/:code", requirePerm("camps", "delete"), async (req, res, next) =
   } catch (e) { next(e); }
 });
 
-function toApi(c: any) {
+function toApi(c: any, deviceStats?: { total: number; online: number }) {
+  const devicesTotal = deviceStats?.total ?? 0;
+  const devicesOnline = deviceStats?.online ?? 0;
   return {
     id: c.id,
     code: c.code,
@@ -75,7 +104,9 @@ function toApi(c: any) {
     site: c.site,
     companyCode: c.companyCode ?? null,
     employees: c.employees,
-    online: c.online,
+    online: devicesOnline > 0,
+    devicesOnline,
+    devicesTotal,
     schedule: {
       breakfast: { start: c.breakfastStart, end: c.breakfastEnd },
       lunch: { start: c.lunchStart, end: c.lunchEnd },
