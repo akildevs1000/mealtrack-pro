@@ -508,7 +508,8 @@ router.get("/by-supplier", async (req, res, next) => {
       byDate.set(day, m);
     }
     // Zero-fill every date in the range so the full selected range is shown.
-    const rows = eachDayIso(from, to).map((date) => {
+    // Reversed so the latest date is first (newest-to-oldest).
+    const rows = eachDayIso(from, to).reverse().map((date) => {
       const m = byDate.get(date) ?? new Map();
       const perSupplier: Record<string, { breakfast: number; lunch: number; dinner: number }> = {};
       const totals = emptyMeals();
@@ -542,7 +543,21 @@ router.get("/by-location", async (req, res, next) => {
     const nameByCode = new Map(sites.map((s) => [s.code, s.name]));
     const supplierId = req.query.supplierId as string | undefined;
     const cateringCompanyId = req.query.cateringCompanyId as string | undefined;
-    const scanWhere: any = { time: { gte: from, lte: to }, status: "Eligible", ...scanCampWhere(codes) };
+    // Eligibility filter: "eligible" (default, unchanged behavior) shows served
+    // meals only; "notEligible" shows denied/duplicate/expired/wrong-camp scan
+    // attempts instead; "all" shows every scan regardless of status.
+    const eligibility = (req.query.eligibility as string) || "eligible";
+    const statusWhere =
+      eligibility === "notEligible"
+        ? { not: "Eligible" as const }
+        : eligibility === "all"
+          ? undefined
+          : "Eligible";
+    const scanWhere: any = {
+      time: { gte: from, lte: to },
+      ...(statusWhere !== undefined ? { status: statusWhere } : {}),
+      ...scanCampWhere(codes),
+    };
     if (supplierId && supplierId !== "all") {
       scanWhere.managerId = supplierId;
     } else if (cateringCompanyId && cateringCompanyId !== "all") {
@@ -568,7 +583,8 @@ router.get("/by-location", async (req, res, next) => {
       byKey.set(key, cell);
     }
     const locations = [...new Set(scans.map((s) => s.campCode))].sort();
-    const days = eachDayIso(from, to);
+    // Reversed so the latest date is first (newest-to-oldest).
+    const days = eachDayIso(from, to).reverse();
     const rows = days.flatMap((day) =>
       locations.map((loc) => ({
         date: day,
@@ -641,10 +657,13 @@ router.get("/request-comparison", async (req, res, next) => {
       return d.toISOString().slice(0, 10);
     };
     const mealOrder: Record<string, number> = { Breakfast: 0, Lunch: 1, Dinner: 2 };
+    // Sorted so the latest date is first (newest-to-oldest); the day-over-day
+    // variance lookup above is a Map lookup keyed by date, so it's unaffected
+    // by this row order.
     const rows = [...meta.entries()]
       .sort(
         (a, b) =>
-          a[1].date.localeCompare(b[1].date) ||
+          b[1].date.localeCompare(a[1].date) ||
           a[1].campCode.localeCompare(b[1].campCode) ||
           (mealOrder[a[1].meal] ?? 9) - (mealOrder[b[1].meal] ?? 9),
       )

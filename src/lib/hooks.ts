@@ -833,7 +833,7 @@ export function useReportBySupplier(p: { from: string; to: string; companyCode?:
 }
 
 export type ByLocationRow = { date: string; location: string; locationName: string } & MealTriple;
-export function useReportByLocation(p: { from: string; to: string; companyCode?: string; campCode?: string; supplierId?: string; cateringCompanyId?: string }) {
+export function useReportByLocation(p: { from: string; to: string; companyCode?: string; campCode?: string; supplierId?: string; cateringCompanyId?: string; eligibility?: "eligible" | "notEligible" | "all" }) {
   return useQuery({
     queryKey: ["reports", "by-location", p],
     queryFn: () => api<{ rows: ByLocationRow[] }>(`/reports/by-location${reportQs(p)}`),

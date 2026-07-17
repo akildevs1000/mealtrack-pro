@@ -57,6 +57,7 @@ function ReportsPage() {
   const [camp, setCamp] = useState("all");
   const [supplier, setSupplier] = useState("all");
   const [catering, setCatering] = useState("all");
+  const [eligibility, setEligibility] = useState<"eligible" | "notEligible" | "all">("eligible");
 
   const companyParam = company === "all" ? undefined : company;
   const campParam = camp === "all" ? undefined : camp;
@@ -107,7 +108,7 @@ function ReportsPage() {
   });
   const byLocation = useReportByLocation({
     from, to, companyCode: companyParam, campCode: campParam,
-    supplierId: supplierParam, cateringCompanyId: cateringParam,
+    supplierId: supplierParam, cateringCompanyId: cateringParam, eligibility,
   });
   const comparison = useReportRequestComparison({ from, to, companyCode: companyParam, supplierId: supplierParam });
   const duplicate = useReportDuplicateEligibility({ from, to, companyCode: companyParam, campCode: campParam });
@@ -218,7 +219,11 @@ function ReportsPage() {
     const ws = XLSX.utils.aoa_to_sheet(exportMatrix);
     const wb = XLSX.utils.book_new();
     const meta = TABS.find((t) => t.id === tab)!;
-    XLSX.utils.book_append_sheet(wb, ws, meta.title.slice(0, 28));
+    // Excel sheet names can't contain : \ / ? * [ ] — "Duplicate / Eligibility"
+    // has a "/", which made book_append_sheet throw and silently break this
+    // export (the exception fired before XLSX.writeFile ever ran).
+    const sheetName = meta.title.replace(/[:\\/?*[\]]/g, "-").slice(0, 28);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
     const range = tab === "daily" ? date : `${from}_to_${to}`;
     XLSX.writeFile(wb, `${meta.title.replace(/\s+/g, "_")}_${range}.xlsx`);
   }
@@ -585,6 +590,15 @@ function ReportsPage() {
               {cateringCompanies.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
+            </select>
+          </Labeled>
+        )}
+        {tab === "location" && (
+          <Labeled label="Eligibility">
+            <select value={eligibility} onChange={(e) => setEligibility(e.target.value as typeof eligibility)} className={inputCls}>
+              <option value="eligible">Eligible (served)</option>
+              <option value="notEligible">Non-eligible (denied)</option>
+              <option value="all">All scans</option>
             </select>
           </Labeled>
         )}
