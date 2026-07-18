@@ -6,7 +6,7 @@ import {
   IdCard, Coffee, UtensilsCrossed, Moon, Check, X,
   Upload, AlertTriangle, Loader2, Printer, User as UserIcon,
   LayoutGrid, List, Eye, Pencil, Save, ImagePlus, Trash2,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Lock,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { QRCodeSVG } from "qrcode.react";
@@ -23,6 +23,11 @@ export const Route = createFileRoute("/employees")({
   component: EmployeesPage,
   head: () => ({ meta: [{ title: "Employees — MyMeals" }] }),
 });
+
+// Shared master password gate in front of editing an employee — a UI
+// convenience lock, not a security boundary (server-side `canImport` already
+// enforces the real permission check).
+const EDIT_MASTER_PASSWORD = "Admin@332211";
 
 function EmployeesPage() {
   const { can } = useSession();
@@ -75,6 +80,7 @@ function EmployeesPage() {
   const [view, setView] = useState<"card" | "list">("list");
   const [selected, setSelected] = useState<CmsEmployee | null>(null);
   const [editing, setEditing] = useState<CmsEmployee | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<CmsEmployee | null>(null);
 
   // Bulk card printing — a set of picked employees (keyed by laborId, full row
   // data kept so the card can render). Kept SEPARATE from `selected` (the
@@ -401,7 +407,7 @@ function EmployeesPage() {
                             </button>
                             {canImport && (
                               <button
-                                onClick={(ev) => { ev.stopPropagation(); setEditing(e); }}
+                                onClick={(ev) => { ev.stopPropagation(); setPendingEdit(e); }}
                                 className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-secondary/60 hover:bg-primary/10 hover:text-primary hover:border-primary/40 transition"
                                 title="Edit employee"
                                 aria-label="Edit employee"
@@ -453,8 +459,15 @@ function EmployeesPage() {
         <ProfileDialog
           emp={selected}
           canEdit={canImport}
-          onEdit={() => { setEditing(selected); setSelected(null); }}
+          onEdit={() => { setPendingEdit(selected); setSelected(null); }}
           onClose={() => setSelected(null)}
+        />
+      )}
+
+      {pendingEdit && (
+        <MasterPasswordDialog
+          onConfirm={() => { setEditing(pendingEdit); setPendingEdit(null); }}
+          onCancel={() => setPendingEdit(null)}
         />
       )}
 
@@ -525,6 +538,75 @@ function BulkPrintDialog({ employees, onClose }: { employees: CmsEmployee[]; onC
       </div>
     </>,
     document.body,
+  );
+}
+
+function MasterPasswordDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password === EDIT_MASTER_PASSWORD) {
+      onConfirm();
+    } else {
+      setError("Incorrect password.");
+      setPassword("");
+      inputRef.current?.focus();
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur p-4" onClick={onCancel}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-elegant overflow-hidden"
+      >
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-lg gradient-primary grid place-items-center text-primary-foreground">
+              <Lock className="size-4" />
+            </div>
+            <div>
+              <div className="font-display font-semibold">Master password required</div>
+              <div className="text-xs text-muted-foreground">Enter the master password to edit this employee</div>
+            </div>
+          </div>
+          <button type="button" onClick={onCancel} className="size-8 grid place-items-center rounded-md hover:bg-secondary text-muted-foreground">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-3">
+          <input
+            ref={inputRef}
+            type="password"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); setError(null); }}
+            placeholder="Master password"
+            className="w-full px-3 py-2 rounded-lg bg-secondary text-sm border border-transparent focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
+          />
+          {error && (
+            <div className="flex items-center gap-1.5 text-xs text-destructive">
+              <AlertTriangle className="size-3.5" /> {error}
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-secondary">
+            Cancel
+          </button>
+          <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow hover:opacity-95">
+            <Lock className="size-3.5" /> Unlock
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
