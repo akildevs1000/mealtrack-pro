@@ -11,7 +11,10 @@ router.use(requireAuth);
 // requireScannerAuth) — not a manually-set flag. A camp only counts as
 // online if at least one of its registered devices has actually been heard
 // from within this window; camps with zero registered devices show 0/0.
-const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+// The mobile app polls /scanner/stats every 15s while logged in, so 45s
+// (3 missed polls) flips a genuinely-down device to "Offline" quickly
+// without flapping on a single dropped request.
+const ONLINE_WINDOW_MS = 45 * 1000;
 
 async function deviceStatsByCamp(campCodes: string[]): Promise<Map<string, { total: number; online: number }>> {
   const devices = await prisma.device.findMany({

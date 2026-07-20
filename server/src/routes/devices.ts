@@ -7,6 +7,9 @@ import { campScopeOf, requireAuth, requirePerm } from "../middleware/auth.js";
 const router = Router();
 router.use(requireAuth);
 
+// Licensed/hardware cap on total registered scanners across the whole system.
+const MAX_DEVICES = 35;
+
 router.get("/", async (req, res, next) => {
   try {
     const scope = campScopeOf(req);
@@ -100,6 +103,12 @@ function writeError(e: unknown, res: Response): boolean {
 
 router.post("/", requirePerm("devices", "edit"), async (req, res, next) => {
   try {
+    const count = await prisma.device.count();
+    if (count >= MAX_DEVICES) {
+      return res.status(409).json({
+        error: `Device limit reached (${MAX_DEVICES} max). Remove an unused device before registering a new one.`,
+      });
+    }
     const body = upsertSchema.parse(req.body);
     const d = await prisma.device.create({
       data: { ...buildDeviceData(body), lastSync: new Date() },

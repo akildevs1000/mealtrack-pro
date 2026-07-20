@@ -184,7 +184,13 @@ export type Overview = {
 
 // Camps
 export function useCamps() {
-  return useQuery({ queryKey: ["camps"], queryFn: () => api<Camp[]>("/camps") });
+  // Poll so a device's online/offline flip (see the server's heartbeat window)
+  // shows up without the admin having to manually refresh the Camps page.
+  return useQuery({
+    queryKey: ["camps"],
+    queryFn: () => api<Camp[]>("/camps"),
+    refetchInterval: 15000,
+  });
 }
 
 export function useUpsertCamp() {

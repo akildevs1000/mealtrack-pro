@@ -73,17 +73,18 @@ router.get("/managers", async (_req, res, next) => {
 });
 
 // ---------- LOGIN ----------
-// Body: { managerId, pin, deviceMac? }   (deviceMac is OPTIONAL and IGNORED)
+// Body: { managerId, pin, deviceMac }
 // Returns: { token, manager, device, camp }
 //
-// The device MAC is no longer an enrolment gate — the scanner does NOT need to
-// be registered in the Devices table. The session's site (meal windows + parent
-// company) comes from the MANAGER's assigned camp. deviceMac is accepted for
-// backward-compat and echoed back, but never validated.
+// deviceMac IS an enrolment gate: the scanner must be a Device row an admin
+// registered for the manager's own camp/project — otherwise its heartbeat
+// would land nowhere and the web app could never show it "Online". The
+// session's site (meal windows + parent company) still comes from the
+// MANAGER's assigned camp, not the device.
 const loginSchema = z.object({
   managerId: z.string().min(1),
   pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
-  deviceMac: z.string().optional(),
+  deviceMac: z.string().min(1, "This scanner isn't bound to a device yet."),
 });
 
 router.post("/login", async (req, res, next) => {
@@ -111,7 +112,7 @@ router.post("/login", async (req, res, next) => {
     }
 
     // 2) Site = the manager's assigned camp (primary campCode, else first of the
-    //    supplier's camp set). The device MAC is ignored entirely.
+    //    supplier's camp set).
     const siteCode = manager.campCode ?? manager.camps[0]?.code ?? null;
     const site = await resolveSite(siteCode);
     if (!site) {
@@ -119,6 +120,28 @@ router.post("/login", async (req, res, next) => {
         error: "No site for this session",
         reason: "manager_no_site",
         message: "This manager isn't assigned to a camp or project. Ask an admin to set it.",
+      });
+    }
+
+    // 3) The scanner itself must be a registered Device for THIS site — this is
+    //    what lets its heartbeat (see requireScannerAuth) actually reach a row
+    //    the Camps page counts. Reject unregistered / wrong-site scanners
+    //    rather than silently letting them log in with no visible online status.
+    const registeredDevice = await prisma.device.findFirst({
+      where: { macAddress: { equals: deviceMac, mode: "insensitive" } },
+    });
+    if (!registeredDevice) {
+      return res.status(403).json({
+        error: "Device not registered",
+        reason: "device_not_registered",
+        message: "This device isn't registered. Ask an admin to register it in the web app first.",
+      });
+    }
+    if (registeredDevice.campCode !== site.code && registeredDevice.projectCode !== site.code) {
+      return res.status(403).json({
+        error: "Device registered to a different site",
+        reason: "device_not_registered",
+        message: `This device is registered to a different camp/project, not ${site.name}. Ask an admin to fix the device's assigned site.`,
       });
     }
 
@@ -147,19 +170,17 @@ router.post("/login", async (req, res, next) => {
       campCode: sessionCampCode,
       siteType: site.siteType,
       companyCode: site.companyCode,
-      deviceMac: deviceMac ?? null,
+      deviceMac: registeredDevice.macAddress,
     });
 
-    // Synthetic device row so the client keeps its expected shape (no Devices
-    // table row is required anymore).
     const device = {
-      id: null,
-      name: "Scanner",
-      campCode: site.siteType === "camp" ? site.code : null,
-      projectCode: site.siteType === "project" ? site.code : null,
-      model: null,
-      serial: null,
-      macAddress: deviceMac ?? null,
+      id: registeredDevice.id,
+      name: registeredDevice.name,
+      campCode: registeredDevice.campCode,
+      projectCode: registeredDevice.projectCode,
+      model: registeredDevice.model,
+      serial: registeredDevice.serial,
+      macAddress: registeredDevice.macAddress,
     };
 
     res.json({
