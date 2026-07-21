@@ -452,6 +452,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
       where: { employeeId_date: { employeeId: employee.id, date: dayStart } },
     });
     const tag = meal === "Breakfast" ? "breakfastTaken" : meal === "Lunch" ? "lunchTaken" : "dinnerTaken";
+    const campTag = meal === "Breakfast" ? "breakfastCampCode" : meal === "Lunch" ? "lunchCampCode" : "dinnerCampCode";
     if (record && (record as any)[tag]) {
       const scan = await prisma.scan.create({
         data: {
@@ -461,11 +462,17 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
           deviceMac,
         },
       });
+      // Report the site the meal was ACTUALLY taken at (not the employee's
+      // home camp) — that's the useful fact when someone tries a second time
+      // at a different camp than where they already ate.
+      const takenAtCode = (record as any)[campTag] as string | null;
+      const takenAtSite = takenAtCode ? await resolveSite(takenAtCode) : null;
       return res.json({
         status: "already_served",
         reason: `already_${meal.toLowerCase()}`,
         employee: toEmployeeApi(employee, req),
         scan: toScanApi(scan),
+        alreadyServedAt: takenAtSite ? { code: takenAtSite.code, name: takenAtSite.name } : null,
       });
     }
 
@@ -473,6 +480,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
     const upsertData: any = {};
     upsertData[tag] = true;
     upsertData[meal === "Breakfast" ? "breakfastTime" : meal === "Lunch" ? "lunchTime" : "dinnerTime"] = timeStr;
+    upsertData[campTag] = campCode;
     await prisma.mealRecord.upsert({
       where: { employeeId_date: { employeeId: employee.id, date: dayStart } },
       create: { employeeId: employee.id, date: dayStart, ...upsertData },

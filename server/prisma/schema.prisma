@@ -231,10 +231,13 @@ model MealRecord {
   date        DateTime    @db.Date
   breakfastTaken Boolean  @default(false)
   breakfastTime  String?  // HH:mm
+  breakfastCampCode String? // site (Camp.code or Project.code) it was actually scanned at
   lunchTaken     Boolean  @default(false)
   lunchTime      String?
+  lunchCampCode  String?
   dinnerTaken    Boolean  @default(false)
   dinnerTime     String?
+  dinnerCampCode String?
 
   @@unique([employeeId, date])
   @@index([date])
