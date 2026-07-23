@@ -404,6 +404,11 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
 
     // Eligibility expiry (effectiveDate) + 15-day grace. Past the grace window
     // the ID is denied as expired even if the Y/N flag still says eligible.
+    // The SAME grace window also covers an InActive status — CMS often marks
+    // someone InActive right at (or before) their effectiveDate, and they
+    // should keep meal access through the full grace period either way, not
+    // lose it the instant status flips while effectiveDate is still current.
+    let withinGrace = false;
     if (employee.effectiveDate) {
       const graceCutoff = dubaiStartOfDay(employee.effectiveDate);
       graceCutoff.setUTCDate(graceCutoff.getUTCDate() + EXPIRY_GRACE_DAYS);
@@ -423,9 +428,14 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
           scan: toScanApi(scan),
         });
       }
+      withinGrace = true;
     }
 
-    if (employee.mealsEligibility !== "Y" || employee.status !== "Active") {
+    // "leave" always denies — a deliberate, separate status, not graced.
+    // InActive is graced above; without an effectiveDate to anchor a grace
+    // window there's nothing to grant grace against, so it denies immediately.
+    const inactiveDenied = employee.status === "InActive" && !withinGrace;
+    if (employee.mealsEligibility !== "Y" || employee.status === "leave" || inactiveDenied) {
       const scan = await prisma.scan.create({
         data: {
           name: employee.name, labourId: employee.laborCode, campCode, meal,
@@ -439,7 +449,7 @@ router.post("/scan", requireScannerAuth, async (req, res, next) => {
         reason:
           employee.status === "leave"
             ? "on_leave"
-            : employee.status !== "Active"
+            : inactiveDenied
               ? "employee_inactive"
               : "meal_ineligible",
         employee: toEmployeeApi(employee, req),
