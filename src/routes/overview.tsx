@@ -71,10 +71,17 @@ function Overview() {
     if (branch !== "all" && !visibleCamps.some((c) => c.code === branch)) setBranch("all");
   }, [visibleCamps, branch]);
 
-  // Backend filters the entire overview payload by the chosen camp + company.
+  // "YYYY-MM-DD" — defaults to today, but the date picker lets the whole
+  // dashboard look back at any single day instead of only ever "live".
+  const todayIso = useMemo(() => new Date().toLocaleDateString("en-CA"), []);
+  const [date, setDate] = useState<string>(todayIso);
+  const isToday = date === todayIso;
+
+  // Backend filters the entire overview payload by the chosen camp + company + date.
   const { data: overview } = useOverview(
     branch === "all" ? null : branch,
     company === "all" ? null : company,
+    date,
   );
   const { data: recentScans = [] } = useScans(20);
 
@@ -97,8 +104,18 @@ function Overview() {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  const dateStr = now.toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" });
   const timeStr = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
+
+  // A "live" concept — only meaningful when looking at today.
+  const activeMealLabel = isToday
+    ? sessionStatus("breakfast") === "In progress"
+      ? "Breakfast"
+      : sessionStatus("lunch") === "In progress"
+        ? "Lunch"
+        : sessionStatus("dinner") === "In progress"
+          ? "Dinner"
+          : null
+    : null;
 
   const completion = Math.round((kpis.servedToday / kpis.estimatedToday) * 100);
   return (
@@ -110,18 +127,32 @@ function Overview() {
             <ChevronRight className="size-3 mx-1 opacity-60" />
             <span className="text-primary">Live Overview</span>
           </nav>
-          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight mt-1.5">Live Distribution Overview</h1>
-          <p className="text-sm text-muted-foreground mt-1">Real-time monitoring across {visibleCamps.length} active regional {visibleCamps.length === 1 ? "camp" : "camps"}.</p>
+          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight mt-1.5">
+            {isToday ? "Live Distribution Overview" : "Distribution Overview"}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isToday ? "Real-time monitoring" : `Snapshot for ${new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" })}`}
+            {" "}across {visibleCamps.length} active regional {visibleCamps.length === 1 ? "camp" : "camps"}.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-card border border-border text-xs">
+          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-card border border-border text-xs cursor-pointer">
             <CalendarDays className="size-3.5 text-muted-foreground" />
-            <span className="font-medium">{dateStr}</span>
-          </div>
-          <div className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-card border border-border text-xs">
-            <Clock className="size-3.5 text-muted-foreground" />
-            <span className="font-mono font-semibold tabular-nums">{timeStr}</span>
-          </div>
+            <input
+              type="date"
+              value={date}
+              max={todayIso}
+              onChange={(e) => setDate(e.target.value || todayIso)}
+              className="bg-transparent font-medium outline-none cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+              aria-label="Filter by date"
+            />
+          </label>
+          {isToday && (
+            <div className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-card border border-border text-xs">
+              <Clock className="size-3.5 text-muted-foreground" />
+              <span className="font-mono font-semibold tabular-nums">{timeStr}</span>
+            </div>
+          )}
           <div className="inline-flex items-center h-9 pl-3 pr-1 rounded-lg bg-card border border-border">
             <Building2 className="size-3.5 text-muted-foreground mr-2" />
             <select
@@ -150,9 +181,11 @@ function Overview() {
               ))}
             </select>
           </div>
-          <div className="h-9 px-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold inline-flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Lunch active
-          </div>
+          {activeMealLabel && (
+            <div className="h-9 px-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold inline-flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> {activeMealLabel} active
+            </div>
+          )}
         </div>
       </div>
 
@@ -160,8 +193,8 @@ function Overview() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 -mt-4">
         <KpiCard label="Total Camps" value={branch === "all" ? visibleCamps.length : 1} icon={Building2} tone="primary" hint={branch === "all" ? "Across all branches" : `Branch ${branch}`} />
         <KpiCard label="Active Employees" value={kpis.activeEmployees.toLocaleString()} icon={Users} delta="+ 124 this week" />
-        <KpiCard label="Meals Served Today" value={kpis.servedToday.toLocaleString()} icon={Utensils} tone="accent" hint={`${completion}% of estimate`} progress={completion} />
-        <KpiCard label="Estimated Today" value={kpis.estimatedToday.toLocaleString()} icon={Target} hint={`${kpis.balance.toLocaleString()} balance`} />
+        <KpiCard label={isToday ? "Meals Served Today" : "Meals Served"} value={kpis.servedToday.toLocaleString()} icon={Utensils} tone="accent" hint={`${completion}% of estimate`} progress={completion} />
+        <KpiCard label={isToday ? "Estimated Today" : "Estimated"} value={kpis.estimatedToday.toLocaleString()} icon={Target} hint={`${kpis.balance.toLocaleString()} balance`} />
         <KpiCard label="Duplicate Attempts" value={kpis.duplicates} icon={AlertTriangle} tone="warm" hint="Auto-blocked" />
         <KpiCard label="Online Devices" value={`${kpis.onlineDevices}/${kpis.totalDevices}`} icon={Smartphone} tone="accent" delta="All synced" />
         <KpiCard label="Peak Throughput" value="312 / min" icon={TrendingUp} hint="12:14 PM today" />
@@ -169,7 +202,11 @@ function Overview() {
       </div>
 
       <div>
-        <SectionHeader title="Meal sessions" subtitle="Today's distribution by service window" right={<span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">All camps · live</span>} />
+        <SectionHeader
+          title="Meal sessions"
+          subtitle={isToday ? "Today's distribution by service window" : "Distribution by service window"}
+          right={<span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{isToday ? "All camps · live" : "All camps"}</span>}
+        />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <SessionCard
             label="Breakfast"
@@ -178,7 +215,7 @@ function Overview() {
             served={sessions.breakfast.served}
             estimated={sessions.breakfast.estimated}
             color="var(--chart-3)"
-            status={sessionStatus("breakfast")}
+            status={isToday ? sessionStatus("breakfast") : "Completed"}
           />
           <SessionCard
             label="Lunch"
@@ -187,8 +224,8 @@ function Overview() {
             served={sessions.lunch.served}
             estimated={sessions.lunch.estimated}
             color="var(--chart-1)"
-            status={sessionStatus("lunch")}
-            active={sessionStatus("lunch") === "In progress"}
+            status={isToday ? sessionStatus("lunch") : "Completed"}
+            active={isToday && sessionStatus("lunch") === "In progress"}
           />
           <SessionCard
             label="Dinner"
@@ -197,8 +234,8 @@ function Overview() {
             served={sessions.dinner.served}
             estimated={sessions.dinner.estimated}
             color="var(--chart-2)"
-            status={sessionStatus("dinner")}
-            active={sessionStatus("dinner") === "In progress"}
+            status={isToday ? sessionStatus("dinner") : "Completed"}
+            active={isToday && sessionStatus("dinner") === "In progress"}
           />
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { campScopeOf, requireAuth } from "../middleware/auth.js";
-import { dubaiDateKey, dubaiDayOfWeek, dubaiHour, dubaiStartOfToday } from "../lib/time.js";
+import { dubaiDateKey, dubaiDayOfWeek, dubaiHour, dubaiStartOfDay, dubaiStartOfToday } from "../lib/time.js";
 import { listReportSites, companySiteCodes } from "../lib/sites.js";
 
 const router = Router();
@@ -36,6 +36,19 @@ router.get("/", async (req, res, next) => {
     }
     const scanFilter = filterCodes ? { campCode: { in: filterCodes } } : {};
 
+    // The dashboard defaults to today, but the date pill can request any
+    // single Dubai calendar day — every "today"-scoped section below (scans,
+    // hourly distribution, meal split, camp comparison) reflects that day
+    // instead. Online device status stays live regardless (heartbeat is
+    // inherently a "now" concept, not historical).
+    const requestedDate =
+      typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+        ? req.query.date
+        : null;
+    const dayStart = requestedDate ? dubaiStartOfDay(requestedDate) : dubaiStartOfToday();
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
     const [camps, devices, todayScans] = await Promise.all([
       listReportSites(filterCodes),
       prisma.device.findMany({
@@ -45,7 +58,7 @@ router.get("/", async (req, res, next) => {
       }),
       prisma.scan.findMany({
         where: {
-          time: { gte: dubaiStartOfToday() },
+          time: { gte: dayStart, lt: dayEnd },
           ...scanFilter,
         },
       }),
@@ -76,9 +89,8 @@ router.get("/", async (req, res, next) => {
         ...v,
       }));
 
-    // Weekly trend (last 7 days, Dubai calendar).
-    const todayKey = dubaiDateKey(new Date());
-    const weekStart = new Date(`${todayKey}T00:00:00.000Z`);
+    // Weekly trend (7 days ending on the selected day, Dubai calendar).
+    const weekStart = new Date(dayStart);
     weekStart.setUTCDate(weekStart.getUTCDate() - 6);
     const weekScans = await prisma.scan.groupBy({
       by: ["time"],
@@ -112,6 +124,7 @@ router.get("/", async (req, res, next) => {
     const perMealEstimate = camps.reduce((sum, c) => sum + c.employees, 0);
 
     res.json({
+      date: dubaiDateKey(dayStart),
       kpis: {
         totalCamps: camps.length,
         activeEmployees: employees,

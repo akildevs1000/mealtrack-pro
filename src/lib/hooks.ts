@@ -161,6 +161,7 @@ export type Scan = {
 };
 
 export type Overview = {
+  date: string;
   kpis: {
     totalCamps: number;
     activeEmployees: number;
@@ -878,13 +879,14 @@ export function useReportDuplicateEligibility(p: { from: string; to: string; com
 
 // Overview / dashboard. Pass a camp code to narrow to one camp and/or a company
 // code to narrow to that parent company's camps (Camp is a sibling of Company).
-export function useOverview(campCode?: string | null, companyCode?: string | null) {
+export function useOverview(campCode?: string | null, companyCode?: string | null, date?: string | null) {
   const params = new URLSearchParams();
   if (campCode) params.set("campCode", campCode);
   if (companyCode) params.set("companyCode", companyCode);
+  if (date) params.set("date", date);
   const qs = params.toString();
   return useQuery({
-    queryKey: ["overview", campCode ?? "all", companyCode ?? "all"],
+    queryKey: ["overview", campCode ?? "all", companyCode ?? "all", date ?? "today"],
     queryFn: () => api<Overview>(`/overview${qs ? `?${qs}` : ""}`),
   });
 }
